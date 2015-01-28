@@ -12,11 +12,11 @@ The Apache™ Hadoop® project develops open-source software for reliable, scala
 
 
 ##What Is Apache [Hive][3].
-*The Apache Hive ™ data warehouse software facilitates querying and managing large datasets residing in distributed storage. Hive provides a mechanism to project structure onto this data and query the data using a SQL-like language called HiveQL. At the same time this language also allows traditional map/reduce programmers to plug in their custom mappers and reducers when it is inconvenient or inefficient to express this logic in HiveQL*. There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [4][site]. 
+*The Apache Hive ™ data warehouse software facilitates querying and managing large datasets residing in distributed storage. Hive provides a mechanism to project structure onto this data and query the data using a SQL-like language called HiveQL. At the same time this language also allows traditional map/reduce programmers to plug in their custom mappers and reducers when it is inconvenient or inefficient to express this logic in HiveQL*. There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [4][site].
 
 
 ##How To Start Hadoop.
-The detail installation instruction of hadoop can be found on this [5][site]. Here are the steps to start and stop the hadoop.
+The detail installation instruction of hadoop can be found on this [site][5]. Here are the steps to start and stop the hadoop.
  
 #### Stop and start Hdfs on Single Node
 ```
@@ -53,7 +53,7 @@ To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed
 
 wget http://www.apache.org/dyn/closer.cgi?path=/thrift/0.9.2/thrift-0.9.2.tar.gz
 
-- Extract Thrift 
+- Extract Thrift
 
 tar -zxvf thrift-0.9.2.tar.gz
 
@@ -75,7 +75,7 @@ https://svn.apache.org/repos/asf/hive/trunk/metastore/src/gen/thrift/gen-cpp/
 
 ###Compile HiveClient library (libhive.so)
 
-``` 
+```
 $ make
 ```
 ```
@@ -102,7 +102,7 @@ $ make install
     # make USE_PGXS=1 install
     ```
 
-Not that we have tested the `hdfs_fdw` extenion only on Ubuntu systems, but other \*NIX's should also work.
+Not that we have tested the `hdfs_fdw` extension only on Ubuntu systems, but other \*NIX's should also work.
 
 Usage
 -----
@@ -110,7 +110,7 @@ Usage
 The following parameters can be set on a HiveServer foreign server object:
 
   * `host`: Address or hostname of the HiveServer. Defaults to `127.0.0.1`
-  * `port`: Port number of the HiveServer. Defaults to `3306`
+  * `port`: Port number of the HiveServer. Defaults to `10000`
 
 The following parameters can be set on a Hive foreign table object:
 
@@ -118,10 +118,10 @@ The following parameters can be set on a Hive foreign table object:
   * `table_name`: Name of the Hive table, default is the same as foreign table.
 
 Othe options.
-  * `client_type`: 0 mean HiveServer1 and 1 means HiveServer2.
+  * `client_type`:  HiveServer1 or HiveServer2.
 
 
-Step 1: Download [8][weblogs_parse] and follow instructions from this [site][9].
+Step 1: Download [weblogs_parse][8] and follow instructions from this [site][9].
 
 Step 2: Upload weblog_parse.txt file using these commands.
 
@@ -178,13 +178,13 @@ CREATE SERVER hdfs_server
 
 -- create user mapping
 CREATE USER MAPPING FOR postgres
-	SERVER hdfs_server;
+    SERVER hdfs_server;
 
 -- create foreign table
 CREATE FOREIGN TABLE weblogs
 (
- client_ip                text, 
- full_request_date        text, 
+ client_ip                text,
+ full_request_date        text,
  day                      text,
  Month                    text,
  month_num                int,
@@ -206,7 +206,7 @@ SERVER hdfs_server
 
 -- select from table
 postgres=# select distinct client_ip IP,count(*) from weblogs group by IP having count(*) > 5000;
-       ip        | count 
+       ip        | count
 -----------------+-------
  683.615.622.618 | 13505
  14.323.74.653   | 16194
@@ -236,7 +236,7 @@ postgres=# select hd.client_ip IP,pr.category,count(hd.client_ip)
 where hd.client_ip = pr.client_ip
 and hd.year = '2011'                                                
 group by hd.client_ip,pr.category;
-       ip        |  category  | count 
+       ip        |  category  | count
 -----------------+------------+-------
  14.323.74.653   | Category A |  9459
  361.631.17.30   | Category A | 76386
@@ -274,11 +274,10 @@ group by hd.client_ip,pr.category;
 
 ##TODO
 1. Hadoop Installation Instructions
-2. HiveServer1 and HiveServer2 Installtion Instrctutions 
-2. Writeable support
-3. HiveServer2 Library
+2. HiveServer1 and HiveServer2 Installation Instructions
+3. Write-able support
 4. Flum support
-5. Regression Test cases 
+5. Regression Test cases
 
 ##Contributing
 If you experince any bug create new [issue][2] and if you have fix for that create a pull request.
