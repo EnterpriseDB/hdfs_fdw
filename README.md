@@ -1,18 +1,83 @@
-#Hadoop (HDFS) Foreign Data Wrapper for PostgreSQL (Alpha)
+##Hadoop (HDFS) Foreign Data Wrapper for PostgreSQL (Alpha)
 
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for [Hadoop][1] (HDFS).
 
 Please note that this version of hdfs_fdw only works with PostgreSQL Version 9.3 and greater.
 
 
-##What Is Apache [Hadoop][1]?
+###What Is Apache [Hadoop][1]?
 The Apache™ Hadoop® project develops open-source software for reliable, scalable, distributed computing.
 
 *The Apache Hadoop software library is a framework that allows for the distributed processing of large data sets across clusters of computers using simple programming models. It is designed to scale up from single servers to thousands of machines, each offering local computation and storage. Rather than rely on hardware to deliver high-availability, the library itself is designed to detect and handle failures at the application layer, so delivering a highly-available service on top of a cluster of computers, each of which may be prone to failures. The detail information can be found [here][1]. Hadoop can be downloaded from this [location][2]*.
 
 
-##What Is Apache [Hive][3].
+###What Is Apache [Hive][3].
 *The Apache Hive ™ data warehouse software facilitates querying and managing large datasets residing in distributed storage. Hive provides a mechanism to project structure onto this data and query the data using a SQL-like language called HiveQL. At the same time this language also allows traditional map/reduce programmers to plug in their custom mappers and reducers when it is inconvenient or inefficient to express this logic in HiveQL*. There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [4][site].
+
+
+###Installation
+To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed. This library can be downloaded from []Apache][2]
+
+###Download and Install Thrift
+
+- Download Thrift
+
+wget http://www.apache.org/dyn/closer.cgi?path=/thrift/0.9.2/thrift-0.9.2.tar.gz
+
+- Extract Thrift
+
+tar -zxvf thrift-0.9.2.tar.gz
+
+- Compile and install Thrift
+
+```
+cd thrift-0.9.2
+./configure
+make
+make install
+```
+
+The detail installation manual can be found at http://thrift.apache.org/docs/install/
+
+###Download and Install Hive Client Libraries
+```
+Hive Client libraries downloaded from these sites
+https://svn.apache.org/repos/asf/hive/trunk/service/src/gen/thrift/gen-cpp/
+https://svn.apache.org/repos/asf/hive/trunk/odbc/src/cpp
+https://svn.apache.org/repos/asf/hive/trunk/ql/src/gen/thrift/gen-cpp/
+https://svn.apache.org/repos/asf/hive/trunk/metastore/src/gen/thrift/gen-cpp/
+```
+
+###Compile HiveClient library (libhive.so)
+
+```
+$ make
+```
+```
+$ make install
+```
+
+###Compile and Install hdfs_fdw
+
+1. To build on POSIX-compliant systems you need to ensure the `pg_config` executable is in your path when you run `make`. This executable is typically in your PostgreSQL installation's `bin` directory. For example:
+
+    ```
+    $ export PATH=/usr/local/pgsql/bin/:$PATH
+    ```
+
+2. Compile the code using make.
+
+    ```
+    $ make USE_PGXS=1
+    ```
+
+4.  Finally install the foreign data wrapper.
+
+    ```
+    # make USE_PGXS=1 install
+    ```
+
+Please note that the HDFS_FDW extension has only been tested on ubuntu systems but it should work on other *UNIX's systems without any problems.
 
 
 ##How To Start Hadoop.
@@ -44,66 +109,6 @@ cd /usr/local/hive/
 bin/hive --service hiveserver2 --hiveconf hive.server2.authentication=NOSASL
 ```
 
-##Installation
-To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed. This library can be downloaded from []Apache][2]
-
-###Download and Install Thrift
-
-- Download Thrift
-
-wget http://www.apache.org/dyn/closer.cgi?path=/thrift/0.9.2/thrift-0.9.2.tar.gz
-
-- Extract Thrift
-
-tar -zxvf thrift-0.9.2.tar.gz
-
-- Compile and install Thrift
-
-cd thrift-0.9.2
-./configure
-make
-make install
-
-The detail installation manual can be found at http://thrift.apache.org/docs/install/
-
-###Download and Install Hive Client Libraries
-Hive Client libraries downloaded from these sites
-https://svn.apache.org/repos/asf/hive/trunk/service/src/gen/thrift/gen-cpp/
-https://svn.apache.org/repos/asf/hive/trunk/odbc/src/cpp
-https://svn.apache.org/repos/asf/hive/trunk/ql/src/gen/thrift/gen-cpp/
-https://svn.apache.org/repos/asf/hive/trunk/metastore/src/gen/thrift/gen-cpp/
-
-###Compile HiveClient library (libhive.so)
-
-```
-$ make
-```
-```
-$ make install
-```
-
-###Compile and Install hdfs_fdw
-
-1. To build on POSIX-compliant systems you need to ensure the `pg_config` executable is in your path when you run `make`. This executable is typically in your PostgreSQL installation's `bin` directory. For example:
-
-    ```
-    $ export PATH=/usr/local/pgsql/bin/:$PATH
-    ```
-
-2. Compile the code using make.
-
-    ```
-    $ make USE_PGXS=1
-    ```
-
-4.  Finally install the foreign data wrapper.
-
-    ```
-    # make USE_PGXS=1 install
-    ```
-
-Not that we have tested the `hdfs_fdw` extension only on Ubuntu systems, but other \*NIX's should also work.
-
 Usage
 -----
 
@@ -111,15 +116,12 @@ The following parameters can be set on a HiveServer foreign server object:
 
   * `host`: Address or hostname of the HiveServer. Defaults to `127.0.0.1`
   * `port`: Port number of the HiveServer. Defaults to `10000`
+  * `client_type`:  HiveServer1 or HiveServer2.
 
 The following parameters can be set on a Hive foreign table object:
 
   * `dbname`: Name of the Hive database to query. This is a mandatory option.
   * `table_name`: Name of the Hive table, default is the same as foreign table.
-
-Othe options.
-  * `client_type`:  HiveServer1 or HiveServer2.
-
 
 Step 1: Download [weblogs_parse][8] and follow instructions from this [site][9].
 
@@ -144,23 +146,23 @@ hive -h 127.0.0.1
 
 Step 5: Create Table in Hive
 ```sql
-create table weblogs (
-    client_ip    string,
-    full_request_date string,
-    day    string,
-    month    string,
-    month_num int,
-    year    string,
-    hour    string,
-    minute    string,
-    second    string,
-    timezone    string,
-    http_verb    string,
-    uri    string,
-    http_status_code    string,
-    bytes_returned        string,
-    referrer        string,
-    user_agent    string)
+CREATE TABLE weblogs (
+    client_ip           STRING,
+    full_request_date   STRING,
+    day                 STRING,
+    month               STRING,
+    month_num           INT,
+    year                STRING,
+    hour                STRING,
+    minute              STRING,
+    second              STRING,
+    timezone            STRING,
+    http_verb           STRING,
+    uri                 STRING,
+    http_status_code    STRING,
+    bytes_returned      STRING,
+    referrer            STRING,
+    user_agent          STRING)
 row format delimited
 fields terminated by '\t';
 ```
@@ -183,29 +185,30 @@ CREATE USER MAPPING FOR postgres
 -- create foreign table
 CREATE FOREIGN TABLE weblogs
 (
- client_ip                text,
- full_request_date        text,
- day                      text,
- Month                    text,
- month_num                int,
- year                     text,
- hour                     text,
- minute                   text,
- second                   text,
- timezone                 text,
- http_verb                text,
- uri                      text,
- http_status_code         text,
- bytes_returned           text,
- referrer                 text,
- user_agent               text
+ client_ip                TEXT,
+ full_request_date        TEXT,
+ day                      TEXT,
+ Month                    TEXT,
+ month_num                INTEGER,
+ year                     TEXT,
+ hour                     TEXT,
+ minute                   TEXT,
+ second                   TEXT,
+ timezone                 TEXT,
+ http_verb                TEXT,
+ uri                      TEXT,
+ http_status_code         TEXT,
+ bytes_returned           TEXT,
+ referrer                 TEXT,
+ user_agent               TEXT
 )
 SERVER hdfs_server
          OPTIONS (dbname 'db', table_name 'weblogs');
 
 
 -- select from table
-postgres=# select distinct client_ip IP,count(*) from weblogs group by IP having count(*) > 5000;
+postgres=# SELECT DISTINCT client_ip IP, count(*)
+           FROM weblogs GROUP BY IP HAVING count(*) > 5000;
        ip        | count
 -----------------+-------
  683.615.622.618 | 13505
@@ -219,23 +222,24 @@ postgres=# select distinct client_ip IP,count(*) from weblogs group by IP having
 (8 rows)
 
 
-create table premium_ip
+CREATE TABLE premium_ip
 (
-client_ip text, category text
+      client_ip TEXT, category TEXT
 );
 
-insert into premium_ip values ('683.615.622.618','Category A');
-insert into premium_ip values ('14.323.74.653','Category A');
-insert into premium_ip values ('13.53.52.13','Category A');
-insert into premium_ip values ('361.631.17.30','Category A');
-insert into premium_ip values ('361.631.17.30','Category A');
-insert into premium_ip values ('325.87.75.336','Category B');
+INSERT INTO premium_ip VALUES ('683.615.622.618','Category A');
+INSERT INTO premium_ip VALUES ('14.323.74.653','Category A');
+INSERT INTO premium_ip VALUES ('13.53.52.13','Category A');
+INSERT INTO premium_ip VALUES ('361.631.17.30','Category A');
+INSERT INTO premium_ip VALUES ('361.631.17.30','Category A');
+INSERT INTO premium_ip VALUES ('325.87.75.336','Category B');
 
-postgres=# select hd.client_ip IP,pr.category,count(hd.client_ip)
- from weblogs hd, premium_ip pr
-where hd.client_ip = pr.client_ip
-and hd.year = '2011'                                                
-group by hd.client_ip,pr.category;
+postgres=# SELECT hd.client_ip IP, pr.category, count(hd.client_ip)
+                           FROM weblogs hd, premium_ip pr
+                           WHERE hd.client_ip = pr.client_ip
+                           AND hd.year = '2011'                                                
+                           GROUP BY hd.client_ip,pr.category;
+                           
        ip        |  category  | count
 -----------------+------------+-------
  14.323.74.653   | Category A |  9459
@@ -246,11 +250,11 @@ group by hd.client_ip,pr.category;
 (5 rows)
 
 
-postgres=# explain verbose select hd.client_ip IP,pr.category,count(hd.client_ip)
-from weblogs hd, premium_ip pr
-where hd.client_ip = pr.client_ip
-and hd.year = '2011'                                                
-group by hd.client_ip,pr.category;
+postgres=# EXPLAIN VERBOSE SELECT hd.client_ip IP, pr.category, count(hd.client_ip)
+                           FROM weblogs hd, premium_ip pr
+                           WHERE hd.client_ip = pr.client_ip
+                           AND hd.year = '2011'                                                
+                           GROUP BY hd.client_ip,pr.category;
                                           QUERY PLAN                                          
 ----------------------------------------------------------------------------------------------
  HashAggregate  (cost=221.40..264.40 rows=4300 width=64)
@@ -274,10 +278,9 @@ group by hd.client_ip,pr.category;
 
 ##TODO
 1. Hadoop Installation Instructions
-2. HiveServer1 and HiveServer2 Installation Instructions
-3. Write-able support
-4. Flum support
-5. Regression Test cases
+2. Write-able support
+3. Flum support
+4. Regression test cases
 
 ##Contributing
 If you experince any bug create new [issue][2] and if you have fix for that create a pull request.
