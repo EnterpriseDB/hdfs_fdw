@@ -16,17 +16,21 @@ The Apache™ Hadoop® project develops open-source software for reliable, scala
 
 
 ###Installation
-To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed. This library can be downloaded from []Apache][2]
+To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed. This library can be downloaded from [Apache][2]
 
 ###Download and Install Thrift
 
 - Download Thrift
 
+```
 wget http://www.apache.org/dyn/closer.cgi?path=/thrift/0.9.2/thrift-0.9.2.tar.gz
+```
 
 - Extract Thrift
 
+```
 tar -zxvf thrift-0.9.2.tar.gz
+```
 
 - Compile and install Thrift
 
@@ -39,16 +43,22 @@ make install
 
 The detail installation manual can be found at http://thrift.apache.org/docs/install/
 
-###Download and Install Hive Client Libraries
+###Compile HiveClient library (libhive.so)
+The libhive library files for Hiveserver1 are downloaded from these sites. The Hiveserver2
+support added to these files. You don't need to download these files. These fiiles are under
+libhive folder.
+
 ```
-Hive Client libraries downloaded from these sites
 https://svn.apache.org/repos/asf/hive/trunk/service/src/gen/thrift/gen-cpp/
 https://svn.apache.org/repos/asf/hive/trunk/odbc/src/cpp
 https://svn.apache.org/repos/asf/hive/trunk/ql/src/gen/thrift/gen-cpp/
 https://svn.apache.org/repos/asf/hive/trunk/metastore/src/gen/thrift/gen-cpp/
 ```
 
-###Compile HiveClient library (libhive.so)
+```
+cd libhive
+```
+
 
 ```
 $ make
@@ -100,7 +110,7 @@ The detail installation instruction of hadoop can be found on this [site][5]. He
 ####Starting HiveServer1
 ```
 cd /usr/local/hive/
-bin/hive --service hiveserver1 -v
+bin/hive --service hiveserver -v
 ```
 
 ####Starting HiveServer2
@@ -303,7 +313,7 @@ the following two paragraphs appear in all copies.
 
 See the [`LICENSE`][10] file for full details.
 
-[1]: http://www.appache.com
+[1]: http://www.apache.org/
 [2]: http://hadoop.apache.org/releases.html
 [3]: https://hive.apache.org/
 [4]: https://hive.apache.org/downloads.html

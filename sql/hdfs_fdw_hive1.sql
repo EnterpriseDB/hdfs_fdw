@@ -1,4 +1,4 @@
-\c postgres
+\c postgres postgres
 CREATE EXTENSION hdfs_fdw;
 CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw;
 CREATE USER MAPPING FOR postgres SERVER hdfs_svr;
