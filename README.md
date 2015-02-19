@@ -293,8 +293,8 @@ postgres=# EXPLAIN VERBOSE SELECT hd.client_ip IP, pr.category, count(hd.client_
 4. Regression test cases
 
 ##Contributing
-If you experince any bug create new [issue][2] and if you have fix for that create a pull request.
-Before submitting a bugfix or new feature, please read the [contributing guidlines][6].
+If you experince any bug create new [issue][6] and if you have fix for that create a pull request.
+Before submitting a bugfix or new feature, please read the [contributing guidlines][7].
 
 ##Support
 This project will be modified to maintain compatibility with new PostgreSQL releases.
