@@ -1,6 +1,6 @@
 .PHONY : clean
 
-THRIFT_HOME=/usr/local/thrift/include/
+THRIFT_HOME=/usr/local/include/
 INSTALL_DIR=/usr/local/pgsql.master/lib
 
 CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(THRIFT_HOME) -I$(THRIFT_HOME)/thrift -I$(THRIFT_HOME)/thrift/fb303 -Ithrift -Imetastore -Iodbc -Iodbc2 -Iql

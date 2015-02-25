@@ -23,7 +23,7 @@ To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed
 - Download Thrift
 
 ```
-wget http://www.apache.org/dyn/closer.cgi?path=/thrift/0.9.2/thrift-0.9.2.tar.gz
+wget http://apache.osuosl.org/thrift/0.9.2/thrift-0.9.2.tar.gz
 ```
 
 - Extract Thrift
@@ -36,6 +36,17 @@ tar -zxvf thrift-0.9.2.tar.gz
 
 ```
 cd thrift-0.9.2
+./configure
+make
+make install
+```
+
+- Compile and install fb303
+
+```
+cd thrift-0.9.2
+cd contrib/fb303
+./bootstrap.sh
 ./configure
 make
 make install
