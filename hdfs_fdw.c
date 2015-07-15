@@ -334,7 +334,6 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	HeapTuple      tuple;
 	char           **values = NULL;
 	char           *value = NULL;
-	bool           *isnulls = NULL;
 	unsigned int   len = 0;
 	int            attid;
 	hdfs_opt     *options = NULL;
@@ -346,11 +345,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	TupleDesc                tupdesc = node->ss.ss_currentRelation->rd_att;
 
 	values = palloc0(tupdesc->natts * sizeof(char*));
-	isnulls = (bool *) palloc(tupdesc->natts * sizeof(bool));
 	
-	/* Initialize to nulls for any columns not present in result */
-	memset(isnulls, true, tupdesc->natts * sizeof(bool));
-
 	ExecClearTuple(slot);
 
 	/* Get the options */
@@ -364,10 +359,13 @@ hdfsIterateForeignScan(ForeignScanState *node)
 		attid = 0;
 		foreach(lc, festate->retrieved_attrs)
 		{
+			bool isnull = true;
 			int attnum = lfirst_int(lc) - 1;
+
 			len = hdfs_get_field_data_len(options, festate->result, attid);
-			value = hdfs_get_field_as_cstring(options, festate->result, attid, &isnulls[attnum], len + 1);
-			if (!isnulls[attnum])
+			value = hdfs_get_field_as_cstring(options, festate->result, attid, &isnull, len + 1);
+
+			if (!isnull)
 				values[attnum] = value;
 			attid++;
 		}

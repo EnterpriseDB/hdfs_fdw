@@ -32,10 +32,10 @@ hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs)
 	return r;
 }
 
-unsigned int
+size_t
 hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs)
 {
-	unsigned int count = 0;
+	size_t count = 0;
 	char err_buf[512];
 	if (DBGetColumnCount(rs, &count, err_buf, sizeof(err_buf)) == HIVE_ERROR)
 		ereport(ERROR,
@@ -44,10 +44,10 @@ hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs)
 	return count;
 }
 
-unsigned int
+size_t
 hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col)
 {
-	unsigned int len;
+	size_t len;
 	char err_buf[512];
 	if (DBGetFieldDataLen(rs, col, &len, err_buf, sizeof(err_buf)) == HIVE_ERROR)
 		ereport(ERROR,
@@ -59,7 +59,7 @@ hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col)
 char *
 hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len)
 {
-	unsigned int   bs;
+	size_t         bs;
 	char           *value;
 	int            isnull = 0;
 	char err_buf[512];
