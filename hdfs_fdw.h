@@ -23,6 +23,7 @@
 #include "lib/stringinfo.h"
 #include "nodes/relation.h"
 #include "utils/rel.h"
+#include "access/htup.h"
 
 typedef enum CLIENT_TYPE
 {

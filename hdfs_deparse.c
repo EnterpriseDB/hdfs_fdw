@@ -1103,15 +1103,10 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
 	appendStringInfoString(buf, quote_identifier(colname));
 }
 
-/*
- * Append remote name of specified foreign table to buf.
- * Use value of table_name FDW option (if any) instead of relation's name.
- * Similarly, schema_name FDW option overrides schema name.
- */
 static void
 deparseRelation(hdfs_opt *opt, StringInfo buf)
 {
-	appendStringInfo(buf, "%s", quote_identifier(opt->table_name));
+	appendStringInfo(buf, "%s", opt->table_name);
 }
 
 /*

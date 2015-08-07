@@ -13,7 +13,7 @@ SHLIB_LINK = -L/usr/local/thrift/lib/ -L$(HIVECLIENT_HOME) -lhive  -lfb303 -lstd
 
 OBJS = hdfs_client.o hdfs_query.o hdfs_option.o hdfs_deparse.o hdfs_connection.o hdfs_fdw.o
 
-REGRESS =  hdfs_fdw_hive2
+REGRESS =  hdfs_fdw_hive1
 EXTENSION = hdfs_fdw
 DATA = hdfs_fdw--1.0.sql
 

@@ -157,7 +157,8 @@ hdfs_get_options(Oid foreigntableid)
 	UserMapping         *f_mapping;
 	List                *options;
 	ListCell            *lc;
-	hdfs_opt          *opt;
+	hdfs_opt            *opt;
+	char                *table_name = NULL;
 
 	opt = (hdfs_opt*) palloc(sizeof(hdfs_opt));
 	memset(opt, 0, sizeof(hdfs_opt));
@@ -195,7 +196,7 @@ hdfs_get_options(Oid foreigntableid)
 			opt->dbname = defGetString(def);
 
 		if (strcmp(def->defname, "table_name") == 0)
-			opt->table_name = defGetString(def);
+			table_name = defGetString(def);
 
 		if (strcmp(def->defname, "client_type") == 0)
 		{
@@ -222,8 +223,11 @@ hdfs_get_options(Oid foreigntableid)
 	if (!opt->dbname)
 		opt->dbname = (char*)DEFAULT_DATABASE;
 
-	if (!opt->table_name)
-		opt->table_name = get_rel_name(foreigntableid);
+	if (!table_name)
+		table_name = get_rel_name(foreigntableid);
+
+	opt->table_name = palloc(strlen(table_name) + strlen(opt->dbname) + 1);
+	sprintf(opt->table_name, "%s.%s", opt->dbname, table_name);
 
 	return opt;
 }
