@@ -1544,8 +1544,43 @@ deparseOperatorName(StringInfo buf, Form_pg_operator opform)
 	}
 	else
 	{
-		/* Just print operator name. */
-		appendStringInfoString(buf, opname);
+		if (strcmp(opname, "~~") == 0)
+		{
+			appendStringInfoString(buf, "LIKE");
+		}
+		else if (strcmp(opname, "~~*") == 0)
+		{
+			appendStringInfoString(buf, "LIKE");
+		}
+		else if (strcmp(opname, "!~~") == 0)
+		{
+			appendStringInfoString(buf, "NOT LIKE");
+		}
+		else if (strcmp(opname, "!~~*") == 0)
+		{
+			appendStringInfoString(buf, "NOT LIKE");
+		}
+		else if (strcmp(opname, "~") == 0)
+		{
+			/* TODO: use hive operator */
+		}
+		else if (strcmp(opname, "~*") == 0)
+		{
+			/* TODO: use hive operator */
+		}
+		else if (strcmp(opname, "!~") == 0)
+		{
+			/* TODO: use hive operator */
+		}
+		else if (strcmp(opname, "!~*") == 0)
+		{
+			/* TODO: use hive operator */
+		}
+		else
+		{
+			/* Just print operator name. */
+			appendStringInfoString(buf, opname);
+		}
 	}
 }
 
@@ -1555,7 +1590,7 @@ deparseOperatorName(StringInfo buf, Form_pg_operator opform)
 static void
 deparseDistinctExpr(DistinctExpr *node, deparse_expr_cxt *context)
 {
-	StringInfo	buf = context->buf;
+	StringInfo buf = context->buf;
 
 	Assert(list_length(node->args) == 2);
 
