@@ -156,8 +156,8 @@ void hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt);
 void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
 void hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt);
 
-unsigned int hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs);
-unsigned int hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col);
+size_t hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs);
+size_t hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col);
 HiveReturn hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs);
 char* hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len);
 HiveResultSet* hdfs_query_execute(hdfs_opt *opt, char *query);
