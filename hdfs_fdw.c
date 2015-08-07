@@ -309,7 +309,11 @@ hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid,
 							local_exprs,
 							scan_relid,
 							params_list,
-							fdw_private);
+							fdw_private
+#if PG_VERSION_NUM >= 90500
+							,NIL
+#endif
+							);
 }
 
 static void
