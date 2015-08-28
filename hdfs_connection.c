@@ -172,6 +172,6 @@ hdfs_disconnect(CLIENT_TYPE client_type, HiveConnection *conn)
 	if (r == HIVE_ERROR)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_OUT_OF_MEMORY),
-				errmsg("failed to initialize the HDFS connection object (%s)", err_buf)));
+				errmsg("failed to close HDFS connection object (%s)", err_buf)));
 	return r;
 }

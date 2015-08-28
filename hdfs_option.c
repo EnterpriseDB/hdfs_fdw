@@ -226,7 +226,7 @@ hdfs_get_options(Oid foreigntableid)
 	if (!table_name)
 		table_name = get_rel_name(foreigntableid);
 
-	opt->table_name = palloc(strlen(table_name) + strlen(opt->dbname) + 1);
+	opt->table_name = palloc(strlen(table_name) + strlen(opt->dbname) + 2);
 	sprintf(opt->table_name, "%s.%s", opt->dbname, table_name);
 
 	return opt;

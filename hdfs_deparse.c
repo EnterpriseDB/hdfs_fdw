@@ -91,11 +91,6 @@ static void deparseTargetList(StringInfo buf,
 				  Relation rel,
 				  Bitmapset *attrs_used,
 				  List **retrieved_attrs);
-static void deparseReturningList(StringInfo buf, PlannerInfo *root,
-					 Index rtindex, Relation rel,
-					 bool trig_after_row,
-					 List *returningList,
-					 List **retrieved_attrs);
 static void deparseColumnRef(StringInfo buf, int varno, int varattno,
 				 PlannerInfo *root);
 static void deparseRelation(hdfs_opt *opt, StringInfo buf);
@@ -123,7 +118,7 @@ static void printRemotePlaceholder(Oid paramtype, int32 paramtypmod,
 /*
  * Examine each qual clause in input_conds, and classify them into two groups,
  * which are returned as two lists:
- *	- remote_conds contains expressions that can be evaluated remotely
+ *  - remote_conds contains expressions that can be evaluated remotely
  *	- local_conds contains expressions that can't be evaluated remotely
  */
 void
@@ -813,190 +808,6 @@ hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
 	}
 }
 
-/*
- * deparse remote INSERT statement
- *
- * The statement text is appended to buf, and we also create an integer List
- * of the columns being retrieved by RETURNING (if any), which is returned
- * to *retrieved_attrs.
- */
-void
-deparseInsertSql(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
-				 Index rtindex, Relation rel,
-				 List *targetAttrs, List *returningList,
-				 List **retrieved_attrs)
-{
-	AttrNumber	pindex;
-	bool		first;
-	ListCell   *lc;
-
-	appendStringInfoString(buf, "INSERT INTO ");
-	deparseRelation(opt,buf);
-
-	if (targetAttrs)
-	{
-		appendStringInfoChar(buf, '(');
-
-		first = true;
-		foreach(lc, targetAttrs)
-		{
-			int			attnum = lfirst_int(lc);
-
-			if (!first)
-				appendStringInfoString(buf, ", ");
-			first = false;
-
-			deparseColumnRef(buf, rtindex, attnum, root);
-		}
-
-		appendStringInfoString(buf, ") VALUES (");
-
-		pindex = 1;
-		first = true;
-		foreach(lc, targetAttrs)
-		{
-			if (!first)
-				appendStringInfoString(buf, ", ");
-			first = false;
-
-			appendStringInfo(buf, "$%d", pindex);
-			pindex++;
-		}
-
-		appendStringInfoChar(buf, ')');
-	}
-	else
-		appendStringInfoString(buf, " DEFAULT VALUES");
-
-	deparseReturningList(buf, root, rtindex, rel,
-					   rel->trigdesc && rel->trigdesc->trig_insert_after_row,
-						 returningList, retrieved_attrs);
-}
-
-/*
- * deparse remote UPDATE statement
- *
- * The statement text is appended to buf, and we also create an integer List
- * of the columns being retrieved by RETURNING (if any), which is returned
- * to *retrieved_attrs.
- */
-void
-deparseUpdateSql(hdfs_opt* opt, StringInfo buf, PlannerInfo *root,
-				 Index rtindex, Relation rel,
-				 List *targetAttrs, List *returningList,
-				 List **retrieved_attrs)
-{
-	AttrNumber	pindex;
-	bool		first;
-	ListCell   *lc;
-
-	appendStringInfoString(buf, "UPDATE ");
-	deparseRelation(opt, buf);
-	appendStringInfoString(buf, " SET ");
-
-	pindex = 2;					/* ctid is always the first param */
-	first = true;
-	foreach(lc, targetAttrs)
-	{
-		int			attnum = lfirst_int(lc);
-
-		if (!first)
-			appendStringInfoString(buf, ", ");
-		first = false;
-
-		deparseColumnRef(buf, rtindex, attnum, root);
-		appendStringInfo(buf, " = $%d", pindex);
-		pindex++;
-	}
-	appendStringInfoString(buf, " WHERE ctid = $1");
-
-	deparseReturningList(buf, root, rtindex, rel,
-					   rel->trigdesc && rel->trigdesc->trig_update_after_row,
-						 returningList, retrieved_attrs);
-}
-
-/*
- * deparse remote DELETE statement
- *
- * The statement text is appended to buf, and we also create an integer List
- * of the columns being retrieved by RETURNING (if any), which is returned
- * to *retrieved_attrs.
- */
-void
-deparseDeleteSql(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
-				 Index rtindex, Relation rel,
-				 List *returningList,
-				 List **retrieved_attrs)
-{
-	appendStringInfoString(buf, "DELETE FROM ");
-	deparseRelation(opt,buf);
-	appendStringInfoString(buf, " WHERE ctid = $1");
-
-	deparseReturningList(buf, root, rtindex, rel,
-					   rel->trigdesc && rel->trigdesc->trig_delete_after_row,
-						 returningList, retrieved_attrs);
-}
-
-/*
- * Add a RETURNING clause, if needed, to an INSERT/UPDATE/DELETE.
- */
-static void
-deparseReturningList(StringInfo buf, PlannerInfo *root,
-					 Index rtindex, Relation rel,
-					 bool trig_after_row,
-					 List *returningList,
-					 List **retrieved_attrs)
-{
-	Bitmapset  *attrs_used = NULL;
-
-	if (trig_after_row)
-	{
-		/* whole-row reference acquires all non-system columns */
-		attrs_used =
-			bms_make_singleton(0 - FirstLowInvalidHeapAttributeNumber);
-	}
-
-	if (returningList != NIL)
-	{
-		/*
-		 * We need the attrs, non-system and system, mentioned in the local
-		 * query's RETURNING list.
-		 */
-		pull_varattnos((Node *) returningList, rtindex,
-					   &attrs_used);
-	}
-
-	if (attrs_used != NULL)
-	{
-		appendStringInfoString(buf, " RETURNING ");
-		deparseTargetList(buf, root, rtindex, rel, attrs_used,
-						  retrieved_attrs);
-	}
-	else
-		*retrieved_attrs = NIL;
-}
-
-/*
- * Construct SELECT statement to acquire size in blocks of given relation.
- *
- * Note: we use local definition of block size, not remote definition.
- * This is perhaps debatable.
- *
- * Note: pg_relation_size() exists in 8.1 and later.
- */
-void
-deparseAnalyzeSizeSql(hdfs_opt *opt, StringInfo buf)
-{
-	StringInfoData relname;
-
-	/* We'll need the remote relation name as a literal. */
-	initStringInfo(&relname);
-	deparseRelation(opt, &relname);
-
-	appendStringInfoString(buf, "SELECT pg_catalog.pg_relation_size(");
-	deparseStringLiteral(buf, relname.data);
-	appendStringInfo(buf, "::pg_catalog.regclass) / %d", BLCKSZ);
-}
 
 /*
  * Construct SELECT statement to acquire sample rows of given relation.

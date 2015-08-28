@@ -13,7 +13,7 @@ SHLIB_LINK = -L/usr/local/thrift/lib/ -L$(HIVECLIENT_HOME) -lhive  -lfb303 -lstd
 
 OBJS = hdfs_client.o hdfs_query.o hdfs_option.o hdfs_deparse.o hdfs_connection.o hdfs_fdw.o
 
-REGRESS =  hdfs_fdw_hive1
+REGRESS =  hdfs_fdw_hive2
 EXTENSION = hdfs_fdw
 DATA = hdfs_fdw--1.0.sql
 
@@ -25,6 +25,6 @@ ifndef MAJORVERSION
     MAJORVERSION := $(basename $(VERSION))
 endif
 
-ifeq (,$(findstring $(MAJORVERSION), 9.3 9.4 9.5))
-    $(error PostgreSQL 9.3, 9.4 or 9.5 is required to compile this extension)
+ifeq (,$(findstring $(MAJORVERSION), 9.3 9.4 9.5 9.6))
+    $(error PostgreSQL 9.3, 9.4, 9.5 or 9.6 is required to compile this extension)
 endif

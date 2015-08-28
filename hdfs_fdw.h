@@ -145,10 +145,6 @@ extern void hdfs_deparse_select(hdfs_opt *opt, StringInfo buf, PlannerInfo *root
 extern void hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, List *exprs, bool is_first, List **params);
 extern void classifyConditions(PlannerInfo *root, RelOptInfo *baserel, List *input_conds, List **remote_conds, List **local_conds);
 extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
-extern void deparseInsertSql(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, Index rtindex, Relation rel, List *targetAttrs, List *returningList, List **retrieved_attrs);
-extern void deparseUpdateSql(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, Index rtindex, Relation rel, List *targetAttrs, List *returningList, List **retrieved_attrs);
-extern void deparseDeleteSql(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, Index rtindex, Relation rel, List *returningList, List **retrieved_attrs);
-extern void deparseAnalyzeSizeSql(hdfs_opt *opt, StringInfo buf);
 extern void deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_attrs);
 extern void deparseStringLiteral(StringInfo buf, const char *val);
 
