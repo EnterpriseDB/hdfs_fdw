@@ -1,0 +1,13 @@
+----------------------------------------------------------------
+Fri Aug 28 17:33:04 PKT 2015:
+Booting Derby version The Apache Software Foundation - Apache Derby - 10.10.1.1 - (1458268): instance a816c00e-014f-744c-0772-00000346b528 
+on database directory /home/ibrar/edb/postgresql/contrib/hdfs_fdw_config/test/metastore_db with class loader sun.misc.Launcher$AppClassLoader@1c57a92 
+Loaded from file:/usr/local/hive/lib/derby-10.10.1.1.jar
+java.vendor=Oracle Corporation
+java.runtime.version=1.7.0_79-b14
+user.dir=/home/ibrar/edb/postgresql/contrib/hdfs_fdw_config/test
+os.name=Linux
+os.arch=i386
+os.version=3.16.0-23-generic
+derby.system.home=null
+Database Class Loader started - derby.database.classpath=''
