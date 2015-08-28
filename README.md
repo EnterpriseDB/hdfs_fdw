@@ -158,7 +158,7 @@ hadoop fs -cp /weblogs/parse/part-00000 /user/hive/warehouse/weblogs/
 Step 3: Start HiveServer
 
 ```sh
-bin/hive --service hiveserver1 -v
+bin/hive --service hiveserver -v
 ```
 Step 4: Start Hive client to connect to HiveServer
 ```sh
