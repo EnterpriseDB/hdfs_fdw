@@ -8,7 +8,7 @@
  * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
- * 		connection.c
+ * 		hdfs_connection.c
  *
  *-------------------------------------------------------------------------
  */
@@ -107,7 +107,7 @@ hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt)
 
 /*
  * cleanup_connection:
- * Delete all the cache entries on backend exists.
+ * 		Delete all the cache entries on backend exists.
  */
 void
 hdfs_cleanup_connection(void)

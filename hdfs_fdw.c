@@ -44,10 +44,10 @@
 PG_MODULE_MAGIC;
 
 /* Default CPU cost to start up a foreign query. */
-#define DEFAULT_FDW_STARTUP_COST	100.0
+#define DEFAULT_FDW_STARTUP_COST    100.0
 
 /* Default CPU cost to process 1 row  */
-#define DEFAULT_FDW_TUPLE_COST		0.01
+#define DEFAULT_FDW_TUPLE_COST      0.01
 
 extern void _PG_init(void);
 
@@ -144,7 +144,7 @@ static void
 hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
 	HDFSFdwRelationInfo *fpinfo = NULL;
-	ListCell              *lc = NULL;
+	ListCell            *lc = NULL;
 	hdfs_opt            *options = NULL;
 
 	/*
@@ -202,8 +202,8 @@ static void
 hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) baserel->fdw_private;
-	int           total_cost = 0;
-	ForeignPath   *path = NULL;
+	int                 total_cost = 0;
+	ForeignPath         *path = NULL;
 
 	total_cost = fpinfo->fdw_tuple_cost * baserel->rows;
 
@@ -237,7 +237,7 @@ hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid,
 	List           *retrieved_attrs;
 	StringInfoData sql;
 	ListCell       *lc = NULL;
-	hdfs_opt     *options = NULL;
+	hdfs_opt       *options = NULL;
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
@@ -320,7 +320,7 @@ static void
 hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 {
 	ForeignScan              *fsplan = (ForeignScan *) node->ss.ps.plan;
-	hdfsFdwExecutionState  *festate = NULL;
+	hdfsFdwExecutionState    *festate = NULL;
 	Oid                      foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 
 	GetOptions(foreigntableid);
@@ -340,13 +340,13 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	char           *value = NULL;
 	unsigned int   len = 0;
 	int            attid;
-	hdfs_opt     *options = NULL;
+	hdfs_opt       *options = NULL;
 	ListCell       *lc = NULL;
 	AttInMetadata  *attinmeta = NULL;
-	Oid                      foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
+	Oid            foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfsFdwExecutionState  *festate = (hdfsFdwExecutionState *) node->fdw_state;
-	TupleTableSlot           *slot = node->ss.ss_ScanTupleSlot;
-	TupleDesc                tupdesc = node->ss.ss_currentRelation->rd_att;
+	TupleTableSlot         *slot = node->ss.ss_ScanTupleSlot;
+	TupleDesc              tupdesc = node->ss.ss_currentRelation->rd_att;
 
 	values = palloc0(tupdesc->natts * sizeof(char*));
 	
@@ -411,11 +411,12 @@ hdfsAcquireSampleRowsFunc(Relation relation, int elevel,
 static bool
 hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func, BlockNumber *totalpages)
 {
-	long		ts = 0;
-	hdfs_opt        *options = NULL;
-	Oid		foreigntableid = RelationGetRelid(relation);
+	long          ts = 0;
+	hdfs_opt      *options = NULL;
+	Oid           foreigntableid = RelationGetRelid(relation);
 
 	*func = hdfsAcquireSampleRowsFunc;
+
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
@@ -431,7 +432,7 @@ hdfsEndForeignScan(ForeignScanState *node)
 {
 	hdfsFdwExecutionState *festate = (hdfsFdwExecutionState *) node->fdw_state;
 	hdfs_opt              *options = NULL;
-	Oid                     foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
+	Oid                   foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);

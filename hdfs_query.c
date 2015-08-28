@@ -23,11 +23,11 @@ hdfs_rowcount(hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRela
 {
 	HiveResultSet*  rs = NULL;
 	size_t          len = 0;
-	bool is_null;
+	bool            is_null;
 	char            *value = NULL;
 	int             idx = 0;
 	double          rows = 0;
-	StringInfoData	sql;
+	StringInfoData  sql;
 
 	initStringInfo(&sql);
 	hdfs_deparse_explain(opt, &sql, root, baserel, fpinfo);
@@ -49,7 +49,7 @@ void
 hdfs_analyze(hdfs_opt *opt)
 {
 	HiveResultSet*  rs = NULL;
-	StringInfoData	sql;
+	StringInfoData  sql;
 
 	initStringInfo(&sql);
 	hdfs_deparse_analyze(&sql, opt);

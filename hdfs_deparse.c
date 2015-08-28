@@ -218,7 +218,7 @@ foreign_expr_walker(Node *node,
 	{
 		case T_Var:
 			{
-				Var		   *var = (Var *) node;
+				Var *var = (Var *) node;
 
 				/*
 				 * If the Var is from the foreign table, we consider its
@@ -249,7 +249,7 @@ foreign_expr_walker(Node *node,
 			break;
 		case T_Const:
 			{
-				Const	   *c = (Const *) node;
+				Const *c = (Const *) node;
 
 				/*
 				 * If the constant has nondefault collation, either it's of a
@@ -701,13 +701,6 @@ hdfs_deparse_select(hdfs_opt *opt,
 	heap_close(rel, NoLock);
 }
 
-/*
- * Emit a target list that retrieves the columns specified in attrs_used.
- * This is used for both SELECT and RETURNING targetlists.
- *
- * The tlist text is appended to buf, and we also create an integer List
- * of the columns being retrieved, which is returned to *retrieved_attrs.
- */
 static void
 deparseTargetList(StringInfo buf,
 				  PlannerInfo *root,

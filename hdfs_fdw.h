@@ -73,10 +73,10 @@ typedef struct HDFSFdwRelationInfo
 	Selectivity local_conds_sel;
 
 	/* Estimated size and cost for a scan with baserestrictinfo quals. */
-	double		rows;
-	int			width;
-	Cost		startup_cost;
-	Cost		total_cost;
+	double      rows;
+	int         width;
+	Cost        startup_cost;
+	Cost        total_cost;
 
 	/* Options extracted from catalogs. */
 	bool		use_remote_estimate;
@@ -84,9 +84,9 @@ typedef struct HDFSFdwRelationInfo
 	Cost		fdw_tuple_cost;
 
 	/* Cached catalog information. */
-	ForeignTable *table;
+	ForeignTable  *table;
 	ForeignServer *server;
-	UserMapping *user;			/* only set in use_remote_estimate mode */
+	UserMapping   *user;			/* only set in use_remote_estimate mode */
 } HDFSFdwRelationInfo;
 
 
@@ -95,45 +95,43 @@ typedef struct HDFSFdwRelationInfo
  */
 typedef struct HDFSFdwScanState
 {
-	Relation	rel;			/* relcache entry for the foreign table */
+	Relation   rel;               /* relcache entry for the foreign table */
 
 	/* extracted fdw_private data */
-	char	   *query;			/* text of SELECT command */
-	List	   *retrieved_attrs;	/* list of retrieved attribute numbers */
+	char       *query;            /* text of SELECT command */
+	List       *retrieved_attrs;  /* list of retrieved attribute numbers */
 
 	/* for remote query execution */
-	unsigned int cursor_number; /* quasi-unique ID for my cursor */
-	bool		cursor_exists;	/* have we created the cursor? */
-	int			numParams;		/* number of parameters passed to query */
-	FmgrInfo   *param_flinfo;	/* output conversion functions for them */
-	List	   *param_exprs;	/* executable expressions for param values */
-	const char **param_values;	/* textual values of query parameters */
+	unsigned int cursor_number;   /* quasi-unique ID for my cursor */
+	bool         cursor_exists;   /* have we created the cursor? */
+	int          numParams;       /* number of parameters passed to query */
+	FmgrInfo     *param_flinfo;   /* output conversion functions for them */
+	List         *param_exprs;    /* executable expressions for param values */
+	const char   **param_values;  /* textual values of query parameters */
 
 	/* for storing result tuples */
-	HeapTuple  *tuples;			/* array of currently-retrieved tuples */
-	int			num_tuples;		/* # of tuples in array */
-	int			next_tuple;		/* index of next one to return */
+	HeapTuple  *tuples;         /* array of currently-retrieved tuples */
+	int        num_tuples;     /* # of tuples in array */
+	int        next_tuple;     /* index of next one to return */
 
 	/* batch-level state, for optimizing rewinds and avoiding useless fetch */
-	int			fetch_ct_2;		/* Min(# of fetches done, 2) */
-	bool		eof_reached;	/* true if last fetch reached EOF */
+	int   fetch_ct_2;     /* Min(# of fetches done, 2) */
+	bool  eof_reached;    /* true if last fetch reached EOF */
 
 	/* working memory contexts */
-	MemoryContext batch_cxt;	/* context holding current batch of tuples */
-	MemoryContext temp_cxt;		/* context for per-tuple temporary data */
+	MemoryContext batch_cxt;    /* context holding current batch of tuples */
+	MemoryContext temp_cxt;     /* context for per-tuple temporary data */
 } HDFSFdwScanState;
 
 /* Callback argument for ec_member_matches_foreign */
 typedef struct
 {
-	Expr	   *current;		/* current expr, or NULL if not yet found */
-	List	   *already_used;	/* expressions already dealt with */
+	Expr *current;       /* current expr, or NULL if not yet found */
+	List *already_used; /* expressions already dealt with */
 } ec_member_foreign_arg;
-
 
 /* Functions prototypes for hdfs_option.c file */
 hdfs_opt* hdfs_get_options(Oid foreigntableid);
-
 
 /* Functions prototypes for hdfs_connection.c file */
 HiveConnection *hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt);

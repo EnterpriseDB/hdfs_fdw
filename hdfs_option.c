@@ -8,7 +8,7 @@
  * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
- * 		hdfs.c
+ * 		hdfs_option.c
  *
  *-------------------------------------------------------------------------
  */

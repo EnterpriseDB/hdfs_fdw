@@ -3,8 +3,6 @@
  * hdfs_client.c
  * 		Foreign-data wrapper for remote Hadoop servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
- *
  * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
@@ -59,12 +57,12 @@ hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col)
 char *
 hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len)
 {
-	size_t         bs;
-	char           *value;
-	int            isnull = 0;
-	char err_buf[512];
+	size_t  bs;
+	char    *value = NULL;
+	int     isnull = 0;
+	char    err_buf[512];
 			
-	value = (char*)palloc(len);
+	value = (char*) palloc(len);
 	if (DBGetFieldAsCString(rs, idx, value, len, &bs, &isnull, err_buf, sizeof(err_buf)) == HIVE_ERROR)
 		ereport(ERROR,
 				(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
@@ -79,7 +77,7 @@ hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_nu
 HiveResultSet*
 hdfs_query_execute(hdfs_opt *opt, char *query)
 {
-	HiveResultSet *rs;
+	HiveResultSet *rs = NULL;
 	char  err_buf[512];
 	if (DBExecute(opt->conn, query, &rs, 1000, err_buf, sizeof(err_buf)) == HIVE_ERROR)
 		ereport(ERROR,
