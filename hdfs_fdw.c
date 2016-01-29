@@ -220,7 +220,10 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 								   total_cost,
 								   NIL,       /* no pathkeys */
 								   NULL,      /* no outer rel either */
-								   NIL);      /* no fdw_private list */
+#if PG_VERSION_NUM >= 90500
+								   NULL, /* no extra plan */
+#endif
+								   NIL); /* no fdw_private data */
 	add_path(baserel, (Path *) path);
 }
 
@@ -312,6 +315,8 @@ hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid,
 							fdw_private
 #if PG_VERSION_NUM >= 90500
 							,NIL
+							,NIL
+							,NULL
 #endif
 							);
 }
