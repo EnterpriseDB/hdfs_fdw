@@ -41,7 +41,6 @@ typedef struct hdfs_opt
 	char           *password;         /* HDFS password */
 	char           *dbname;           /* HDFS database name */
 	char           *table_name;       /* HDFS table name */
-	HiveConnection *conn;
 	CLIENT_TYPE    client_type;
 	bool           use_remote_estimate;
 } hdfs_opt;
@@ -50,6 +49,7 @@ typedef struct hdfsFdwExecutionState
 {
 	char            *query;
 	HiveResultSet   *result;
+	HiveConnection *conn;
 	Relation        rel;              /* relcache entry for the foreign table */
 	List	        *retrieved_attrs; /* list of retrieved attribute numbers */
 } hdfsFdwExecutionState;
@@ -135,8 +135,7 @@ hdfs_opt* hdfs_get_options(Oid foreigntableid);
 
 /* Functions prototypes for hdfs_connection.c file */
 HiveConnection *hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt);
-void hdfs_cleanup_connection(void);
-void hdfs_rel_connection(hdfs_opt *opt);
+void hdfs_rel_connection(HiveConnection *conn);
 
 /* Functions prototypes for hdfs_deparse.c file */
 extern void hdfs_deparse_select(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, Bitmapset *attrs_used, List **retrieved_attrs);
@@ -154,11 +153,11 @@ size_t hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs);
 size_t hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col);
 HiveReturn hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs);
 char* hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len);
-HiveResultSet* hdfs_query_execute(hdfs_opt *opt, char *query);
+HiveResultSet* hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query);
 void hdfs_close_result_set(hdfs_opt *opt, HiveResultSet *rs);
 
-double hdfs_rowcount(hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
-double hdfs_describe(hdfs_opt *opt);
-void hdfs_analyze(hdfs_opt *opt);
+double hdfs_rowcount(HiveConnection *conn, hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
+double hdfs_describe(HiveConnection *conn, hdfs_opt *opt);
+void hdfs_analyze(HiveConnection *conn, hdfs_opt *opt);
 
 #endif   /* HADOOP_FDW_H */

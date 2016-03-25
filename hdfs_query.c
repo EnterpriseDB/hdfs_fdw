@@ -19,7 +19,7 @@
 #include "hdfs_fdw.h"
 
 double
-hdfs_rowcount(hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
+hdfs_rowcount(HiveConnection *conn, hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
 {
 	HiveResultSet*  rs = NULL;
 	size_t          len = 0;
@@ -32,7 +32,7 @@ hdfs_rowcount(hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRela
 	initStringInfo(&sql);
 	hdfs_deparse_explain(opt, &sql, root, baserel, fpinfo);
 
-	rs = hdfs_query_execute(opt, sql.data);
+	rs = hdfs_query_execute(conn, opt, sql.data);
 	if (hdfs_fetch(opt, rs) == HIVE_SUCCESS)
 	{
 		len = hdfs_get_field_data_len(opt, rs, idx);
@@ -46,19 +46,19 @@ hdfs_rowcount(hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRela
 }
 
 void
-hdfs_analyze(hdfs_opt *opt)
+hdfs_analyze(HiveConnection *conn, hdfs_opt *opt)
 {
 	HiveResultSet*  rs = NULL;
 	StringInfoData  sql;
 
 	initStringInfo(&sql);
 	hdfs_deparse_analyze(&sql, opt);
-	rs = hdfs_query_execute(opt, sql.data);
+	rs = hdfs_query_execute(conn, opt, sql.data);
 	hdfs_close_result_set(opt, rs);
 }
 
 double
-hdfs_describe(hdfs_opt *opt)
+hdfs_describe(HiveConnection *conn, hdfs_opt *opt)
 {
 	HiveResultSet*  rs = NULL;
 	size_t          len;
@@ -72,7 +72,7 @@ hdfs_describe(hdfs_opt *opt)
 
 	initStringInfo(&sql);
 	hdfs_deparse_describe(&sql, opt);
-	rs = hdfs_query_execute(opt, sql.data);
+	rs = hdfs_query_execute(conn, opt, sql.data);
 	while (hdfs_fetch(opt, rs) == HIVE_SUCCESS)
 	{
 		count = hdfs_get_column_count(opt, rs);

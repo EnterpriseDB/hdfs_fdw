@@ -75,11 +75,12 @@ hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_nu
 }
 
 HiveResultSet*
-hdfs_query_execute(hdfs_opt *opt, char *query)
+hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query)
 {
 	HiveResultSet *rs = NULL;
 	char  err_buf[512];
-	if (DBExecute(opt->conn, query, &rs, 1000, err_buf, sizeof(err_buf)) == HIVE_ERROR)
+
+	if (DBExecute(conn, query, &rs, 1000, err_buf, sizeof(err_buf)) == HIVE_ERROR)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 				errmsg("failed to fetch execute query: %s", err_buf)));

@@ -53,14 +53,19 @@ extern void _PG_init(void);
 
 PG_FUNCTION_INFO_V1(hdfs_fdw_handler);
 
-static void hdfs_fdw_exit(int code, Datum arg);
 static hdfs_opt *GetOptions(Oid foreigntableid);
+static HiveConnection* GetConnection(hdfs_opt *opt, Oid foreigntableid);
 
 static void hdfsGetForeignRelSize(PlannerInfo *root,RelOptInfo *baserel, Oid foreigntableid);
 static void hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path,
-					List *tlist, List *scan_clauses, Plan *outer_plan);
-
+#if PG_VERSION_NUM >= 90500
+static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
+									   Oid foreigntableid, ForeignPath *best_path,
+										List *tlist, List *scan_clauses, Plan *outer_plan);
+#else
+static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
+									   Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses);
+#endif
 static void hdfsBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *hdfsIterateForeignScan(ForeignScanState *node);
 static void hdfsReScanForeignScan(ForeignScanState *node);
@@ -68,20 +73,6 @@ static void hdfsEndForeignScan(ForeignScanState *node);
 static void hdfsExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static bool hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func,
                                       BlockNumber *totalpages);
-
-/* Initialization routine */
-void
-_PG_init(void)
-{
-	on_proc_exit(&hdfs_fdw_exit, PointerGetDatum(NULL));
-}
-
-/* Cleanup routine */
-static void
-hdfs_fdw_exit(int code, Datum arg)
-{
-	hdfs_cleanup_connection();
-}
 
 /*
  * Foreign-data wrapper handler function, return
@@ -110,29 +101,34 @@ hdfs_fdw_handler(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(routine);
 }
 
+
+HiveConnection*
+GetConnection(hdfs_opt* opt, Oid foreigntableid)
+{
+	Oid             userid =  GetUserId();
+	ForeignServer   *server = NULL;
+	ForeignTable    *table = NULL;
+	UserMapping     *user = NULL;
+
+	table = GetForeignTable(foreigntableid);
+	server = GetForeignServer(table->serverid);
+	user = GetUserMapping(userid, server->serverid);
+
+	/* Connect to the server */
+	return hdfs_get_connection(server,user, opt);
+}
+
+
 /*
  * Return the Connection and options and the connection.
  */
 static hdfs_opt*
 GetOptions(Oid foreigntableid)
 {
-	hdfs_opt      *options;
-	Oid             userid =  GetUserId();
-	ForeignServer   *server = NULL;
-	UserMapping     *user = NULL;
-	ForeignTable    *table = NULL;
-
-	table = GetForeignTable(foreigntableid);
-	server = GetForeignServer(table->serverid);
-	user = GetUserMapping(userid, server->serverid);
-
 	/* Fetch the options */
-	options = hdfs_get_options(foreigntableid);
-
-	/* Connect to the server */
-	options->conn = hdfs_get_connection(server, user, options);
-	return options;
+	return hdfs_get_options(foreigntableid);
 }
+
 
 /*
  * hdfsGetForeignRelSize
@@ -147,7 +143,7 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	HDFSFdwRelationInfo *fpinfo = NULL;
 	ListCell            *lc = NULL;
 	hdfs_opt            *options = NULL;
-
+	HiveConnection      *conn;
 	/*
 	 * We use HDFSFdwRelationInfo to pass various information to subsequent
 	 * functions.
@@ -157,6 +153,9 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
+
+	/* Connect to HIVE server */
+	conn = GetConnection(options, foreigntableid);
 
 	fpinfo->fdw_startup_cost = DEFAULT_FDW_STARTUP_COST;
 	fpinfo->fdw_tuple_cost = DEFAULT_FDW_TUPLE_COST;
@@ -193,7 +192,7 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	 * if use_remote_estimate is specified in options.
 	 */
 	if (options->use_remote_estimate)
-		baserel->rows = hdfs_rowcount(options, root, baserel, fpinfo);
+		baserel->rows = hdfs_rowcount(conn, options, root, baserel, fpinfo);
 
 	fpinfo->rows = baserel->tuples = baserel->rows;
 }
@@ -233,6 +232,7 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
  * hdfsGetForeignPlan
  *              Create ForeignScan plan node which implements selected best path
  */
+#if PG_VERSION_NUM >= 90500
 static ForeignScan *
 hdfsGetForeignPlan(PlannerInfo *root,
 					RelOptInfo *baserel,
@@ -241,6 +241,15 @@ hdfsGetForeignPlan(PlannerInfo *root,
 					List *tlist,
 					List *scan_clauses,
 					Plan *outer_plan)
+#else
+static ForeignScan*
+hdfsGetForeignPlan(PlannerInfo *root,
+					RelOptInfo *baserel,
+					Oid foreigntableid,
+					ForeignPath *best_path,
+					List *tlist,
+					List *scan_clauses)
+#endif
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) baserel->fdw_private;
 	Index          scan_relid = baserel->relid;
@@ -338,10 +347,13 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	ForeignScan              *fsplan = (ForeignScan *) node->ss.ps.plan;
 	hdfsFdwExecutionState    *festate = NULL;
 	Oid                      foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
-
-	GetOptions(foreigntableid);
+	hdfs_opt                 *opt = GetOptions(foreigntableid);
 
 	festate = (hdfsFdwExecutionState *) palloc(sizeof(hdfsFdwExecutionState));
+
+	/* Connect to HIVE server */
+	festate->conn = GetConnection(opt, foreigntableid);
+
 	node->fdw_state = (void *) festate;
 	festate->result = NULL;
 	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
@@ -372,7 +384,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	options = GetOptions(foreigntableid);
 
 	if (!festate->result)
-		festate->result = hdfs_query_execute(options, festate->query);
+		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
 	
 	if (hdfs_fetch(options, festate->result) == HIVE_SUCCESS)
 	{
@@ -430,14 +442,18 @@ hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func, BlockNum
 	long          ts = 0;
 	hdfs_opt      *options = NULL;
 	Oid           foreigntableid = RelationGetRelid(relation);
+	HiveConnection *conn;
 
 	*func = hdfsAcquireSampleRowsFunc;
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
-	hdfs_analyze(options);
-	ts = hdfs_describe(options);
+	/* Connect to HIVE server */
+	conn = GetConnection(options, foreigntableid);
+
+	hdfs_analyze(conn, options);
+	ts = hdfs_describe(conn, options);
 
 	*totalpages = ts/BLCKSZ;
 	return true;
@@ -457,5 +473,10 @@ hdfsEndForeignScan(ForeignScanState *node)
 	{
 		hdfs_close_result_set(options, festate->result);
 		festate->result = NULL;
+	}
+	if(festate->conn)
+	{
+		hdfs_rel_connection(festate->conn);
+		festate->conn = NULL;
 	}
 }
