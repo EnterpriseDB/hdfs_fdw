@@ -58,8 +58,9 @@ static hdfs_opt *GetOptions(Oid foreigntableid);
 
 static void hdfsGetForeignRelSize(PlannerInfo *root,RelOptInfo *baserel, Oid foreigntableid);
 static void hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
-					Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses);
+static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path,
+					List *tlist, List *scan_clauses, Plan *outer_plan);
+
 static void hdfsBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *hdfsIterateForeignScan(ForeignScanState *node);
 static void hdfsReScanForeignScan(ForeignScanState *node);
@@ -227,9 +228,19 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 	add_path(baserel, (Path *) path);
 }
 
+
+/*
+ * hdfsGetForeignPlan
+ *              Create ForeignScan plan node which implements selected best path
+ */
 static ForeignScan *
-hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid,
-					 ForeignPath *best_path, List *tlist, List *scan_clauses)
+hdfsGetForeignPlan(PlannerInfo *root,
+					RelOptInfo *baserel,
+					Oid foreigntableid,
+					ForeignPath *best_path,
+					List *tlist,
+					List *scan_clauses,
+					Plan *outer_plan)
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) baserel->fdw_private;
 	Index          scan_relid = baserel->relid;
