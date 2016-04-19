@@ -137,7 +137,9 @@ The following parameters can be set on a HiveServer foreign server object:
 
   * `host`: Address or hostname of the HiveServer. Defaults to `127.0.0.1`
   * `port`: Port number of the HiveServer. Defaults to `10000`
-  * `client_type`:  HiveServer1 or HiveServer2.
+  * `client_type`:  HiveServer1 or HiveServer2. Default is HiveServer1
+  * `connect_timeout`:  Connection timeout, default value is 300 seconds.
+  * `query_timeout`:  Query timeout, default value is 300 seconds
 
 The following parameters can be set on a Hive foreign table object:
 

@@ -28,17 +28,21 @@ hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt)
 {
 	HiveConnection *conn = NULL;
 	char           err_buf[512];
+
 	conn = DBOpenConnection(opt->dbname,
 				opt->host,
 				opt->port,
 				0,
 				opt->client_type,
+				opt->connect_timeout,
+				opt->receive_timeout,
 				err_buf,
 				512);
 	if (!conn)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_OUT_OF_MEMORY),
 				errmsg("failed to initialize the HDFS connection object (%s)", err_buf)));
+
 	return conn;
 }
 

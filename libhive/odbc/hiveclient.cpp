@@ -46,7 +46,7 @@ using namespace apache::thrift::transport;
  *****************************************************************/
 
 HiveConnection* DBOpenConnection(const char* database, const char* host, int port, int framed,
-                                 HIVE_SERVER_TYPE v, char* err_buf, size_t err_buf_len) {
+                                 HIVE_SERVER_TYPE v, int coonect_timeout, int receive_timeout, char* err_buf, size_t err_buf_len) {
 /* TODO: Add in database selection when Hive supports this feature. */
   shared_ptr<TSocket>           socket(new TSocket(host, port));
   shared_ptr<TTransport>        transport;
@@ -55,7 +55,15 @@ HiveConnection* DBOpenConnection(const char* database, const char* host, int por
   shared_ptr<ThriftHiveClient>  hs1_client;	
   TOpenSessionReq               *req = NULL;
   TOpenSessionResp              *res = NULL;
-  
+
+  /* Set the timeout if timeout is greater than 0 */
+  if (coonect_timeout > 0)
+    socket->setConnTimeout(coonect_timeout);
+
+  /* Set the timeout if timeout is greater than 0 */
+  if (receive_timeout > 0)
+    socket->setRecvTimeout(receive_timeout);
+
   conn = new HiveConnection(); /* Will set client and tranport later */
 
   if (framed) {

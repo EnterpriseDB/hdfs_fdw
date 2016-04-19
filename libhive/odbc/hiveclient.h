@@ -113,7 +113,7 @@ typedef enum HIVE_SERVER_TYPE {
  *         or NULL if an error occurred. Error messages will be stored in err_buf.
  */
 HiveConnection* DBOpenConnection(const char* database, const char* host, int port, int framed,
-                 HIVE_SERVER_TYPE v, char* err_buf, size_t err_buf_len);
+                 HIVE_SERVER_TYPE v, int coonect_timeout, int receive_timeout, char* err_buf, size_t err_buf_len);
 
 /**
  * @brief Disconnects from a Hive database.

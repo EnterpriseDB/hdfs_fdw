@@ -43,6 +43,8 @@ typedef struct hdfs_opt
 	char           *table_name;       /* HDFS table name */
 	CLIENT_TYPE    client_type;
 	bool           use_remote_estimate;
+	int            connect_timeout;
+	int            receive_timeout;
 } hdfs_opt;
 
 typedef struct hdfsFdwExecutionState

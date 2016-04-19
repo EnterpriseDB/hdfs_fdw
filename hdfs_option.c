@@ -71,6 +71,8 @@ static struct HDFSFdwOption valid_options[] =
 	{ "table_name",          ForeignTableRelationId },
 	{ "client_type",         ForeignServerRelationId },
 	{ "use_remote_estimate", ForeignServerRelationId },
+	{ "query_timeout",       ForeignServerRelationId },
+	{ "connect_timeout",     ForeignServerRelationId },
 	{ NULL,                  InvalidOid }
 };
 
@@ -163,6 +165,9 @@ hdfs_get_options(Oid foreigntableid)
 	opt = (hdfs_opt*) palloc(sizeof(hdfs_opt));
 	memset(opt, 0, sizeof(hdfs_opt));
 
+	opt->receive_timeout = 1000 * 300;  /* Default timeout is 300 seconds */
+	opt->connect_timeout = 1000 * 300;  /* Default timeout is 300 seconds */
+
 	/*
 	 * Extract options from FDW objects.
 	 */
@@ -209,8 +214,15 @@ hdfs_get_options(Oid foreigntableid)
 					errmsg("invalid option \"%s\"", defGetString(def)), 
 						errhint("Valid clinet_type are hiveserver1 and hiveserver2"));
 		}
+
 		if (strcmp(def->defname, "use_remote_estimate") == 0)
 			opt->use_remote_estimate = defGetBoolean(def);
+
+		if (strcmp(def->defname, "query_timeout") == 0)
+			opt->receive_timeout = atoi(defGetString(def));
+
+		if (strcmp(def->defname, "connect_timeout") == 0)
+			opt->connect_timeout = atoi(defGetString(def));
 	}
 
 	/* Default values, if required */
