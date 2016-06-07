@@ -192,7 +192,11 @@ hdfs_get_options(Oid foreigntableid)
 			opt->host = defGetString(def);
 
 		if (strcmp(def->defname, "port") == 0)
+		{
 			opt->port = atoi(defGetString(def));
+			if (opt->port <= 0 || opt->port >= 65535)
+				elog(ERROR, "invalid port number: %s", defGetString(def));
+		}
 
 		if (strcmp(def->defname, "username") == 0)
 			opt->username = defGetString(def);
