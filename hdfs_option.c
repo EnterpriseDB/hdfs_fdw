@@ -180,6 +180,9 @@ hdfs_get_options(Oid foreigntableid)
 	options = list_concat(options, f_server->options);
 	options = list_concat(options, f_mapping->options);
 
+	/* Set default clinet type to HiverServer2 */
+	opt->client_type = HIVESERVER2;
+
 	/* Loop through the options, and get the server/port */
 	foreach(lc, options)
 	{
