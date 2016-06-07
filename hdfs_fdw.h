@@ -155,6 +155,10 @@ size_t hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs);
 size_t hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col);
 HiveReturn hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs);
 char* hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len);
+
+Datum
+hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len);
+
 HiveResultSet* hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query);
 void hdfs_close_result_set(hdfs_opt *opt, HiveResultSet *rs);
 

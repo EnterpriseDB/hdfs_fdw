@@ -12,6 +12,11 @@
  */
 
 #include "postgres.h"
+#include "utils/lsyscache.h"
+#include "funcapi.h"
+#include "access/htup_details.h"
+#include "catalog/pg_type.h"
+#include "utils/syscache.h"
 
 #include "libhive/odbc/hiveclient.h"
 
@@ -54,19 +59,74 @@ hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col)
 	return len;
 }
 
+Datum
+hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len)
+{
+	Datum      value_datum = 0;
+	Datum      valueDatum = 0;
+	regproc    typeinput;
+	HeapTuple  tuple;
+	int        typemod;
+
+	/* get the type's output function */
+	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(pgtyp));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for type%u", pgtyp);
+
+	typeinput = ((Form_pg_type)GETSTRUCT(tuple))->typinput;
+	typemod  = ((Form_pg_type)GETSTRUCT(tuple))->typtypmod;
+	ReleaseSysCache(tuple);
+
+	switch (pgtyp)
+	{
+		case INT4OID:
+		case INT8OID:
+		case FLOAT4OID:
+		case FLOAT8OID:
+		case NUMERICOID:
+		case BOOLOID:
+		{
+			char *value;
+			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+			/* libhive return an empty string for null value */
+			if (strlen(value) == 0)
+			{
+				*is_null = true;
+			}
+			else
+			{
+				valueDatum = CStringGetDatum((char*)value);
+				value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(InvalidOid), Int32GetDatum(typemod));
+			}
+		}
+		break;
+		default:
+		{
+			char *value;
+			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+			valueDatum = CStringGetDatum((char*)value);
+			value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(InvalidOid), Int32GetDatum(typemod));
+		}
+		break;
+	}
+	return value_datum;
+}
+
+
 char *
 hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len)
 {
 	size_t  bs;
 	char    *value = NULL;
-	int     isnull = 0;
+	int     isnull = 1;
 	char    err_buf[512];
-			
+
 	value = (char*) palloc(len);
 	if (DBGetFieldAsCString(rs, idx, value, len, &bs, &isnull, err_buf, sizeof(err_buf)) == HIVE_ERROR)
 		ereport(ERROR,
 				(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 					errmsg("failed to fetch field from HiveServer: %s", err_buf)));
+
 	if (isnull == 0)
 		*is_null = false;
 	else
@@ -80,7 +140,7 @@ hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query)
 	HiveResultSet *rs = NULL;
 	char  err_buf[512];
 
-	if (DBExecute(conn, query, &rs, 1000, err_buf, sizeof(err_buf)) == HIVE_ERROR)
+	if (DBExecute(conn, query, &rs, 1000, err_buf, sizeof(err_buf)) != HIVE_SUCCESS)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 				errmsg("failed to fetch execute query: %s", err_buf)));

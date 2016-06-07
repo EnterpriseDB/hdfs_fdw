@@ -364,21 +364,22 @@ static TupleTableSlot *
 hdfsIterateForeignScan(ForeignScanState *node)
 {
 	HeapTuple      tuple;
-	char           **values = NULL;
 	char           *value = NULL;
 	unsigned int   len = 0;
 	int            attid;
 	hdfs_opt       *options = NULL;
 	ListCell       *lc = NULL;
 	AttInMetadata  *attinmeta = NULL;
-	Oid            foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
+	Oid                    foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfsFdwExecutionState  *festate = (hdfsFdwExecutionState *) node->fdw_state;
-	TupleTableSlot         *slot = node->ss.ss_ScanTupleSlot;
+	TupleTableSlot         *tupleSlot = node->ss.ss_ScanTupleSlot;
 	TupleDesc              tupdesc = node->ss.ss_currentRelation->rd_att;
+	HiveReturn             r;
 
-	values = palloc0(tupdesc->natts * sizeof(char*));
+	memset (tupleSlot->tts_values, 0, sizeof(Datum) * tupdesc->natts);
+	memset (tupleSlot->tts_isnull, false, sizeof(bool) * tupdesc->natts);
 	
-	ExecClearTuple(slot);
+	ExecClearTuple(tupleSlot);
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
@@ -386,26 +387,43 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	if (!festate->result)
 		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
 	
-	if (hdfs_fetch(options, festate->result) == HIVE_SUCCESS)
+	r = hdfs_fetch(options, festate->result);
+	switch(r)
 	{
-		attid = 0;
-		foreach(lc, festate->retrieved_attrs)
+		case HIVE_SUCCESS:
 		{
-			bool isnull = true;
-			int attnum = lfirst_int(lc) - 1;
+			attid = 0;
+			foreach(lc, festate->retrieved_attrs)
+			{
+				int         len;
+				bool        isnull = true;
+				int         attnum = lfirst_int(lc) - 1;
+				Oid         pgtype = tupdesc->attrs[attnum]->atttypid;
+				int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
+				Datum       v;
 
-			len = hdfs_get_field_data_len(options, festate->result, attid);
-			value = hdfs_get_field_as_cstring(options, festate->result, attid, &isnull, len + 1);
+				len = hdfs_get_field_data_len(options, festate->result, attid);
+				v = hdfs_get_value(options, pgtype, pgtypmod, festate->result, attid, &isnull, len + 1);
 
-			if (!isnull)
-				values[attnum] = value;
-			attid++;
+				if (!isnull)
+					tupleSlot->tts_values[attnum] = v;
+				else
+				{
+					tupleSlot->tts_isnull[attnum] = true;
+				}
+				attid++;
+			}
+			ExecStoreVirtualTuple(tupleSlot);
 		}
-		attinmeta = TupleDescGetAttInMetadata(tupdesc);
-		tuple = BuildTupleFromCStrings(attinmeta, values);
-		ExecStoreTuple(tuple, slot, InvalidBuffer, false);
+		break;
+		case HIVE_NO_MORE_DATA:
+		case HIVE_SUCCESS_WITH_MORE_DATA:
+		case HIVE_STILL_EXECUTING:
+		case HIVE_ERROR:
+		break;
 	}
-	return slot;
+
+	return tupleSlot;
 }
 
 static void
