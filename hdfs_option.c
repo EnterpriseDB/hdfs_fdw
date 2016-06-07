@@ -208,14 +208,15 @@ hdfs_get_options(Oid foreigntableid)
 
 		if (strcmp(def->defname, "client_type") == 0)
 		{
-			if (strcmp(defGetString(def), "hiveserver1") == 0)
+			if (strcasecmp(defGetString(def), "hiveserver1") == 0)
 				opt->client_type = HIVESERVER1;
-			else if (strcmp(defGetString(def), "hiveserver2") == 0)
+			else if (strcasecmp(defGetString(def), "hiveserver2") == 0)
 				opt->client_type = HIVESERVER2;
 			else
-				(errcode(ERRCODE_FDW_INVALID_OPTION_NAME), 
-					errmsg("invalid option \"%s\"", defGetString(def)), 
-						errhint("Valid clinet_type are hiveserver1 and hiveserver2"));
+				ereport(ERROR,
+					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME), 
+						errmsg("invalid option \"%s\"", defGetString(def)), 
+							errhint("Valid clinet_type are hiveserver1 and hiveserver2")));
 		}
 
 		if (strcmp(def->defname, "use_remote_estimate") == 0)
