@@ -151,7 +151,13 @@ HiveReturn
 HiveQueryResultSetHS2::getValue(string& val, TColumnValue& col_value)
 {
   if (col_value.__isset.boolVal)
-    val = col_value.boolVal.value;
+  {
+	  val = col_value.boolVal.value;
+	  if (col_value.boolVal.value == 0)
+		  val = "f";
+	  else
+		  val = "t";
+  }
   else if (col_value.__isset.byteVal)
     val = col_value.byteVal.value;
   else if (col_value.__isset.doubleVal)
