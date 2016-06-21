@@ -1059,9 +1059,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 	if (node->constisnull)
 	{
 		appendStringInfoString(buf, "NULL");
-		appendStringInfo(buf, "::%s",
-						 format_type_with_typemod(node->consttype,
-												  node->consttypmod));
 		return;
 	}
 

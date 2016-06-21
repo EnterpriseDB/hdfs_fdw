@@ -363,34 +363,39 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 static TupleTableSlot *
 hdfsIterateForeignScan(ForeignScanState *node)
 {
-	HeapTuple      tuple;
-	char           *value = NULL;
-	unsigned int   len = 0;
-	int            attid;
-	hdfs_opt       *options = NULL;
-	ListCell       *lc = NULL;
-	AttInMetadata  *attinmeta = NULL;
+	HeapTuple              tuple;
+	Datum	               *values;
+	bool	               *nulls;
+	char                   *value = NULL;
+	unsigned int           len = 0;
+	int                    attid;
+	hdfs_opt               *options = NULL;
+	ListCell               *lc = NULL;
 	Oid                    foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfsFdwExecutionState  *festate = (hdfsFdwExecutionState *) node->fdw_state;
-	TupleTableSlot         *tupleSlot = node->ss.ss_ScanTupleSlot;
 	TupleDesc              tupdesc = node->ss.ss_currentRelation->rd_att;
+	TupleTableSlot         *slot = node->ss.ss_ScanTupleSlot;
 	HiveReturn             r;
 
-	memset (tupleSlot->tts_values, 0, sizeof(Datum) * tupdesc->natts);
-	memset (tupleSlot->tts_isnull, false, sizeof(bool) * tupdesc->natts);
-	
-	ExecClearTuple(tupleSlot);
+	values = (Datum *) palloc0(tupdesc->natts * sizeof(Datum));
+	nulls = (bool *) palloc(tupdesc->natts * sizeof(bool));
+
+	/* Initialize to nulls for any columns not present in result */
+	memset(nulls, true, tupdesc->natts * sizeof(bool));
+
+	ExecClearTuple(slot);
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
 	if (!festate->result)
 		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
-	
+
 	r = hdfs_fetch(options, festate->result);
 	switch(r)
 	{
 		case HIVE_SUCCESS:
+		case HIVE_SUCCESS_WITH_MORE_DATA:
 		{
 			attid = 0;
 			foreach(lc, festate->retrieved_attrs)
@@ -406,29 +411,40 @@ hdfsIterateForeignScan(ForeignScanState *node)
 				v = hdfs_get_value(options, pgtype, pgtypmod, festate->result, attid, &isnull, len + 1);
 
 				if (!isnull)
-					tupleSlot->tts_values[attnum] = v;
-				else
 				{
-					tupleSlot->tts_isnull[attnum] = true;
+					nulls[attnum] = false;
+					values[attnum] = v;
 				}
 				attid++;
 			}
-			ExecStoreVirtualTuple(tupleSlot);
+			tuple = heap_form_tuple(tupdesc, values, nulls);
+			ExecStoreTuple(tuple, slot, InvalidBuffer, true);
 		}
 		break;
 		case HIVE_NO_MORE_DATA:
-		case HIVE_SUCCESS_WITH_MORE_DATA:
 		case HIVE_STILL_EXECUTING:
 		case HIVE_ERROR:
 		break;
 	}
 
-	return tupleSlot;
+	return slot;
 }
 
 static void
 hdfsReScanForeignScan(ForeignScanState *node)
 {
+	Oid                    foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
+	hdfsFdwExecutionState  *festate = (hdfsFdwExecutionState *) node->fdw_state;
+	hdfs_opt               *options = NULL;
+
+	/* Get the options */
+	options = GetOptions(foreigntableid);
+
+	if (festate->result)
+	{
+		hdfs_close_result_set(options, festate->result);
+		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
+	}
 }
 
 static void
