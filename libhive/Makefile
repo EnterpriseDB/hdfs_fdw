@@ -1,9 +1,10 @@
 .PHONY : clean
 
-THRIFT_HOME=/usr/local/include/
-INSTALL_DIR=/usr/local/pgsql.master/lib
+THRIFT_HOME:="$(shell echo $(THRIFT_HOME))"
+BOOST_HOME:="$(shell echo $(BOOST_HOME))"
+INSTALL_DIR:="$(shell echo $(PGDIR))/lib"
 
-CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(THRIFT_HOME) -I$(THRIFT_HOME)/thrift -I$(THRIFT_HOME)/thrift/fb303 -Ithrift -Imetastore -Iodbc -Iodbc2 -Iql
+CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(THRIFT_HOME)/include -I$(THRIFT_HOME)/include/thrift -I$(BOOST_HOME)/include -I$(THRIFT_HOME)/include/thrift/fb303 -Ithrift -Imetastore -Iodbc -Iodbc2 -Iql
 LDFLAGS= -shared
 
 METASTORE = metastore/hive_metastore_constants.cpp  metastore/hive_metastore_types.cpp  metastore/ThriftHiveMetastore.cpp
