@@ -220,17 +220,30 @@ hdfs_get_options(Oid foreigntableid)
 				ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME), 
 						errmsg("invalid option \"%s\"", defGetString(def)), 
-							errhint("Valid clinet_type are hiveserver1 and hiveserver2")));
+							errhint("Valid client_type are hiveserver1 and hiveserver2")));
 		}
 
 		if (strcmp(def->defname, "use_remote_estimate") == 0)
 			opt->use_remote_estimate = defGetBoolean(def);
 
 		if (strcmp(def->defname, "query_timeout") == 0)
+		{
 			opt->receive_timeout = atoi(defGetString(def));
-
+			if (opt->receive_timeout <= 0 || opt->receive_timeout >= INT_MAX)
+				ereport(ERROR,
+					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+						errmsg("invalid query timeout \"%s\"", defGetString(def)),
+							errhint("Valid range is 0 - 2147483647 ms")));
+		}
 		if (strcmp(def->defname, "connect_timeout") == 0)
+		{
 			opt->connect_timeout = atoi(defGetString(def));
+			if (opt->connect_timeout <= 0 || opt->connect_timeout >= INT_MAX)
+				ereport(ERROR,
+					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+						errmsg("invalid connect timeout \"%s\"", defGetString(def)),
+							errhint("Valid range is 0 - 2147483647 ms")));
+		}
 	}
 
 	/* Default values, if required */
