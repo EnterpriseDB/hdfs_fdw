@@ -229,20 +229,22 @@ hdfs_get_options(Oid foreigntableid)
 		if (strcmp(def->defname, "query_timeout") == 0)
 		{
 			opt->receive_timeout = atoi(defGetString(def));
-			if (opt->receive_timeout <= 0 || opt->receive_timeout >= INT_MAX)
+			if (opt->receive_timeout <= 0 || opt->receive_timeout >= 100000)
 				ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
 						errmsg("invalid query timeout \"%s\"", defGetString(def)),
-							errhint("Valid range is 0 - 2147483647 ms")));
+							errhint("Valid range is 1 - 100000 ms")));
+			opt->receive_timeout = opt->receive_timeout * 1000;
 		}
 		if (strcmp(def->defname, "connect_timeout") == 0)
 		{
 			opt->connect_timeout = atoi(defGetString(def));
-			if (opt->connect_timeout <= 0 || opt->connect_timeout >= INT_MAX)
+			if (opt->connect_timeout <= 0 || opt->connect_timeout >= 100000)
 				ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
 						errmsg("invalid connect timeout \"%s\"", defGetString(def)),
-							errhint("Valid range is 0 - 2147483647 ms")));
+							errhint("Valid range is 1 - 100000 ms")));
+			opt->connect_timeout = opt->connect_timeout * 1000;	
 		}
 	}
 
