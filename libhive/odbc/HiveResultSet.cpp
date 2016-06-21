@@ -121,23 +121,23 @@ HiveReturn HiveQueryResultSetHS2::fetchResults(TOperationHandle &opHandle) {
   req->__set_orientation((TFetchOrientation::type)0);
 
   req->maxRows = m_max_buffered_rows;
-  hive_fetchReq = req;
+  m_fetchReq = req;
 
   m_connection->getClient2()->FetchResults(*res, *req);
   
-  hive_rows = res->results.rows;
+  m_rows = res->results.rows;
   
   if (res->results.rows.size() <= 0)
       return HIVE_NO_MORE_DATA;
 
-  hive_result_iterator = hive_rows.begin();
+  m_result_iterator = m_rows.begin();
   
   TGetResultSetMetadataReq *rq = new TGetResultSetMetadataReq();
   rq->__set_operationHandle(opHandle);
   TGetResultSetMetadataResp *re = new TGetResultSetMetadataResp();
   
   m_connection->getClient2()->GetResultSetMetadata(*re, *rq);
-  hive_column_desc = re->schema.columns;
+  m_column_desc = re->schema.columns;
   return HIVE_SUCCESS;
 }
 
@@ -218,7 +218,7 @@ HiveReturn HiveQueryResultSetHS2::fetchNext(char* err_buf, size_t err_buf_len) {
   unsigned int  i;
   
   try {
-    if ((m_fetch_idx >= (int)hive_rows.size()) && (fetchNewResults(err_buf, err_buf_len) != HIVE_SUCCESS))
+    if ((m_fetch_idx >= (int)m_rows.size()) && (fetchNewResults(err_buf, err_buf_len) != HIVE_SUCCESS))
       return HIVE_NO_MORE_DATA;
   }
   catch(const std::exception& ex) {
@@ -226,10 +226,10 @@ HiveReturn HiveQueryResultSetHS2::fetchNext(char* err_buf, size_t err_buf_len) {
                      ex.what(), err_buf, err_buf_len, HIVE_ERROR);
   }
     
-  hive_result_set_data.clear();
-  for (i = 0; i < hive_result_iterator->colVals.size(); i++) {
+  m_result_data.clear();
+  for (i = 0; i < m_result_iterator->colVals.size(); i++) {
     try {
-      r = getValue(val, hive_result_iterator->colVals[i]);
+      r = getValue(val, m_result_iterator->colVals[i]);
      }
      catch(const std::exception& ex)
      {
@@ -237,9 +237,9 @@ HiveReturn HiveQueryResultSetHS2::fetchNext(char* err_buf, size_t err_buf_len) {
                        ex.what(), err_buf, err_buf_len, HIVE_ERROR);
      }
     RETURN_ON_ASSERT(r == HIVE_ERROR, __FUNCTION__, "failed to fetch rows from resultset", err_buf, err_buf_len, HIVE_ERROR);
-    hive_result_set_data.push_back(val);
+    m_result_data.push_back(val);
   }
-  hive_result_iterator++;
+  m_result_iterator++;
   m_fetch_idx++;
   return HIVE_SUCCESS;
 }
@@ -250,7 +250,7 @@ size_t HiveQueryResultSetHS1::getColumnCount() {
 
 size_t HiveQueryResultSetHS2::getColumnCount()
 {
-  return hive_column_desc.size();
+  return m_column_desc.size();
 }
 
 HiveReturn HiveQueryResultSetHS1::getFieldDataLen(size_t column_idx, size_t* col_len, char* err_buf, size_t err_buf_len)
@@ -265,7 +265,7 @@ HiveReturn HiveQueryResultSetHS2::getFieldDataLen(size_t column_idx, size_t* col
   RETURN_ON_ASSERT(column_idx >= getColumnCount(), __FUNCTION__,
                      "Column index out of bounds.", err_buf, err_buf_len, HIVE_ERROR);
 
-  string val = hive_result_set_data.at(column_idx);
+  string val = m_result_data.at(column_idx);
   *col_len = val.length();
   return HIVE_SUCCESS;
 }
@@ -293,12 +293,12 @@ HiveReturn HiveQueryResultSetHS2::getFieldAsCString(size_t column_idx, char* buf
   RETURN_ON_ASSERT(buffer_len == 0, __FUNCTION__,
 		    "Output buffer cannot have a size of zero.", err_buf, err_buf_len, HIVE_ERROR);
 
-  if (hive_result_set_data.at(column_idx).c_str() == NULL)
+  if (m_result_data.at(column_idx).c_str() == NULL)
     *is_null_value = 1;
   else
     *is_null_value = 0;
 
-  strcpy(buffer, hive_result_set_data.at(column_idx).c_str());
+  strcpy(buffer, m_result_data.at(column_idx).c_str());
   return HIVE_SUCCESS;
 }
 
@@ -343,7 +343,7 @@ HiveReturn HiveQueryResultSetHS1::getColumnCount(size_t* col_count, char* err_bu
 }
 
 HiveReturn HiveQueryResultSetHS2::getColumnCount(size_t* col_count, char* err_buf, size_t err_buf_len) {
-  *col_count = hive_column_desc.size();
+  *col_count = m_column_desc.size();
   return HIVE_SUCCESS;
 }
 
@@ -433,7 +433,7 @@ HiveReturn HiveQueryResultSetHS1::fetchNewResults(char* err_buf, size_t err_buf_
 }
 
 HiveReturn HiveQueryResultSetHS2::fetchNewResults(char* err_buf, size_t err_buf_len) {
-    hive_rows.clear();
+    m_rows.clear();
    
     RETURN_ON_ASSERT(m_connection == NULL, __FUNCTION__,
                      "Hive connection cannot be NULL", err_buf, err_buf_len, HIVE_ERROR);
@@ -444,13 +444,13 @@ HiveReturn HiveQueryResultSetHS2::fetchNewResults(char* err_buf, size_t err_buf_
 
     TFetchResultsResp *res = new TFetchResultsResp();
 
-    m_connection->getClient2()->FetchResults(*res, *hive_fetchReq);
+    m_connection->getClient2()->FetchResults(*res, *m_fetchReq);
 
     if (res->results.rows.size() > 0)
     {
-      hive_rows = res->results.rows;
+      m_rows = res->results.rows;
       m_fetch_idx = 0;
-      hive_result_iterator = hive_rows.begin();
+      m_result_iterator = m_rows.begin();
     }
     else
       return HIVE_NO_MORE_DATA;

@@ -95,11 +95,11 @@ protected:
     Schema                  m_schema;                                     ///< Schema of the result table
     HiveReturn              initializeSchema(char* err_buf, size_t err_buf_len);
     HiveReturn              fetchNewResults(char* err_buf, size_t err_buf_len, char);
-    vector<string>          hive_result_set_data;                         ///associated with the current fetched row (if any)
-    vector<TRow>            hive_rows;                                    /// fetched rows
-    TFetchResultsReq        *hive_fetchReq;                               /// handle to the results fetch request on the server
-    vector<TRow>::iterator  hive_result_iterator;                         ///iterator for fetched rows
-    vector<TColumnDesc>     hive_column_desc;                             /// column descriptor associated with resultset
+    vector<string>          m_result_data;
+    vector<TColumnDesc>     m_column_desc;
+	vector<TRow>            m_rows;
+    TFetchResultsReq        *m_fetchReq;
+    vector<TRow>::iterator  m_result_iterator;
 };
 
 class HiveQueryResultSetHS1: public HiveQueryResultSet {
