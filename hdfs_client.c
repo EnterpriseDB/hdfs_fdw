@@ -96,7 +96,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 			else
 			{
 				valueDatum = CStringGetDatum((char*)value);
-				value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(InvalidOid), Int32GetDatum(typemod));
+				value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
 			}
 		}
 		break;
@@ -105,7 +105,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 			char *value;
 			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
 			valueDatum = CStringGetDatum((char*)value);
-			value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(InvalidOid), Int32GetDatum(typemod));
+			value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
 		}
 		break;
 	}
