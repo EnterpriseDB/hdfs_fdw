@@ -71,7 +71,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 	/* get the type's output function */
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(pgtyp));
 	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for type%u", pgtyp);
+		elog(ERROR, "cache lookup failed for type %u", pgtyp);
 
 	typeinput = ((Form_pg_type)GETSTRUCT(tuple))->typinput;
 	typemod  = ((Form_pg_type)GETSTRUCT(tuple))->typtypmod;
@@ -79,15 +79,22 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 
 	switch (pgtyp)
 	{
+		case BITOID:
+		case BOOLOID:
+		case INT2OID:
 		case INT4OID:
 		case INT8OID:
+		case BYTEAOID:
+		case DATEOID:
+		case TIMEOID:
+		case TIMESTAMPOID:
+		case TIMESTAMPTZOID:
 		case FLOAT4OID:
-		case FLOAT8OID:
-		case NUMERICOID:
-		case BOOLOID:
-		{
+ 		case FLOAT8OID:
+ 		{
 			char *value;
 			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+
 			/* libhive return an empty string for null value */
 			if (strlen(value) == 0)
 			{
@@ -100,14 +107,23 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 			}
 		}
 		break;
-		default:
+		case CHAROID:
+		case NAMEOID:
+		case TEXTOID:
+		case VARCHAROID:
 		{
 			char *value;
-			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+			value = pstrdup(hdfs_get_field_as_cstring(opt, rs, idx, is_null, len));
 			valueDatum = CStringGetDatum((char*)value);
 			value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
 		}
 		break;
+		default:
+			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+								errmsg("unknown or unsupported data type"),
+								errhint("Supported data types are, BOOL, INT, DATE, TIME, FLOAT, CHAR, TEXT and VARCHAR : %u", pgtyp)));
+                        break;
+
 	}
 	return value_datum;
 }
