@@ -314,6 +314,8 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	if (remote_conds)
 		hdfs_append_where_clause(options, &sql, root, baserel, remote_conds,
 						  true, &params_list);
+
+	elog(DEBUG1, "Remote SQL: %s", sql.data);
 	/*
 	 * Build the fdw_private list that will be available to the executor.
 	 * Items in the list must match enum FdwScanPrivateIndex, above.
@@ -411,7 +413,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 				int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
 				Datum       v;
 				char        *attrname;
-				hdfs_column *cols;
+				hdfs_column *cols = NULL;
 				ListCell    *list_cell;
 
 				attrname = NameStr(tupdesc->attrs[attnum]->attname);

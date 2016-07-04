@@ -78,6 +78,8 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 	appendStringInfo(&sql, "DESC %s", opt->table_name);
 	rs = hdfs_query_execute(conn, opt, sql.data);
 
+	elog(DEBUG1, "Remote Describe SQL: %s", sql.data);
+
 	while (hdfs_fetch(opt, rs) == HIVE_SUCCESS)
 	{
 		cols = palloc0(sizeof(hdfs_column));

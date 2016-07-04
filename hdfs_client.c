@@ -111,6 +111,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 		case CHAROID:
 		case NAMEOID:
 		case TEXTOID:
+		case BPCHAROID:
 		case VARCHAROID:
 		{
 			switch (col_type)
@@ -144,7 +145,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 		default:
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
 								errmsg("unknown or unsupported data type"),
-								errhint("Supported data types are, BOOL, INT, DATE, TIME, FLOAT, CHAR, TEXT and VARCHAR : %u", pgtyp)));
+								errhint("Supported data types are BOOL, INT, DATE, TIME, FLOAT, CHAR, TEXT and VARCHAR : %u", pgtyp)));
                         break;
 
 	}
