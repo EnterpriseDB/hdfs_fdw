@@ -60,13 +60,14 @@ hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col)
 }
 
 Datum
-hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len)
+hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len, int col_type)
 {
 	Datum      value_datum = 0;
 	Datum      valueDatum = 0;
 	regproc    typeinput;
 	HeapTuple  tuple;
 	int        typemod;
+	char *value;
 
 	/* get the type's output function */
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(pgtyp));
@@ -112,10 +113,32 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 		case TEXTOID:
 		case VARCHAROID:
 		{
-			char *value;
-			value = pstrdup(hdfs_get_field_as_cstring(opt, rs, idx, is_null, len));
-			valueDatum = CStringGetDatum((char*)value);
-			value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
+			switch (col_type)
+			{
+				case HDFS_TINYINT:
+				{
+					char str[10];
+					value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+					if (strlen(value) == 0)
+					{
+						*is_null = true;
+					}
+					else
+					{
+						sprintf(str, "%d", value[0]);
+						valueDatum = CStringGetDatum((char*)str);
+						value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
+					}
+				}
+				break;
+				default:
+				{
+					value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+					valueDatum = CStringGetDatum((char*)value);
+					value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
+				}
+				break;
+			}
 		}
 		break;
 		default:

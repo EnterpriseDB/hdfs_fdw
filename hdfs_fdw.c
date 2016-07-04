@@ -356,6 +356,7 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 
 	node->fdw_state = (void *) festate;
 	festate->result = NULL;
+	festate->col_list = NULL;
 	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
 	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private, 1);
 }
@@ -388,6 +389,9 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
+	if (!festate->col_list)
+		festate->col_list = hdfs_desc_query(festate->conn, options);
+
 	if (!festate->result)
 		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
 
@@ -406,16 +410,30 @@ hdfsIterateForeignScan(ForeignScanState *node)
 				Oid         pgtype = tupdesc->attrs[attnum]->atttypid;
 				int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
 				Datum       v;
+				char        *attrname;
+				hdfs_column *cols;
+				ListCell    *list_cell;
 
-				len = hdfs_get_field_data_len(options, festate->result, attid);
-				v = hdfs_get_value(options, pgtype, pgtypmod, festate->result, attid, &isnull, len + 1);
-
-				if (!isnull)
+				attrname = NameStr(tupdesc->attrs[attnum]->attname);
+				foreach(list_cell, festate->col_list)
 				{
-					nulls[attnum] = false;
-					values[attnum] = v;
+					cols = (hdfs_column *) lfirst(list_cell);
+
+					if (cols != NULL && strcmp(cols->col_name, attrname) == 0)
+						break;
 				}
-				attid++;
+				if (cols)
+				{
+					len = hdfs_get_field_data_len(options, festate->result, attid);
+					v = hdfs_get_value(options, pgtype, pgtypmod, festate->result, attid, &isnull, len + 1, cols->col_type);
+
+					if (!isnull)
+					{
+						nulls[attnum] = false;
+						values[attnum] = v;
+					}
+					attid++;
+				}
 			}
 			tuple = heap_form_tuple(tupdesc, values, nulls);
 			ExecStoreTuple(tuple, slot, InvalidBuffer, true);

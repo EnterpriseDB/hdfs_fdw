@@ -25,11 +25,29 @@
 #include "utils/rel.h"
 #include "access/htup.h"
 
+#define HDFS_TINYINT     0
+#define HDFS_SMALLINT    1
+#define HDFS_INT         2
+#define HDFS_BIGINT      3
+#define HDFS_STRING      4
+#define HDFS_VARCHAR     5
+#define HDFS_CHAR        6
+#define HDFS_TIMESTAMPS  7
+#define HDFS_DACIMAL     8
+#define HDFS_DATE        9
+
 typedef enum CLIENT_TYPE
 {
 	HIVESERVER1,
 	HIVESERVER2
 } CLIENT_TYPE;
+
+typedef struct hdfs_col
+{
+	char *col_name;
+	int  col_type;
+} hdfs_column;
+
 
 /*
  * Options structure to store the HDFS server information */
@@ -54,6 +72,7 @@ typedef struct hdfsFdwExecutionState
 	HiveConnection *conn;
 	Relation        rel;              /* relcache entry for the foreign table */
 	List	        *retrieved_attrs; /* list of retrieved attribute numbers */
+	List	        *col_list;        /* list of remote column's type */
 } hdfsFdwExecutionState;
 
 
@@ -147,6 +166,8 @@ extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
 extern void deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_attrs);
 extern void deparseStringLiteral(StringInfo buf, const char *val);
 
+List *hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt);
+
 void hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt);
 void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
 void hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt);
@@ -157,7 +178,7 @@ HiveReturn hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs);
 char* hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len);
 
 Datum
-hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len);
+hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len, int col_type);
 
 HiveResultSet* hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query);
 void hdfs_close_result_set(hdfs_opt *opt, HiveResultSet *rs);
