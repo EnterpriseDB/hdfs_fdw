@@ -71,7 +71,7 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 	int             found = 0;
 	List            *col_list = NULL;
 	hdfs_column     *cols;
-	char            *col_type;
+	char            *col_type = NULL;
 
 	initStringInfo(&sql);
 
@@ -94,7 +94,7 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 		if (len > 0)
 		{
 			col_type = hdfs_get_field_as_cstring(opt, rs, 1, &is_null, len + 1);
-			if (is_null)
+			if (col_type == NULL || is_null)
 				continue;
 		}
 
@@ -127,6 +127,15 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 
 		else if (strcasecmp(col_type, "Date") == 0)
 			cols->col_type = HDFS_DATE;
+
+		else if (strstr(col_type, "varchar") != 0)
+			cols->col_type = HDFS_VARCHAR;
+
+		else
+			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+								errmsg("unknown or unsupported Hive data type"),
+								errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DACIMAL, DATE and VARCHAR")));
+
 
 		col_list = lappend(col_list, cols);
 	}
