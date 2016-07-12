@@ -125,6 +125,9 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 		else if (strcasecmp(col_type, "Dacimal") == 0)
 			cols->col_type = HDFS_DACIMAL;
 
+		else if (strstr(col_type, "decimal") != 0)
+			cols->col_type = HDFS_DACIMAL;
+
 		else if (strcasecmp(col_type, "Date") == 0)
 			cols->col_type = HDFS_DATE;
 
@@ -132,11 +135,12 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 			cols->col_type = HDFS_VARCHAR;
 
 		else
+		{
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
 								errmsg("unknown or unsupported Hive data type"),
-								errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DACIMAL, DATE and VARCHAR")));
+								errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DECIMAL, DATE and VARCHAR")));
 
-
+		}
 		col_list = lappend(col_list, cols);
 	}
 	hdfs_close_result_set(opt, rs);
