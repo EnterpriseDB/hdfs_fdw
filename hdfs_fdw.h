@@ -35,7 +35,8 @@
 #define HDFS_TIMESTAMPS  7
 #define HDFS_DACIMAL     8
 #define HDFS_DATE        9
-
+#define HDFS_DOUBLE      10
+#define HDFS_BOLEAN      11
 typedef enum CLIENT_TYPE
 {
 	HIVESERVER1,

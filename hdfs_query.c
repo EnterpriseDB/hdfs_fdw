@@ -107,8 +107,14 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 		else if (strcasecmp(col_type, "INT") == 0)
 			cols->col_type = HDFS_INT;
 
+		else if (strcasecmp(col_type, "double") == 0)
+			cols->col_type = HDFS_DOUBLE;
+
 		else if (strcasecmp(col_type, "BIGINT") == 0)
 			cols->col_type = HDFS_BIGINT;
+
+		else if (strcasecmp(col_type, "Boolean") == 0)
+			cols->col_type = HDFS_BOLEAN;
 
 		else if (strcasecmp(col_type, "String") == 0)
 			cols->col_type = HDFS_STRING;
@@ -119,7 +125,13 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 		else if (strcasecmp(col_type, "CHAR") == 0)
 			cols->col_type = HDFS_CHAR;
 
+		else if (strstr(col_type, "char") != 0)
+			cols->col_type = HDFS_CHAR;
+
 		else if (strcasecmp(col_type, "Timestamps") == 0)
+			cols->col_type = HDFS_TIMESTAMPS;
+
+		else if (strcasecmp(col_type, "timestamp") == 0)
 			cols->col_type = HDFS_TIMESTAMPS;
 
 		else if (strcasecmp(col_type, "Dacimal") == 0)
@@ -137,8 +149,8 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 		else
 		{
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
-								errmsg("unknown or unsupported Hive data type"),
-								errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DECIMAL, DATE and VARCHAR")));
+				errmsg("unknown or unsupported Hive data type"),
+					errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DECIMAL, DATE and VARCHAR: %s", col_type)));
 
 		}
 		col_list = lappend(col_list, cols);
