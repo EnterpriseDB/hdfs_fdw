@@ -169,6 +169,11 @@ CREATE TABLE emp (
 )
 row format delimited fields terminated by ',';
 
+CREATE TABLE double_data (
+    col1         DOUBLE
+)
+row format delimited fields terminated by ',';
+
 --Load data in the Tables.
 
 LOAD DATA INPATH 'emp_table.txt' OVERWRITE INTO TABLE emp;
