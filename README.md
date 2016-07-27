@@ -298,32 +298,32 @@ postgres=# EXPLAIN VERBOSE SELECT hd.client_ip IP, pr.category, count(hd.client_
                      Remote SQL: SELECT client_ip FROM weblogs WHERE ((year = '2011'))
 ```
 ##Regression
+
 To execute the Regression, follow the below steps.
-1. Open /etc/hosts and add the following line (the IP Address is of the Hive Server Machine).
+1.  Open /etc/hosts and add the following line (the IP Address is of the Hive Server Machine).
 
-127.0.0.1 hive.server
+    `127.0.0.1 hive.server`
 
-2. Run Hive Server without NOSASL Authentication using the following command.
+2.  Run Hive Server without NOSASL Authentication using the following command.
 
-./hive --service hiveserver2
+    `./hive --service hiveserver2`
 
-3. Load sample data for the test cases by using the following command.
+3.  Load sample data for the test cases by using the following command.
 
-hdfs_fdw/test/insert_hive.sh
+    `hdfs_fdw/test/insert_hive.sh`
 
-4. Run Hive Server with NOSASL Authentication using the following command.
+4.  Run Hive Server with NOSASL Authentication using the following command.
 
-./hive --service hiveserver2 --hiveconf hive.server2.authentication=NOSASL
+    `./hive --service hiveserver2 --hiveconf hive.server2.authentication=NOSASL`
 
-5. Execute the Regression using the following command.
+5.  Execute the Regression using the following command.
 
-hdfs_fdw/make installcheck
+    `hdfs_fdw/make installcheck`
 
 ##TODO
 1. Hadoop Installation Instructions
 2. Write-able support
 3. Flum support
-4. Regression test cases
 
 ##Contributing
 If you experince any bug create new [issue][6] and if you have fix for that create a pull request.
