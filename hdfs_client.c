@@ -68,6 +68,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 	HeapTuple  tuple;
 	int        typemod;
 	char *value;
+	char str[10];
 
 	/* get the type's output function */
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(pgtyp));
@@ -95,31 +96,10 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
  		{
 			char *value;
 			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
-
-			/* libhive return an empty string for null value */
-			if (strlen(value) == 0)
-			{
-				*is_null = true;
-			}
-			else
-			{
-				valueDatum = CStringGetDatum((char*)value);
-				value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
-			}
-		}
-		break;
-		case CHAROID:
-		case NAMEOID:
-		case TEXTOID:
-		case BPCHAROID:
-		case VARCHAROID:
-		{
 			switch (col_type)
 			{
 				case HDFS_TINYINT:
 				{
-					char str[10];
-					value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
 					if (strlen(value) == 0)
 					{
 						*is_null = true;
@@ -134,7 +114,46 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 				break;
 				default:
 				{
-					value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+					/* libhive return an empty string for null value */
+					if (strlen(value) == 0)
+					{
+						*is_null = true;
+					}
+					else
+					{
+						valueDatum = CStringGetDatum((char*)value);
+						value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
+					}
+				}
+				break;
+			}
+		}
+		break;
+		case CHAROID:
+		case NAMEOID:
+		case TEXTOID:
+		case BPCHAROID:
+		case VARCHAROID:
+		{
+			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
+			switch (col_type)
+			{
+				case HDFS_TINYINT:
+				{
+					if (strlen(value) == 0)
+					{
+						*is_null = true;
+					}
+					else
+					{
+						sprintf(str, "%d", value[0]);
+						valueDatum = CStringGetDatum((char*)str);
+						value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
+					}
+				}
+				break;
+				default:
+				{
 					valueDatum = CStringGetDatum((char*)value);
 					value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
 				}
@@ -144,8 +163,8 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 		break;
 		default:
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
-								errmsg("unknown or unsupported PostgreSQL data type"),
-								errhint("Supported data types are BOOL, INT, DATE, TIME, FLOAT, CHAR, TEXT and VARCHAR : %u", pgtyp)));
+								errmsg("unsupported PostgreSQL data type"),
+								errhint("Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : %u", pgtyp)));
                         break;
 
 	}

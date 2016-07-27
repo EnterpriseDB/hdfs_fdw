@@ -149,7 +149,7 @@ hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt)
 		else
 		{
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
-				errmsg("unknown or unsupported Hive data type"),
+				errmsg("unsupported Hive data type"),
 					errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DECIMAL, DATE and VARCHAR: %s", col_type)));
 
 		}

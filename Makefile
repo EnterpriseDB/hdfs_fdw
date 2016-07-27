@@ -14,7 +14,7 @@ SHLIB_LINK = -L$(THRIFT_HOME)/lib -L$(HIVECLIENT_HOME) -lhive  -lfb303 -lstdc++ 
 
 OBJS = hdfs_client.o hdfs_query.o hdfs_option.o hdfs_deparse.o hdfs_connection.o hdfs_fdw.o
 
-REGRESS =  hdfs_fdw_hive2
+REGRESS = external mapping retrival
 EXTENSION = hdfs_fdw
 DATA = hdfs_fdw--1.0.sql
 
