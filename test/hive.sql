@@ -168,17 +168,17 @@ CREATE TABLE binary_data (
 )
 row format delimited fields terminated by ',';
 
-CREATE TABLE emp (
-    empno           INT,
-    ename           VARCHAR(10),
-    job                 VARCHAR(9),
-    mgr               INT,
-    hiredate        DATE,
-    sal                INT,
-    comm           DECIMAL(7,2),
-    deptno          INT
-)
-row format delimited fields terminated by ',';
+--CREATE TABLE emp (
+--    empno           INT,
+--    ename           VARCHAR(10),
+--    job                 VARCHAR(9),
+--    mgr               INT,
+--    hiredate        DATE,
+--    sal                INT,
+--    comm           DECIMAL(7,2),
+--    deptno          INT
+--)
+--row format delimited fields terminated by ',';
 
 CREATE TABLE double_data (
     col1         DOUBLE
