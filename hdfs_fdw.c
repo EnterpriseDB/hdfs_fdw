@@ -350,6 +350,7 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	hdfsFdwExecutionState    *festate = NULL;
 	Oid                      foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfs_opt                 *opt = GetOptions(foreigntableid);
+	EState                   *estate = node->ss.ps.state;
 
 	festate = (hdfsFdwExecutionState *) palloc(sizeof(hdfsFdwExecutionState));
 
@@ -357,8 +358,14 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	festate->conn = GetConnection(opt, foreigntableid);
 
 	node->fdw_state = (void *) festate;
+	festate->batch_cxt = AllocSetContextCreate(estate->es_query_cxt,
+                                                                                           "hdfs_fdw tuple data",
+                                                                                           ALLOCSET_DEFAULT_MINSIZE,
+                                                                                           ALLOCSET_DEFAULT_INITSIZE,
+                                                                                           ALLOCSET_DEFAULT_MAXSIZE);
+
+	festate->col_list = hdfs_desc_query(festate->conn, opt);
 	festate->result = NULL;
-	festate->col_list = NULL;
 	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
 	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private, 1);
 }
@@ -379,6 +386,15 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	TupleDesc              tupdesc = node->ss.ss_currentRelation->rd_att;
 	TupleTableSlot         *slot = node->ss.ss_ScanTupleSlot;
 	HiveReturn             r;
+	MemoryContext oldcontext;
+
+	ExecClearTuple(slot);
+	/* Get the options */
+
+	options = GetOptions(foreigntableid);
+
+	MemoryContextReset(festate->batch_cxt);
+	oldcontext = MemoryContextSwitchTo(festate->batch_cxt);
 
 	values = (Datum *) palloc0(tupdesc->natts * sizeof(Datum));
 	nulls = (bool *) palloc(tupdesc->natts * sizeof(bool));
@@ -386,13 +402,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	/* Initialize to nulls for any columns not present in result */
 	memset(nulls, true, tupdesc->natts * sizeof(bool));
 
-	ExecClearTuple(slot);
 
-	/* Get the options */
-	options = GetOptions(foreigntableid);
-
-	if (!festate->col_list)
-		festate->col_list = hdfs_desc_query(festate->conn, options);
 
 	if (!festate->result)
 		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
@@ -446,7 +456,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 		case HIVE_ERROR:
 		break;
 	}
-
+	MemoryContextSwitchTo(oldcontext);
 	return slot;
 }
 

@@ -69,6 +69,7 @@ typedef struct hdfs_opt
 typedef struct hdfsFdwExecutionState
 {
 	char            *query;
+	MemoryContext batch_cxt;
 	HiveResultSet   *result;
 	HiveConnection *conn;
 	Relation        rel;              /* relcache entry for the foreign table */

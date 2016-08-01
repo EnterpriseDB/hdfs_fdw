@@ -94,7 +94,6 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 		case FLOAT4OID:
  		case FLOAT8OID:
  		{
-			char *value;
 			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
 			switch (col_type)
 			{
@@ -127,6 +126,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 				}
 				break;
 			}
+			pfree(value);
 		}
 		break;
 		case CHAROID:
@@ -159,6 +159,7 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 				}
 				break;
 			}
+			pfree(value);
 		}
 		break;
 		default:
