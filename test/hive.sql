@@ -69,7 +69,18 @@ CREATE TABLE weblogs (
 row format delimited
 fields terminated by '\t';
 
-create external table emp_ext  ( empno INT, ename VARCHAR(10), job VARCHAR(9), mgr INT, hiredate DATE, sal INT, comm DECIMAL(7,2), deptno INT ) row format delimited fields terminated by ',' location '/home/hadoop/empext/';
+CREATE EXTERNAL TABLE emp_ext (
+    empno           INT,
+    ename           VARCHAR(10),
+    job                 VARCHAR(9),
+    mgr               INT,
+    hiredate        DATE,
+    sal                INT,
+    comm           DECIMAL(7,2),
+    deptno          INT
+)
+row format delimited fields terminated by ','
+location '/home/hadoop/empext/';
 
 -- Tables for Datatype Mappings
 
@@ -157,17 +168,17 @@ CREATE TABLE binary_data (
 )
 row format delimited fields terminated by ',';
 
-CREATE TABLE emp (
-    empno           INT,
-    ename           VARCHAR(10),
-    job                 VARCHAR(9),
-    mgr               INT,
-    hiredate        DATE,
-    sal                INT,
-    comm           DECIMAL(7,2),
-    deptno          INT
-)
-row format delimited fields terminated by ',';
+--CREATE TABLE emp (
+--    empno           INT,
+--    ename           VARCHAR(10),
+--    job                 VARCHAR(9),
+--    mgr               INT,
+--    hiredate        DATE,
+--    sal                INT,
+--    comm           DECIMAL(7,2),
+--    deptno          INT
+--)
+--row format delimited fields terminated by ',';
 
 CREATE TABLE double_data (
     col1         DOUBLE
