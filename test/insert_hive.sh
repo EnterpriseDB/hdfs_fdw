@@ -14,6 +14,13 @@ hadoop fs -rm bool_dt_table.txt
 hadoop fs -rm str_dt_table.txt
 hadoop fs -rm num_dt_table.txt
 hadoop fs -rm arrdat_dt_table.txt
+hadoop fs -rm dept_table1.txt
+hadoop fs -rm dept_table2.txt
+hadoop fs -rm str_dt_table1.txt
+hadoop fs -rm str_dt_table2.txt
+hadoop fs -rm num_dt_table1.txt
+hadoop fs -rm emp_1_table1.txt
+hadoop fs -rm emp_1_table2.txt
 hadoop fs -put emp_table.txt
 hadoop fs -put dept_table.txt
 hadoop fs -put jobhist_table.txt
@@ -24,5 +31,12 @@ hadoop fs -put bool_dt_table.txt
 hadoop fs -put str_dt_table.txt
 hadoop fs -put num_dt_table.txt
 hadoop fs -put arrdat_dt_table.txt
+hadoop fs -put dept_table1.txt
+hadoop fs -put dept_table2.txt
+hadoop fs -put str_dt_table1.txt
+hadoop fs -put str_dt_table2.txt
+hadoop fs -put num_dt_table1.txt
+hadoop fs -put emp_1_table1.txt
+hadoop fs -put emp_1_table2.txt
 #hive 127.0.0.1 -f hive.sql
 beeline -u jdbc:hive2://localhost:10000/default -n hadoop -f hive.sql
