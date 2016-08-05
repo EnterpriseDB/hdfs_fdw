@@ -143,22 +143,6 @@ CREATE USER MAPPING FOR postgres SERVER hdfs_srv1;
  hdfs_srv1 | postgres  | 
 (1 row)
 
-CREATE FOREIGN TABLE dept (
-deptno INTEGER,
-dname VARCHAR2(14),
-loc VARCHAR2(13)
-)
-SERVER hdfs_srv1 OPTIONS (dbname 'fdw_db', table_name 'dept');
---should work successfully indicating host defaulted to localhost, port to 10000
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
 --test ALTER SERVER OWNER TO, and RENAME to clauses
 ALTER SERVER hdfs_srv1 RENAME TO hdfs_srv1_renamed;
 \des+ hdfs_srv1
@@ -175,7 +159,6 @@ ALTER SERVER hdfs_srv1_renamed OWNER to low_priv_user;
  hdfs_srv1_renamed | low_priv_user | hdfs_fdw             |                   |      |         | (client_type 'hiveserver2') | 
 (1 row)
 
-DROP FOREIGN TABLE dept;
 DROP USER MAPPING FOR postgres SERVER hdfs_srv1_renamed;
 --end test server
 --Create a server providing TYPE and VERSION clauses. 
@@ -193,26 +176,6 @@ OPTIONS (host '127.0.0.1', PORT:HIVE_PORT,Client_Type :HIVE_CLIENT_TYPE);
  hdfs_srv2 | postgres | hdfs_fdw             |                   | abc  | 1.0     | (host '127.0.0.1', port '10000', client_type 'hiveserver2') | 
 (1 row)
 
---test server
-CREATE USER MAPPING FOR postgres SERVER hdfs_srv2;
-CREATE FOREIGN TABLE dept (
-deptno INTEGER,
-dname VARCHAR2(14),
-loc VARCHAR2(13)
-)
-SERVER hdfs_srv2 OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
-DROP FOREIGN TABLE dept;
-DROP USER MAPPING FOR postgres SERVER hdfs_srv2;
---end test server
 --Create a server providing valid OPTIONS (HOST,PORT,CLIENT_TYPE,connect_timeout,query_timeout)
 CREATE SERVER hdfs_srv3a FOREIGN DATA WRAPPER hdfs_fdw 
  OPTIONS (host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, connect_timeout '4000',query_timeout '4000');
@@ -280,73 +243,11 @@ SELECT * FROM dept;
 (4 rows)
 
 --test host
---valid IP address, should succeed
-ALTER SERVER hdfs_srv3a OPTIONS (SET host '127.0.0.1');
-\des+ hdfs_srv3a
-                                                                                    List of foreign servers
-    Name    |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                         FDW Options                                         | Description 
-------------+----------+----------------------+-------------------+------+---------+---------------------------------------------------------------------------------------------+-------------
- hdfs_srv3a | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', client_type 'hiveserver2', connect_timeout '4000', query_timeout '4000') | 
-(1 row)
-
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
---invalid IP address, should fail (RM37672)
-ALTER SERVER hdfs_srv3a OPTIONS (SET host '127.0.0.2');
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
---invalid domain, should fail
-ALTER SERVER hdfs_srv3a OPTIONS (SET host 'invalid.domain');
-SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (Could not resolve host for client socket.)
 --empty string, should fail
 ALTER SERVER hdfs_srv3a OPTIONS (SET host '');
 SELECT * FROM dept;
 ERROR:  failed to initialize the HDFS connection object (Could not resolve host for client socket.)
---drop host to see it defaults to localhost
-ALTER SERVER hdfs_srv3a OPTIONS (DROP host);
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
 --test cient_type
---check case insensitivity, should pass (but fails RM 37640)
-ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'HIVEserver2');
-\des+ hdfs_srv3a
-                                                                           List of foreign servers
-    Name    |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                FDW Options                                | Description 
-------------+----------+----------------------+-------------------+------+---------+---------------------------------------------------------------------------+-------------
- hdfs_srv3a | postgres | hdfs_fdw             |                   |      |         | (client_type 'HIVEserver2', connect_timeout '4000', query_timeout '4000') | 
-(1 row)
-
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
 --set to hiveserver1, should error when querying 
 --since the target is hiveserver2
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'hiverserver1');
@@ -363,57 +264,6 @@ ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
 HINT:  Valid client_type are hiveserver1 and hiveserver2
---drop client_type and then add back again, success
-ALTER SERVER hdfs_srv3a OPTIONS (DROP client_type);
-ALTER SERVER hdfs_srv3a OPTIONS (ADD client_type 'hiveserver2');
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
---test connect_timeout and query_timeout
--- set connect_timeout and query_timeout to 0, should disable timeout
---and bring results from foreign server (and not mean 0ms to fail every query)
-ALTER SERVER hdfs_srv3a OPTIONS (SET connect_timeout '0', SET query_timeout '0');
-\des+ hdfs_srv3a
-                                                                        List of foreign servers
-    Name    |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                             FDW Options                             | Description 
-------------+----------+----------------------+-------------------+------+---------+---------------------------------------------------------------------+-------------
- hdfs_srv3a | postgres | hdfs_fdw             |                   |      |         | (connect_timeout '0', query_timeout '0', client_type 'hiveserver2') | 
-(1 row)
-
-SELECT * FROM dept;
-ERROR:  invalid connect timeout "0"
-HINT:  Valid range is 1 - 100000 ms
--- set to 10ms each and see they should timeout
-ALTER SERVER hdfs_srv3a OPTIONS (SET connect_timeout '10', SET query_timeout '10');
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
---success
-ALTER SERVER hdfs_srv3a OPTIONS (SET connect_timeout '-1', SET query_timeout '-1');
-SELECT * FROM dept;
-ERROR:  invalid connect timeout "-1"
-HINT:  Valid range is 1 - 100000 ms
---success
-ALTER SERVER hdfs_srv3a OPTIONS (SET connect_timeout '2000', SET query_timeout '-1');
-SELECT * FROM dept;
-ERROR:  invalid query timeout "-1"
-HINT:  Valid range is 1 - 100000 ms
-ALTER SERVER hdfs_srv3a OPTIONS (SET connect_timeout '-1', SET query_timeout '4000');
-SELECT * FROM dept;
-ERROR:  invalid connect timeout "-1"
-HINT:  Valid range is 1 - 100000 ms
 --test DROP SERVER
 --should fail, RESTRICT enforced
 DROP SERVER hdfs_srv3a;
