@@ -442,19 +442,16 @@ HiveReturn HiveQueryResultSetHS2::fetchNewResults(char* err_buf, size_t err_buf_
     RETURN_ON_ASSERT(m_max_buffered_rows <= 0, __FUNCTION__,
                      "Rows to be buffered should have a positive value", err_buf, err_buf_len, HIVE_ERROR);
 
-    TFetchResultsResp *res = new TFetchResultsResp();
+    m_connection->getClient2()->FetchResults(m_res, *m_fetchReq);
 
-    m_connection->getClient2()->FetchResults(*res, *m_fetchReq);
-
-    if (res->results.rows.size() > 0)
+    if (m_res.results.rows.size() > 0)
     {
-      m_rows = res->results.rows;
+      m_rows = m_res.results.rows;
       m_fetch_idx = 0;
       m_result_iterator = m_rows.begin();
     }
     else
       return HIVE_NO_MORE_DATA;
-
     return HIVE_SUCCESS;  
 }
 

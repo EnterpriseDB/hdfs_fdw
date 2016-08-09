@@ -37,7 +37,6 @@
 #include "HiveColumnDesc.h"
 #include "TCLIService.h"
 #include "HiveConnection.h"
-//#include "HiveConnection2.h"
 
 using namespace std;
 
@@ -97,9 +96,10 @@ protected:
     HiveReturn              fetchNewResults(char* err_buf, size_t err_buf_len, char);
     vector<string>          m_result_data;
     vector<TColumnDesc>     m_column_desc;
-	vector<TRow>            m_rows;
+    vector<TRow>            m_rows;
     TFetchResultsReq        *m_fetchReq;
     vector<TRow>::iterator  m_result_iterator;
+    TFetchResultsResp       m_res;
 };
 
 class HiveQueryResultSetHS1: public HiveQueryResultSet {
