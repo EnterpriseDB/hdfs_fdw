@@ -233,7 +233,7 @@ hdfs_get_options(Oid foreigntableid)
 				ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
 						errmsg("invalid query timeout \"%s\"", defGetString(def)),
-							errhint("Valid range is 1 - 100000 ms")));
+							errhint("Valid range is 1 - 100000 S")));
 			opt->receive_timeout = opt->receive_timeout * 1000;
 		}
 		if (strcmp(def->defname, "connect_timeout") == 0)
@@ -243,7 +243,7 @@ hdfs_get_options(Oid foreigntableid)
 				ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
 						errmsg("invalid connect timeout \"%s\"", defGetString(def)),
-							errhint("Valid range is 1 - 100000 ms")));
+							errhint("Valid range is 1 - 100000 S")));
 			opt->connect_timeout = opt->connect_timeout * 1000;	
 		}
 	}
