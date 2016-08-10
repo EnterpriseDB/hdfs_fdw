@@ -43,7 +43,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(port '10000', client_type 'hiveserver2');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE);
 
 -- Create Hadoop USER MAPPING.
 
