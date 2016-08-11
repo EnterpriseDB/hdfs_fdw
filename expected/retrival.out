@@ -333,11 +333,11 @@ SELECT COUNT(empno) FROM jobhist;
     17
 (1 row)
 
-SELECT * FROM jobhist LIMIT 2;
- empno |      startdate      | enddate |   job    | sal  | comm | deptno | chgdesc  
--------+---------------------+---------+----------+------+------+--------+----------
-  7369 | 17/12/1980 00:00:00 |         | CLERK    |  800 |      |     20 | New Hire
-  7499 | 20/02/1980 00:00:00 |         | SALESMAN | 1600 |  300 |     30 | New Hire
+SELECT empno,startdate,job,sal,deptno FROM jobhist LIMIT 2;
+ empno |      startdate      |   job    | sal  | deptno 
+-------+---------------------+----------+------+--------
+  7369 | 17/12/1980 00:00:00 | CLERK    |  800 |     20
+  7499 | 20/02/1980 00:00:00 | SALESMAN | 1600 |     30
 (2 rows)
 
 SELECT * FROM emp ORDER BY empno LIMIT ALL;
@@ -403,23 +403,21 @@ SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptn
          30 |               6
 (3 rows)
 
-SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp GROUP BY deptno ORDER BY deptno;
- Department | Total Salary…. 
-------------+----------------
-         10 |           8750
-         20 |          10875
-         30 |           9400
-(3 rows)
-
-SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp
-GROUP BY deptno
-HAVING SUM(sal) > 8750
-ORDER BY deptno;
- Department | Total Salary…. 
-------------+----------------
-         20 |          10875
-         30 |           9400
+SELECT deptno, SUM(sal) FROM emp GROUP BY deptno HAVING deptno IN (10, 30) ORDER BY deptno;
+ deptno | sum  
+--------+------
+     10 | 8750
+     30 | 9400
 (2 rows)
+
+SELECT deptno, SUM(sal) FROM emp
+GROUP BY deptno
+HAVING SUM(sal) > 9400
+ORDER BY deptno;
+ deptno |  sum  
+--------+-------
+     20 | 10875
+(1 row)
 
 SELECT deptno, ROUND(AVG(sal)) FROM emp
 GROUP BY deptno

@@ -157,7 +157,7 @@ SELECT COUNT(DISTINCT deptno) FROM jobhist;
 
 SELECT COUNT(empno) FROM jobhist;
 
-SELECT * FROM jobhist LIMIT 2;
+SELECT empno,startdate,job,sal,deptno FROM jobhist LIMIT 2;
 
 SELECT * FROM emp ORDER BY empno LIMIT ALL;
 
@@ -171,11 +171,11 @@ SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
 
 SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptno ORDER BY deptno;
 
-SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp GROUP BY deptno ORDER BY deptno;
+SELECT deptno, SUM(sal) FROM emp GROUP BY deptno HAVING deptno IN (10, 30) ORDER BY deptno;
 
-SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp
+SELECT deptno, SUM(sal) FROM emp
 GROUP BY deptno
-HAVING SUM(sal) > 8750
+HAVING SUM(sal) > 9400
 ORDER BY deptno;
 
 SELECT deptno, ROUND(AVG(sal)) FROM emp
