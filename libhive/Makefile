@@ -5,7 +5,7 @@ BOOST_HOME:="$(shell echo $(BOOST_HOME))"
 INSTALL_DIR:="$(shell echo $(PGDIR))/lib"
 
 CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(THRIFT_HOME)/include -I$(THRIFT_HOME)/include/thrift -I$(BOOST_HOME)/include -I$(THRIFT_HOME)/include/thrift/fb303 -Ithrift -Imetastore -Iodbc -Iodbc2 -Iql
-LDFLAGS= -shared
+LDFLAGS= -shared -L$(THRIFT_HOME)/lib -lfb303 -lthrift
 
 METASTORE = metastore/hive_metastore_constants.cpp  metastore/hive_metastore_types.cpp  metastore/ThriftHiveMetastore.cpp
 THRIFT = thrift/hive_service_constants.cpp thrift/TCLIService_constants.cpp thrift/TCLIService_server.skeleton.cpp \
