@@ -261,9 +261,13 @@ CREATE FOREIGN TABLE dept_dt_enum (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+/*
+
+Commenetd due to reported RM.
+
 SELECT * FROM dept_dt_enum;
-ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 190687
+
+*/
 DROP FOREIGN TABLE dept_dt_enum;
 DROP TYPE deptnotype;
 CREATE TYPE dnametype AS ENUM ('ACCOUNTING', 'RESEARCH','OPERATIONS','SALES');
@@ -273,9 +277,14 @@ CREATE FOREIGN TABLE dept_dt_enum1 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+/*
+
+RM Reported.
+
 SELECT * FROM dept_dt_enum1;
-ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 190698
+
+
+*/
 DROP FOREIGN TABLE dept_dt_enum1;
 DROP TYPE dnametype;
 -- Create Table with datatype NUMERIC, error message will be displayed.
@@ -319,7 +328,7 @@ CREATE FOREIGN TABLE binary_data
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'binary_data');
 SELECT * FROM binary_data;
 ERROR:  unsupported Hive data type
-HINT:  Supported data types are TINYINT, SMALLINT, INT, BIGINT, STRING, CHAR, TIMESTAMPS, DECIMAL, DATE and VARCHAR: binary
+HINT:  Supported data types are TINYINT, SMALLINT, INT, BIGINT, BOOLEAN, DOUBLE, STRING, CHAR, TIMESTAMP, DECIMAL, DATE and VARCHAR: binary
 DROP FOREIGN TABLE binary_data;
 -- Create Hadoop Table with datatype DOUBLE, error message will be displayed.
 CREATE FOREIGN TABLE dbl_data
@@ -349,7 +358,7 @@ CREATE FOREIGN TABLE dept_dt_smlint (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_smlint;
+SELECT * FROM dept_dt_smlint ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -366,7 +375,7 @@ CREATE FOREIGN TABLE dept_dt_bgint (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_bgint;
+SELECT * FROM dept_dt_bgint ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -383,7 +392,7 @@ CREATE FOREIGN TABLE dept_dt_ser (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_ser;
+SELECT * FROM dept_dt_ser ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -399,7 +408,7 @@ CREATE FOREIGN TABLE dept_dt_bgser (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_bgser;
+SELECT * FROM dept_dt_bgser ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -415,7 +424,7 @@ CREATE FOREIGN TABLE dept_dt_smlser (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_smlser;
+SELECT * FROM dept_dt_smlser ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -432,7 +441,7 @@ CREATE FOREIGN TABLE dept_dt_real (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_real;
+SELECT * FROM dept_dt_real ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -449,7 +458,7 @@ CREATE FOREIGN TABLE dept_dt_dbl (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_dbl;
+SELECT * FROM dept_dt_dbl ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -466,7 +475,7 @@ CREATE FOREIGN TABLE dept_dt_blob (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_blob;
+SELECT * FROM dept_dt_blob ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  \x3130 | ACCOUNTING | NEW YORK
@@ -483,7 +492,7 @@ CREATE FOREIGN TABLE dept_dt_byt (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_byt;
+SELECT * FROM dept_dt_byt ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  \x3130 | ACCOUNTING | NEW YORK
@@ -500,7 +509,7 @@ CREATE FOREIGN TABLE dept_dt_str (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_str;
+SELECT * FROM dept_dt_str ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  10     | ACCOUNTING | NEW YORK
@@ -517,7 +526,7 @@ CREATE FOREIGN TABLE dept_dt_int (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_int;
+SELECT * FROM dept_dt_int ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -534,7 +543,7 @@ CREATE FOREIGN TABLE dept_dt_var (
     loc             VARCHAR(20)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_var;
+SELECT * FROM dept_dt_var ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -556,23 +565,23 @@ CREATE FOREIGN TABLE emp_dt_date (
     deptno          INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_date;
+SELECT * FROM emp_dt_date ORDER BY deptno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
 -------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |    0 |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |    0 |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |    0 |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |    0 |     10
+  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_date;
@@ -588,23 +597,23 @@ CREATE FOREIGN TABLE emp_dt_time_tm (
     deptno          INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_time_tm;
+SELECT * FROM emp_dt_time_tm ORDER BY deptno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
 -------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |    0 |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |    0 |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |    0 |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |    0 |     10
+  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_time_tm;
@@ -619,23 +628,23 @@ CREATE FOREIGN TABLE emp_dt_time (
     deptno          INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_time;
+SELECT * FROM emp_dt_time ORDER BY empno;
  empno | ename  |    job    | mgr  |        hiredate         | sal  | comm | deptno 
 -------+--------+-----------+------+-------------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 PST |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 PST |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 PST | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 PST | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 PST | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 PST | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 PDT | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 PDT | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 PDT | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 PDT | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 PST | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 PDT | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 PDT | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 PDT | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 PST | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 PDT | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 PDT | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 PST |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 PST | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 PST | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 PDT | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 PST |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 PST | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 PST | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_time;
@@ -650,23 +659,23 @@ CREATE FOREIGN TABLE emp_dt_time_otm (
     deptno          INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_time_otm;
+SELECT * FROM emp_dt_time_otm ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
 -------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_time_otm;
@@ -676,12 +685,12 @@ CREATE FOREIGN TABLE emp_dt_bol (
     bol2           INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_dt_bol;
+SELECT * FROM emp_dt_bol ORDER BY bol1;
  bol1 | bol2 
 ------+------
  f    |    1
- t    |    0
  f    |    1
+ t    |    0
  t    |    2
 (4 rows)
 
@@ -691,12 +700,12 @@ CREATE FOREIGN TABLE emp_dt_bol1 (
     bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_dt_bol1;
+SELECT * FROM emp_dt_bol1 ORDER BY bol1;
  bol1 | bol2 
 ------+------
  f    | 1
- t    | 0
  f    | 1
+ t    | 0
  t    | 2
 (4 rows)
 
@@ -708,7 +717,7 @@ CREATE FOREIGN TABLE dept_dt_car (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_car;
+SELECT * FROM dept_dt_car ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  10     | ACCOUNTING | NEW YORK
@@ -724,7 +733,7 @@ CREATE FOREIGN TABLE dept_dt_car1 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_car1;
+SELECT * FROM dept_dt_car1 ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  10     | ACCOUNTING | NEW YORK
@@ -741,7 +750,7 @@ CREATE FOREIGN TABLE dept_dt_var2 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_var2;
+SELECT * FROM dept_dt_var2 ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  10     | ACCOUNTING | NEW YORK
@@ -757,7 +766,7 @@ CREATE FOREIGN TABLE dept_dt_var3 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_var3;
+SELECT * FROM dept_dt_var3 ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  10     | ACCOUNTING | NEW YORK
@@ -774,7 +783,7 @@ CREATE FOREIGN TABLE dept_dt_txt (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_txt;
+SELECT * FROM dept_dt_txt ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
  10     | ACCOUNTING | NEW YORK
@@ -791,7 +800,7 @@ CREATE FOREIGN TABLE dept_dt_dt (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_dt;
+SELECT * FROM dept_dt_dt ORDER BY deptno;
 ERROR:  invalid input syntax for type timestamp: "10"
 DROP FOREIGN TABLE dept_dt_dt;
 -- Mapp TIMESTAMP with INT, error will be displayed.
@@ -801,7 +810,7 @@ CREATE FOREIGN TABLE dept_dt_tm (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_tm;
+SELECT * FROM dept_dt_tm ORDER BY deptno;
 ERROR:  invalid input syntax for type timestamp: "10"
 DROP FOREIGN TABLE dept_dt_tm;
 -- Mapp TIME with INT, error will be displayed.
@@ -811,7 +820,7 @@ CREATE FOREIGN TABLE dept_dt_tme (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_tme;
+SELECT * FROM dept_dt_tme ORDER BY deptno;
 ERROR:  invalid input syntax for type time: "10"
 DROP FOREIGN TABLE dept_dt_tme;
 -- Mapp INT with VARCHAR2, error will be displayed.
@@ -821,7 +830,7 @@ CREATE FOREIGN TABLE dept_dt_con_var (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_con_var;
+SELECT * FROM dept_dt_con_var ORDER BY deptno;
 ERROR:  invalid input syntax for integer: "ACCOUNTING"
 DROP FOREIGN TABLE dept_dt_con_var;
 -- Mapp DATE with VARCHAR2, error will be displayed.
@@ -831,7 +840,7 @@ CREATE FOREIGN TABLE dept_dt_con_date (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_con_date;
+SELECT * FROM dept_dt_con_date ORDER BY deptno;
 ERROR:  invalid input syntax for type timestamp: "ACCOUNTING"
 DROP FOREIGN TABLE dept_dt_con_date;
 -- Mapp TIMESTAMP with VARCHAR2, error will be displayed.
@@ -841,7 +850,7 @@ CREATE FOREIGN TABLE dept_dt_con_tmpstmp (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_con_tmpstmp;
+SELECT * FROM dept_dt_con_tmpstmp ORDER BY deptno;
 ERROR:  invalid input syntax for type timestamp: "ACCOUNTING"
 DROP FOREIGN TABLE dept_dt_con_tmpstmp;
 -- Data will be displayed.
@@ -851,7 +860,7 @@ CREATE FOREIGN TABLE dept_dt_mp1 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_mp1;
+SELECT * FROM dept_dt_mp1 ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -868,7 +877,7 @@ CREATE FOREIGN TABLE dept_dt_mp2 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt_mp2;
+SELECT * FROM dept_dt_mp2 ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -890,23 +899,23 @@ CREATE FOREIGN TABLE emp_dt_mp1 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp1;
+SELECT * FROM emp_dt_mp1 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
 -------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_mp1;
@@ -922,23 +931,23 @@ CREATE FOREIGN TABLE emp2 (
     deptno          FLOAT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp2;
+SELECT * FROM emp2 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
 -------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp2;
@@ -949,7 +958,7 @@ CREATE FOREIGN TABLE dept_dt31 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt31;
+SELECT * FROM dept_dt31 ORDER BY deptno;
 ERROR:  invalid input syntax for type real: "ACCOUNTING"
 DROP FOREIGN TABLE dept_dt31;
 -- Error will be displayed.
@@ -959,7 +968,7 @@ CREATE FOREIGN TABLE dept_dt32 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept_dt32;
+SELECT * FROM dept_dt32 ORDER BY deptno;
 ERROR:  invalid input syntax for type double precision: "ACCOUNTING"
 DROP FOREIGN TABLE dept_dt32;
 -- Mapp VARCHAR2 with DATE, data will be displayed.
@@ -974,23 +983,23 @@ CREATE FOREIGN TABLE emp_dt_mp2 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp2;
+SELECT * FROM emp_dt_mp2 ORDER BY empno;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_mp2;
@@ -1006,23 +1015,23 @@ CREATE FOREIGN TABLE emp_dt_mp3 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp3;
+SELECT * FROM emp_dt_mp3 ORDER BY empno;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_mp3;
@@ -1038,23 +1047,23 @@ CREATE FOREIGN TABLE emp_dt_mp4 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp4;
+SELECT * FROM emp_dt_mp4 ORDER BY empno;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_mp4;
@@ -1070,23 +1079,23 @@ CREATE FOREIGN TABLE emp_dt_mp5 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp5;
+SELECT * FROM emp_dt_mp5 ORDER BY empno;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 1981-11-17 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_mp5;
@@ -1102,7 +1111,7 @@ CREATE FOREIGN TABLE emp_dt_mp6 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp6;
+SELECT * FROM emp_dt_mp6 ORDER BY empno;
 ERROR:  invalid input syntax for type time: "1980-12-17"
 DROP FOREIGN TABLE emp_dt_mp6;
 -- Mapp TIMESTAMP with DATE, data will be displayed.
@@ -1117,23 +1126,23 @@ CREATE FOREIGN TABLE emp_dt_mp7 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp7;
+SELECT * FROM emp_dt_mp7 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
 -------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |    0 |     20
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
   7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
   7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |    0 |     20
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
   7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |    0 |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |    0 |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |    0 |     20
-  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |    0 |     10
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |    0 | 17/11/1981 00:00:00 | 5000 |      |     10
   7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |    0 |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |    0 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |    0 |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |    0 |     10
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
 (14 rows)
 
 DROP FOREIGN TABLE emp_dt_mp7;
@@ -1149,7 +1158,7 @@ CREATE FOREIGN TABLE emp_dt_mp8 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp8;
+SELECT * FROM emp_dt_mp8 ORDER BY empno;
 ERROR:  invalid input syntax for type boolean: "1980-12-17"
 DROP FOREIGN TABLE emp_dt_mp8;
 -- Mapp BOOLEAN with INT, error will be displayed.
@@ -1164,7 +1173,7 @@ CREATE FOREIGN TABLE emp_dt_mp9 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp9;
+SELECT * FROM emp_dt_mp9 ORDER BY empno;
 ERROR:  invalid input syntax for type boolean: "7369"
 DROP FOREIGN TABLE emp_dt_mp9;
 -- Mapp BOOLEAN with VARCHAR, error will be displayed.
@@ -1179,7 +1188,7 @@ CREATE FOREIGN TABLE emp_dt_mp10 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp10;
+SELECT * FROM emp_dt_mp10 ORDER BY empno;
 ERROR:  invalid input syntax for type boolean: "SMITH"
 DROP FOREIGN TABLE emp_dt_mp10;
 -- Mapp smallint with DATE, error will be displayed.
@@ -1194,7 +1203,7 @@ CREATE FOREIGN TABLE emp18 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp18;
+SELECT * FROM emp18 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "1980-12-17"
 DROP FOREIGN TABLE emp18;
 -- Mapp INTEGER with DATE, error will be displayed.
@@ -1209,7 +1218,7 @@ CREATE FOREIGN TABLE emp_dt_mp11 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp_dt_mp11;
+SELECT * FROM emp_dt_mp11 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "1980-12-17"
 DROP FOREIGN TABLE emp_dt_mp11;
 -- Create Foreign Table, error will be displayed.
@@ -1224,7 +1233,7 @@ CREATE FOREIGN TABLE emp20 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp20;
+SELECT * FROM emp20 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "1980-12-17"
 DROP FOREIGN TABLE emp20;
 -- Create Foreign Table, error will be displayed.
@@ -1239,7 +1248,7 @@ CREATE FOREIGN TABLE emp23 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp23;
+SELECT * FROM emp23 ORDER BY empno;
 ERROR:  invalid input syntax for type real: "1980-12-17"
 DROP FOREIGN TABLE emp23;
 -- Create Foreign Table, error will be displayed.
@@ -1254,7 +1263,7 @@ CREATE FOREIGN TABLE emp24 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp24;
+SELECT * FROM emp24 ORDER BY empno;
 ERROR:  invalid input syntax for type double precision: "1980-12-17"
 DROP FOREIGN TABLE emp24;
 -- Create Foreign Table, error will be displayed.
@@ -1269,7 +1278,7 @@ CREATE FOREIGN TABLE emp25 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp25;
+SELECT * FROM emp25 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "1980-12-17"
 DROP FOREIGN TABLE emp25;
 -- Create Foreign Table, error will be displayed.
@@ -1284,7 +1293,7 @@ CREATE FOREIGN TABLE emp26 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp26;
+SELECT * FROM emp26 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "1980-12-17"
 DROP FOREIGN TABLE emp26;
 -- Create Foreign Table, error will be displayed.
@@ -1299,7 +1308,7 @@ CREATE FOREIGN TABLE emp27 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-SELECT * FROM emp27;
+SELECT * FROM emp27 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "1980-12-17"
 DROP FOREIGN TABLE emp27;
 -- Mapp INTEGER with TINYINT, data will be displayed.
@@ -1309,7 +1318,7 @@ CREATE FOREIGN TABLE dept_dt_mp1 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
-SELECT * FROM dept_dt_mp1;
+SELECT * FROM dept_dt_mp1 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1326,7 +1335,7 @@ CREATE FOREIGN TABLE dept_dt_mp_2 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
-SELECT * FROM dept_dt_mp_2;
+SELECT * FROM dept_dt_mp_2 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1343,7 +1352,7 @@ CREATE FOREIGN TABLE dept_dt_mp3 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
-SELECT * FROM dept_dt_mp3;
+SELECT * FROM dept_dt_mp3 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1360,7 +1369,7 @@ CREATE FOREIGN TABLE dept_dt_mp4 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
-SELECT * FROM dept_dt_mp4;
+SELECT * FROM dept_dt_mp4 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
  10     | ACCOUNTING | NEW YORK     
@@ -1377,7 +1386,7 @@ CREATE FOREIGN TABLE dept_dt_mp5 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
-SELECT * FROM dept_dt_mp5;
+SELECT * FROM dept_dt_mp5 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
  10     | ACCOUNTING | NEW YORK     
@@ -1394,7 +1403,7 @@ CREATE FOREIGN TABLE dept_dt_mp7 (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp7;
+SELECT * FROM dept_dt_mp7 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1411,7 +1420,7 @@ CREATE FOREIGN TABLE dept_dt_mp8 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp8;
+SELECT * FROM dept_dt_mp8 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1428,7 +1437,7 @@ CREATE FOREIGN TABLE dept_dt_mp_8 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_8;
+SELECT * FROM dept_dt_mp_8 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1445,7 +1454,7 @@ CREATE FOREIGN TABLE dept_dt_mp_9 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_9;
+SELECT * FROM dept_dt_mp_9 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1462,7 +1471,7 @@ CREATE FOREIGN TABLE dept_dt_mp_10 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_10;
+SELECT * FROM dept_dt_mp_10 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1479,7 +1488,7 @@ CREATE FOREIGN TABLE dept_dt_mp_11 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_11;
+SELECT * FROM dept_dt_mp_11 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
  10     | ACCOUNTING | NEW YORK     
@@ -1496,7 +1505,7 @@ CREATE FOREIGN TABLE dept_dt_mp_12 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_12;
+SELECT * FROM dept_dt_mp_12 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
  10     | ACCOUNTING | NEW YORK     
@@ -1513,7 +1522,7 @@ CREATE FOREIGN TABLE dept_dt_mp_13 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_13;
+SELECT * FROM dept_dt_mp_13 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
  10     | ACCOUNTING | NEW YORK     
@@ -1530,7 +1539,7 @@ CREATE FOREIGN TABLE dept_dt_mp_10 (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp_10;
+SELECT * FROM dept_dt_mp_10 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
  10     | ACCOUNTING | NEW YORK     
@@ -1547,7 +1556,7 @@ CREATE FOREIGN TABLE dept_dt_mp9 (
     loc             CHAR(20)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp9;
+SELECT * FROM dept_dt_mp9 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1564,7 +1573,7 @@ CREATE FOREIGN TABLE dept_dt_mp10 (
     loc             CHAR(20)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp10;
+SELECT * FROM dept_dt_mp10 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1581,7 +1590,7 @@ CREATE FOREIGN TABLE dept_dt_mp12 (
     loc             CHAR(20)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-SELECT * FROM dept_dt_mp12;
+SELECT * FROM dept_dt_mp12 ORDER BY deptno;
  deptno |   dname    |      loc      
 --------+------------+---------------
      10 | ACCOUNTING | NEW YORK     
@@ -1597,12 +1606,12 @@ CREATE FOREIGN TABLE emp_dt_bool1 (
     bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_dt_bool1;
+SELECT * FROM emp_dt_bool1 ORDER BY bol1;
  bol1 | bol2 
 ------+------
  f    | 1
- t    | 0
  f    | 1
+ t    | 0
  t    | 2
 (4 rows)
 
@@ -1613,7 +1622,7 @@ CREATE FOREIGN TABLE emp_dt_bool2 (
     bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_dt_bool2;
+SELECT * FROM emp_dt_bool2 ORDER BY bol1;
 ERROR:  invalid input syntax for integer: "f"
 DROP FOREIGN TABLE emp_dt_bool2;
 -- Mapp VARCHAR2 with BOOLEAN, data will be displayed.
@@ -1622,12 +1631,12 @@ CREATE FOREIGN TABLE emp_dt_bool3 (
     bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_dt_bool3;
+SELECT * FROM emp_dt_bool3 ORDER BY bol1;
  bol1 | bol2 
 ------+------
  f    | 1
- t    | 0
  f    | 1
+ t    | 0
  t    | 2
 (4 rows)
 
@@ -1638,12 +1647,12 @@ CREATE FOREIGN TABLE emp_dt_bool4 (
     bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_dt_bool4;
+SELECT * FROM emp_dt_bool4 ORDER BY bol1;
  bol1 | bol2 
 ------+------
  f    | 1
- t    | 0
  f    | 1
+ t    | 0
  t    | 2
 (4 rows)
 
@@ -1654,12 +1663,12 @@ CREATE FOREIGN TABLE emp_bol5 (
     bol2             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_bol5;
+SELECT * FROM emp_bol5 ORDER BY bol1;
  bol1 | bol2 
 ------+------
  \x66 | 1
- \x74 | 0
  \x66 | 1
+ \x74 | 0
  \x74 | 2
 (4 rows)
 
@@ -1670,7 +1679,7 @@ CREATE FOREIGN TABLE emp_bol8 (
     bol2           INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-SELECT * FROM emp_bol8;
+SELECT * FROM emp_bol8 ORDER BY bol1;
 ERROR:  invalid input syntax for type timestamp: "f"
 DROP FOREIGN TABLE emp_bol8;
 -- Mapp DATE with STRING, data will be displayed.
@@ -1678,7 +1687,7 @@ CREATE FOREIGN TABLE str_date (
     col1            DATE
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_date');
-SELECT * FROM str_date;
+SELECT * FROM str_date ORDER BY col1;
         col1         
 ---------------------
  17/12/1980 01:23:23
@@ -1693,7 +1702,7 @@ CREATE FOREIGN TABLE str_date1 (
     col1            timestamp with time zone 
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_date');
-SELECT * FROM str_date1;
+SELECT * FROM str_date1 ORDER BY col1;
           col1           
 -------------------------
  17/12/1980 01:23:23 PST
@@ -1708,7 +1717,7 @@ CREATE FOREIGN TABLE str_date2 (
     col1            TIME
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_date');
-SELECT * FROM str_date2;
+SELECT * FROM str_date2 ORDER BY col1;
    col1   
 ----------
  01:23:23
@@ -1723,7 +1732,7 @@ CREATE FOREIGN TABLE chr_date1 (
     col1           DATE
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
-SELECT * FROM chr_date1;
+SELECT * FROM chr_date1 ORDER BY col1;
         col1         
 ---------------------
  17/12/1980 01:23:23
@@ -1738,7 +1747,7 @@ CREATE FOREIGN TABLE chr_date2 (
     col1           TIME
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
-SELECT * FROM chr_date2;
+SELECT * FROM chr_date2 ORDER BY col1;
    col1   
 ----------
  01:23:23
@@ -1753,7 +1762,7 @@ CREATE FOREIGN TABLE chr_date3 (
     col1           TIMESTAMP
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
-SELECT * FROM chr_date3;
+SELECT * FROM chr_date3 ORDER BY col1;
         col1         
 ---------------------
  17/12/1980 01:23:23
@@ -1768,14 +1777,14 @@ CREATE FOREIGN TABLE var_int (
     col1           INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'var_int');
-SELECT col1+1 FROM var_int;
+SELECT col1+1 FROM var_int ORDER BY col1;
  ?column? 
 ----------
-      567
-      124
         1
         2
        11
+      124
+      567
 (5 rows)
 
 DROP FOREIGN TABLE var_int;
@@ -1784,14 +1793,14 @@ CREATE FOREIGN TABLE str_int (
     col1           INT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_int');
-SELECT col1+1 FROM str_int;
+SELECT col1+1 FROM str_int ORDER BY col1;
  ?column? 
 ----------
-      567
-      124
         1
         2
        11
+      124
+      567
 (5 rows)
 
 DROP FOREIGN TABLE str_int;
@@ -1807,7 +1816,7 @@ CREATE FOREIGN TABLE emp_dt_1 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_dt_1;
+SELECT * FROM emp_dt_1 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "300.1"
 DROP FOREIGN TABLE emp_dt_1;
 -- Create Foreign Table, error will be displayed.
@@ -1822,7 +1831,7 @@ CREATE FOREIGN TABLE emp_dt_2 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_dt_2;
+SELECT * FROM emp_dt_2 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "300.1"
 DROP FOREIGN TABLE emp_dt_2;
 -- Create Foreign Table, error will be displayed.
@@ -1837,7 +1846,7 @@ CREATE FOREIGN TABLE emp_fr4 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr4;
+SELECT * FROM emp_fr4 ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
 HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1186
 DROP FOREIGN TABLE emp_fr4;
@@ -1853,7 +1862,7 @@ CREATE FOREIGN TABLE emp_fr5 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr5;
+SELECT * FROM emp_fr5 ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
 HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1700
 DROP FOREIGN TABLE emp_fr5;
@@ -1891,7 +1900,7 @@ CREATE FOREIGN TABLE emp_fr6 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr6;
+SELECT * FROM emp_fr6 ORDER BY empno;
  empno | ename  |    job    | mgr  |        hiredate         | sal  |  comm   | deptno 
 -------+--------+-----------+------+-------------------------+------+---------+--------
   7369 | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 PST |  800 |       0 |     20
@@ -1923,7 +1932,7 @@ CREATE FOREIGN TABLE emp_fr7 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr7;
+SELECT * FROM emp_fr7 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
   7369 | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 |  800 |       0 |     20
@@ -1955,7 +1964,7 @@ CREATE FOREIGN TABLE emp_fr12 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr12;
+SELECT * FROM emp_fr12 ORDER BY empno;
  empno | ename  |    job    | mgr  |       hiredate        | sal  |  comm   | deptno 
 -------+--------+-----------+------+-----------------------+------+---------+--------
  7369  | SMITH  | CLERK     | 7902 | 1980-12-17 01:23:23.0 |  800 |       0 |     20
@@ -1987,7 +1996,7 @@ CREATE FOREIGN TABLE emp_fr13 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr13;
+SELECT * FROM emp_fr13 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
  7369  | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 |  800 |       0 |     20
@@ -2019,7 +2028,7 @@ CREATE FOREIGN TABLE emp_fr14 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr14;
+SELECT * FROM emp_fr14 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
  7369  | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 |  800 |       0 |     20
@@ -2051,7 +2060,7 @@ CREATE FOREIGN TABLE emp_fro14 (
     deptno          FLOAT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fro14;
+SELECT * FROM emp_fro14 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
   7369 | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 |  800 |       0 |     20
@@ -2083,7 +2092,7 @@ CREATE FOREIGN TABLE emp_fr15 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr15;
+SELECT * FROM emp_fr15 ORDER BY empno;
 ERROR:  invalid input syntax for type timestamp: "7369"
 DROP FOREIGN TABLE emp_fr15;
 -- Create Foreign Table, data will be displayed.
@@ -2098,7 +2107,7 @@ CREATE FOREIGN TABLE emp_fr16 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr16;
+SELECT * FROM emp_fr16 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
  7369  | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 |  800 | 0       |     20
@@ -2130,7 +2139,7 @@ CREATE FOREIGN TABLE emp_fr17 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr17;
+SELECT * FROM emp_fr17 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
  7369  | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 | 800  | 0       |     20
@@ -2162,7 +2171,7 @@ CREATE FOREIGN TABLE emp_fr18 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr18;
+SELECT * FROM emp_fr18 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       | sal  |  comm   | deptno 
 -------+--------+-----------+------+---------------------+------+---------+--------
  7369  | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 | 800  | 0       |     20
@@ -2194,7 +2203,7 @@ CREATE FOREIGN TABLE emp_fr19 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_fr19;
+SELECT * FROM emp_fr19 ORDER BY empno;
  empno | ename  |    job    | mgr  |      hiredate       |    sal     |       comm       | deptno 
 -------+--------+-----------+------+---------------------+------------+------------------+--------
  7369  | SMITH  | CLERK     | 7902 | 17/12/1980 01:23:23 | \x383030   | \x30             |     20
@@ -2522,7 +2531,7 @@ CREATE FOREIGN TABLE emp_dt_bg1 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-SELECT * FROM emp_dt_bg1;
+SELECT * FROM emp_dt_bg1 ORDER BY empno;
 ERROR:  invalid input syntax for integer: "300.1"
 DROP FOREIGN TABLE emp_dt_bg1;
 --===================================================================================

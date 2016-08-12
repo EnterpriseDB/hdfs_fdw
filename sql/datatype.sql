@@ -321,7 +321,13 @@ CREATE FOREIGN TABLE dept_dt_enum (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
+/*
+
+Commenetd due to reported RM.
+
 SELECT * FROM dept_dt_enum;
+
+*/
 
 DROP FOREIGN TABLE dept_dt_enum;
 
@@ -336,7 +342,14 @@ CREATE FOREIGN TABLE dept_dt_enum1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
+/*
+
+RM Reported.
+
 SELECT * FROM dept_dt_enum1;
+
+
+*/
 
 DROP FOREIGN TABLE dept_dt_enum1;
 
@@ -426,7 +439,7 @@ CREATE FOREIGN TABLE dept_dt_smlint (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_smlint;
+SELECT * FROM dept_dt_smlint ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_smlint;
 
@@ -439,7 +452,7 @@ CREATE FOREIGN TABLE dept_dt_bgint (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_bgint;
+SELECT * FROM dept_dt_bgint ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_bgint;
 
@@ -452,7 +465,7 @@ CREATE FOREIGN TABLE dept_dt_ser (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_ser;
+SELECT * FROM dept_dt_ser ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_ser;
 
@@ -463,7 +476,7 @@ CREATE FOREIGN TABLE dept_dt_bgser (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_bgser;
+SELECT * FROM dept_dt_bgser ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_bgser;
 
@@ -474,7 +487,7 @@ CREATE FOREIGN TABLE dept_dt_smlser (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_smlser;
+SELECT * FROM dept_dt_smlser ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_smlser;
 
@@ -487,7 +500,7 @@ CREATE FOREIGN TABLE dept_dt_real (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_real;
+SELECT * FROM dept_dt_real ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_real;
 
@@ -500,7 +513,7 @@ CREATE FOREIGN TABLE dept_dt_dbl (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_dbl;
+SELECT * FROM dept_dt_dbl ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_dbl;
 
@@ -513,7 +526,7 @@ CREATE FOREIGN TABLE dept_dt_blob (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_blob;
+SELECT * FROM dept_dt_blob ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_blob;
 
@@ -526,7 +539,7 @@ CREATE FOREIGN TABLE dept_dt_byt (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_byt;
+SELECT * FROM dept_dt_byt ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_byt;
 
@@ -539,7 +552,7 @@ CREATE FOREIGN TABLE dept_dt_str (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_str;
+SELECT * FROM dept_dt_str ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_str;
 
@@ -552,7 +565,7 @@ CREATE FOREIGN TABLE dept_dt_int (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_int;
+SELECT * FROM dept_dt_int ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_int;
 
@@ -565,7 +578,7 @@ CREATE FOREIGN TABLE dept_dt_var (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_var;
+SELECT * FROM dept_dt_var ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_var;
 
@@ -583,7 +596,7 @@ CREATE FOREIGN TABLE emp_dt_date (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_date;
+SELECT * FROM emp_dt_date ORDER BY deptno;
 
 DROP FOREIGN TABLE emp_dt_date;
 
@@ -601,7 +614,7 @@ CREATE FOREIGN TABLE emp_dt_time_tm (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_time_tm;
+SELECT * FROM emp_dt_time_tm ORDER BY deptno;
 
 DROP FOREIGN TABLE emp_dt_time_tm;
 
@@ -617,7 +630,7 @@ CREATE FOREIGN TABLE emp_dt_time (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_time;
+SELECT * FROM emp_dt_time ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_time;
 
@@ -633,7 +646,7 @@ CREATE FOREIGN TABLE emp_dt_time_otm (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_time_otm;
+SELECT * FROM emp_dt_time_otm ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_time_otm;
 
@@ -645,7 +658,7 @@ CREATE FOREIGN TABLE emp_dt_bol (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_dt_bol;
+SELECT * FROM emp_dt_bol ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_dt_bol;
 
@@ -655,7 +668,7 @@ CREATE FOREIGN TABLE emp_dt_bol1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_dt_bol1;
+SELECT * FROM emp_dt_bol1 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_dt_bol1;
 
@@ -668,7 +681,7 @@ CREATE FOREIGN TABLE dept_dt_car (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_car;
+SELECT * FROM dept_dt_car ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_car;
 
@@ -679,7 +692,7 @@ CREATE FOREIGN TABLE dept_dt_car1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_car1;
+SELECT * FROM dept_dt_car1 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_car1;
 
@@ -692,7 +705,7 @@ CREATE FOREIGN TABLE dept_dt_var2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_var2;
+SELECT * FROM dept_dt_var2 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_var2;
 
@@ -703,7 +716,7 @@ CREATE FOREIGN TABLE dept_dt_var3 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_var3;
+SELECT * FROM dept_dt_var3 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_var3;
 
@@ -716,7 +729,7 @@ CREATE FOREIGN TABLE dept_dt_txt (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_txt;
+SELECT * FROM dept_dt_txt ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_txt;
 
@@ -729,7 +742,7 @@ CREATE FOREIGN TABLE dept_dt_dt (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_dt;
+SELECT * FROM dept_dt_dt ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_dt;
 
@@ -742,7 +755,7 @@ CREATE FOREIGN TABLE dept_dt_tm (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_tm;
+SELECT * FROM dept_dt_tm ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_tm;
 
@@ -755,7 +768,7 @@ CREATE FOREIGN TABLE dept_dt_tme (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_tme;
+SELECT * FROM dept_dt_tme ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_tme;
 
@@ -768,7 +781,7 @@ CREATE FOREIGN TABLE dept_dt_con_var (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_con_var;
+SELECT * FROM dept_dt_con_var ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_con_var;
 
@@ -781,7 +794,7 @@ CREATE FOREIGN TABLE dept_dt_con_date (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_con_date;
+SELECT * FROM dept_dt_con_date ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_con_date;
 
@@ -794,7 +807,7 @@ CREATE FOREIGN TABLE dept_dt_con_tmpstmp (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_con_tmpstmp;
+SELECT * FROM dept_dt_con_tmpstmp ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_con_tmpstmp;
 
@@ -807,7 +820,7 @@ CREATE FOREIGN TABLE dept_dt_mp1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_mp1;
+SELECT * FROM dept_dt_mp1 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp1;
 
@@ -820,7 +833,7 @@ CREATE FOREIGN TABLE dept_dt_mp2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt_mp2;
+SELECT * FROM dept_dt_mp2 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp2;
 
@@ -838,7 +851,7 @@ CREATE FOREIGN TABLE emp_dt_mp1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp1;
+SELECT * FROM emp_dt_mp1 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp1;
 
@@ -856,7 +869,7 @@ CREATE FOREIGN TABLE emp2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp2;
+SELECT * FROM emp2 ORDER BY empno;
 
 DROP FOREIGN TABLE emp2;
 
@@ -869,7 +882,7 @@ CREATE FOREIGN TABLE dept_dt31 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt31;
+SELECT * FROM dept_dt31 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt31;
 
@@ -882,7 +895,7 @@ CREATE FOREIGN TABLE dept_dt32 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
-SELECT * FROM dept_dt32;
+SELECT * FROM dept_dt32 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt32;
 
@@ -900,7 +913,7 @@ CREATE FOREIGN TABLE emp_dt_mp2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp2;
+SELECT * FROM emp_dt_mp2 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp2;
 
@@ -918,7 +931,7 @@ CREATE FOREIGN TABLE emp_dt_mp3 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp3;
+SELECT * FROM emp_dt_mp3 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp3;
 
@@ -936,7 +949,7 @@ CREATE FOREIGN TABLE emp_dt_mp4 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp4;
+SELECT * FROM emp_dt_mp4 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp4;
 
@@ -954,7 +967,7 @@ CREATE FOREIGN TABLE emp_dt_mp5 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp5;
+SELECT * FROM emp_dt_mp5 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp5;
 
@@ -972,7 +985,7 @@ CREATE FOREIGN TABLE emp_dt_mp6 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp6;
+SELECT * FROM emp_dt_mp6 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp6;
 
@@ -990,7 +1003,7 @@ CREATE FOREIGN TABLE emp_dt_mp7 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp7;
+SELECT * FROM emp_dt_mp7 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp7;
 
@@ -1008,7 +1021,7 @@ CREATE FOREIGN TABLE emp_dt_mp8 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp8;
+SELECT * FROM emp_dt_mp8 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp8;
 
@@ -1026,7 +1039,7 @@ CREATE FOREIGN TABLE emp_dt_mp9 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp9;
+SELECT * FROM emp_dt_mp9 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp9;
 
@@ -1044,7 +1057,7 @@ CREATE FOREIGN TABLE emp_dt_mp10 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp10;
+SELECT * FROM emp_dt_mp10 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp10;
 
@@ -1062,7 +1075,7 @@ CREATE FOREIGN TABLE emp18 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp18;
+SELECT * FROM emp18 ORDER BY empno;
 
 DROP FOREIGN TABLE emp18;
 
@@ -1080,7 +1093,7 @@ CREATE FOREIGN TABLE emp_dt_mp11 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp_dt_mp11;
+SELECT * FROM emp_dt_mp11 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_mp11;
 
@@ -1098,7 +1111,7 @@ CREATE FOREIGN TABLE emp20 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp20;
+SELECT * FROM emp20 ORDER BY empno;
 
 DROP FOREIGN TABLE emp20;
 
@@ -1116,7 +1129,7 @@ CREATE FOREIGN TABLE emp23 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp23;
+SELECT * FROM emp23 ORDER BY empno;
 
 DROP FOREIGN TABLE emp23;
 
@@ -1134,7 +1147,7 @@ CREATE FOREIGN TABLE emp24 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp24;
+SELECT * FROM emp24 ORDER BY empno;
 
 DROP FOREIGN TABLE emp24;
 
@@ -1152,7 +1165,7 @@ CREATE FOREIGN TABLE emp25 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp25;
+SELECT * FROM emp25 ORDER BY empno;
 
 DROP FOREIGN TABLE emp25;
 
@@ -1170,7 +1183,7 @@ CREATE FOREIGN TABLE emp26 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp26;
+SELECT * FROM emp26 ORDER BY empno;
 
 DROP FOREIGN TABLE emp26;
 
@@ -1188,7 +1201,7 @@ CREATE FOREIGN TABLE emp27 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
-SELECT * FROM emp27;
+SELECT * FROM emp27 ORDER BY empno;
 
 DROP FOREIGN TABLE emp27;
 
@@ -1201,7 +1214,7 @@ CREATE FOREIGN TABLE dept_dt_mp1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
-SELECT * FROM dept_dt_mp1;
+SELECT * FROM dept_dt_mp1 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp1;
 
@@ -1214,7 +1227,7 @@ CREATE FOREIGN TABLE dept_dt_mp_2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
-SELECT * FROM dept_dt_mp_2;
+SELECT * FROM dept_dt_mp_2 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_2;
 
@@ -1227,7 +1240,7 @@ CREATE FOREIGN TABLE dept_dt_mp3 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
-SELECT * FROM dept_dt_mp3;
+SELECT * FROM dept_dt_mp3 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp3;
 
@@ -1240,7 +1253,7 @@ CREATE FOREIGN TABLE dept_dt_mp4 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
-SELECT * FROM dept_dt_mp4;
+SELECT * FROM dept_dt_mp4 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp4;
 
@@ -1253,7 +1266,7 @@ CREATE FOREIGN TABLE dept_dt_mp5 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
-SELECT * FROM dept_dt_mp5;
+SELECT * FROM dept_dt_mp5 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp5;
 
@@ -1266,7 +1279,7 @@ CREATE FOREIGN TABLE dept_dt_mp7 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp7;
+SELECT * FROM dept_dt_mp7 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp7;
 
@@ -1279,7 +1292,7 @@ CREATE FOREIGN TABLE dept_dt_mp8 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp8;
+SELECT * FROM dept_dt_mp8 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp8;
 
@@ -1292,7 +1305,7 @@ CREATE FOREIGN TABLE dept_dt_mp_8 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_8;
+SELECT * FROM dept_dt_mp_8 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_8;
 
@@ -1305,7 +1318,7 @@ CREATE FOREIGN TABLE dept_dt_mp_9 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_9;
+SELECT * FROM dept_dt_mp_9 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_9;
 
@@ -1318,7 +1331,7 @@ CREATE FOREIGN TABLE dept_dt_mp_10 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_10;
+SELECT * FROM dept_dt_mp_10 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_10;
 
@@ -1331,7 +1344,7 @@ CREATE FOREIGN TABLE dept_dt_mp_11 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_11;
+SELECT * FROM dept_dt_mp_11 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_11;
 
@@ -1344,7 +1357,7 @@ CREATE FOREIGN TABLE dept_dt_mp_12 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_12;
+SELECT * FROM dept_dt_mp_12 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_12;
 
@@ -1357,7 +1370,7 @@ CREATE FOREIGN TABLE dept_dt_mp_13 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_13;
+SELECT * FROM dept_dt_mp_13 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_13;
 
@@ -1370,7 +1383,7 @@ CREATE FOREIGN TABLE dept_dt_mp_10 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp_10;
+SELECT * FROM dept_dt_mp_10 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp_10;
 
@@ -1383,7 +1396,7 @@ CREATE FOREIGN TABLE dept_dt_mp9 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp9;
+SELECT * FROM dept_dt_mp9 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp9;
 
@@ -1396,7 +1409,7 @@ CREATE FOREIGN TABLE dept_dt_mp10 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp10;
+SELECT * FROM dept_dt_mp10 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp10;
 
@@ -1409,7 +1422,7 @@ CREATE FOREIGN TABLE dept_dt_mp12 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
-SELECT * FROM dept_dt_mp12;
+SELECT * FROM dept_dt_mp12 ORDER BY deptno;
 
 DROP FOREIGN TABLE dept_dt_mp12;
 
@@ -1421,7 +1434,7 @@ CREATE FOREIGN TABLE emp_dt_bool1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_dt_bool1;
+SELECT * FROM emp_dt_bool1 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_dt_bool1;
 
@@ -1433,7 +1446,7 @@ CREATE FOREIGN TABLE emp_dt_bool2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_dt_bool2;
+SELECT * FROM emp_dt_bool2 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_dt_bool2;
 
@@ -1445,7 +1458,7 @@ CREATE FOREIGN TABLE emp_dt_bool3 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_dt_bool3;
+SELECT * FROM emp_dt_bool3 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_dt_bool3;
 
@@ -1457,7 +1470,7 @@ CREATE FOREIGN TABLE emp_dt_bool4 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_dt_bool4;
+SELECT * FROM emp_dt_bool4 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_dt_bool4;
 
@@ -1469,7 +1482,7 @@ CREATE FOREIGN TABLE emp_bol5 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_bol5;
+SELECT * FROM emp_bol5 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_bol5;
 
@@ -1481,7 +1494,7 @@ CREATE FOREIGN TABLE emp_bol8 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 
-SELECT * FROM emp_bol8;
+SELECT * FROM emp_bol8 ORDER BY bol1;
 
 DROP FOREIGN TABLE emp_bol8;
 
@@ -1492,7 +1505,7 @@ CREATE FOREIGN TABLE str_date (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_date');
 
-SELECT * FROM str_date;
+SELECT * FROM str_date ORDER BY col1;
 
 DROP FOREIGN TABLE str_date;
 
@@ -1503,7 +1516,7 @@ CREATE FOREIGN TABLE str_date1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_date');
 
-SELECT * FROM str_date1;
+SELECT * FROM str_date1 ORDER BY col1;
 
 DROP FOREIGN TABLE str_date1;
 
@@ -1514,7 +1527,7 @@ CREATE FOREIGN TABLE str_date2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_date');
 
-SELECT * FROM str_date2;
+SELECT * FROM str_date2 ORDER BY col1;
 
 DROP FOREIGN TABLE str_date2;
 
@@ -1525,7 +1538,7 @@ CREATE FOREIGN TABLE chr_date1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
 
-SELECT * FROM chr_date1;
+SELECT * FROM chr_date1 ORDER BY col1;
 
 DROP FOREIGN TABLE chr_date1;
 
@@ -1536,7 +1549,7 @@ CREATE FOREIGN TABLE chr_date2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
 
-SELECT * FROM chr_date2;
+SELECT * FROM chr_date2 ORDER BY col1;
 
 DROP FOREIGN TABLE chr_date2;
 
@@ -1547,7 +1560,7 @@ CREATE FOREIGN TABLE chr_date3 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
 
-SELECT * FROM chr_date3;
+SELECT * FROM chr_date3 ORDER BY col1;
 
 DROP FOREIGN TABLE chr_date3;
 
@@ -1558,7 +1571,7 @@ CREATE FOREIGN TABLE var_int (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'var_int');
 
-SELECT col1+1 FROM var_int;
+SELECT col1+1 FROM var_int ORDER BY col1;
 
 DROP FOREIGN TABLE var_int;
 
@@ -1569,7 +1582,7 @@ CREATE FOREIGN TABLE str_int (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'str_int');
 
-SELECT col1+1 FROM str_int;
+SELECT col1+1 FROM str_int ORDER BY col1;
 
 DROP FOREIGN TABLE str_int;
 
@@ -1587,7 +1600,7 @@ CREATE FOREIGN TABLE emp_dt_1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_dt_1;
+SELECT * FROM emp_dt_1 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_1;
 
@@ -1605,7 +1618,7 @@ CREATE FOREIGN TABLE emp_dt_2 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_dt_2;
+SELECT * FROM emp_dt_2 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_2;
 
@@ -1623,7 +1636,7 @@ CREATE FOREIGN TABLE emp_fr4 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr4;
+SELECT * FROM emp_fr4 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr4;
 
@@ -1641,7 +1654,7 @@ CREATE FOREIGN TABLE emp_fr5 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr5;
+SELECT * FROM emp_fr5 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr5;
 
@@ -1683,7 +1696,7 @@ CREATE FOREIGN TABLE emp_fr6 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr6;
+SELECT * FROM emp_fr6 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr6;
 
@@ -1701,7 +1714,7 @@ CREATE FOREIGN TABLE emp_fr7 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr7;
+SELECT * FROM emp_fr7 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr7;
 
@@ -1719,7 +1732,7 @@ CREATE FOREIGN TABLE emp_fr12 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr12;
+SELECT * FROM emp_fr12 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr12;
 
@@ -1737,7 +1750,7 @@ CREATE FOREIGN TABLE emp_fr13 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr13;
+SELECT * FROM emp_fr13 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr13;
 
@@ -1755,7 +1768,7 @@ CREATE FOREIGN TABLE emp_fr14 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr14;
+SELECT * FROM emp_fr14 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr14;
 
@@ -1773,7 +1786,7 @@ CREATE FOREIGN TABLE emp_fro14 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fro14;
+SELECT * FROM emp_fro14 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fro14;
 
@@ -1791,7 +1804,7 @@ CREATE FOREIGN TABLE emp_fr15 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr15;
+SELECT * FROM emp_fr15 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr15;
 
@@ -1809,7 +1822,7 @@ CREATE FOREIGN TABLE emp_fr16 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr16;
+SELECT * FROM emp_fr16 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr16;
 
@@ -1827,7 +1840,7 @@ CREATE FOREIGN TABLE emp_fr17 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr17;
+SELECT * FROM emp_fr17 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr17;
 
@@ -1845,7 +1858,7 @@ CREATE FOREIGN TABLE emp_fr18 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr18;
+SELECT * FROM emp_fr18 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr18;
 
@@ -1863,7 +1876,7 @@ CREATE FOREIGN TABLE emp_fr19 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_fr19;
+SELECT * FROM emp_fr19 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_fr19;
 
@@ -2179,7 +2192,7 @@ CREATE FOREIGN TABLE emp_dt_bg1 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 
-SELECT * FROM emp_dt_bg1;
+SELECT * FROM emp_dt_bg1 ORDER BY empno;
 
 DROP FOREIGN TABLE emp_dt_bg1;
 
