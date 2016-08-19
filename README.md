@@ -300,6 +300,7 @@ postgres=# EXPLAIN VERBOSE SELECT hd.client_ip IP, pr.category, count(hd.client_
 ##Regression
 
 To execute the Regression, follow the below steps.
+
 1.  Open /etc/hosts and add the following line (the IP Address is of the Hive Server Machine).
 
     `127.0.0.1 hive.server`
