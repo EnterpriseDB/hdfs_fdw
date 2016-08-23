@@ -15,6 +15,9 @@ The Apache™ Hadoop® project develops open-source software for reliable, scala
 
 
 ###Installation
+There are two options for installation. If you have an EDB Postgres Subscription, you can us the Interactive Installers provided via StackBuilder Plus or the RPMs from the yum.enterprisedb.com site. Otherwise, you can compile install the required dependancies and compile from source
+
+###Installation Steps
 To compile the [Hadoop][1] foreign data wrapper, Hive C client library is needed. This library can be downloaded from [Apache][2]
 
 ###Download and Install Thrift
