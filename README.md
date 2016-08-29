@@ -1,5 +1,5 @@
-						Hadoop (HDFS) Foreign Data Wrapper for PostgreSQL
-
+Hadoop (HDFS) Foreign Data Wrapper for PostgreSQL
+-------------------------------------------------
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for 
 [Hadoop][1] (HDFS).
 
@@ -23,8 +23,7 @@ called HiveQL. At the same time this language also allows traditional
 map/reduce programmers to plug in their custom mappers and reducers when it is
 inconvenient or inefficient to express this logic in HiveQL*. 
 
-There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this 
-[4][site].
+There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [site][4].
   
 Usage
 -----
@@ -253,15 +252,15 @@ and the following two paragraphs appear in all copies.
 See the [`LICENSE`][10] file for full details.
   
 [1]: http://www.apache.org/
-  [2]: http://hadoop.apache.org/releases.html
-  [3]: https://hive.apache.org/
-  [4]: https://hive.apache.org/downloads.html
-  [5]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
-  [6]: https://github.com/EnterpriseDB/hdfs_fdw/issues/new
-  [7]: CONTRIBUTING.md
-  [8]: http://wiki.pentaho.com/download/attachments/23531451/weblogs_parse.zip?version=1&modificationDate=1327096242000
-  [9]: http://wiki.pentaho.com/display/BAD/Transforming+Data+within+Hive
-  [10]: LICENSE
+[2]: http://hadoop.apache.org/releases.html
+[3]: https://hive.apache.org/
+[4]: https://hive.apache.org/downloads.html
+[5]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
+[6]: https://github.com/EnterpriseDB/hdfs_fdw/issues/new
+[7]: CONTRIBUTING.md
+[8]: http://wiki.pentaho.com/download/attachments/23531451/weblogs_parse.zip?version=1&modificationDate=1327096242000
+[9]: http://wiki.pentaho.com/display/BAD/Transforming+Data+within+Hive
+[10]: LICENSE
 
 
   
