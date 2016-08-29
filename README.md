@@ -1,43 +1,35 @@
-              Hadoop (HDFS) Foreign Data Wrapper for PostgreSQL
+						Hadoop (HDFS) Foreign Data Wrapper for PostgreSQL
 
-  This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for 
-  [Hadoop][1] (HDFS).
+This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for 
+[Hadoop][1] (HDFS).
 
-  Please note that this version of hdfs_fdw works with PostgreSQL and EDB 
-  Postgres Advanced Server 9.3, 9.4 and 9.5. Work is underway for certification 
-  with 9.6Beta.
+Please note that this version of hdfs_fdw works with PostgreSQL and EDB 
+Postgres Advanced Server 9.3, 9.4 and 9.5. Work is underway for certification 
+with 9.6Beta.
 
-  What Is Apache [Hadoop][1]?
-  --------------
-  The Apache™ Hadoop® project develops open-source software for reliable, 
-  scalable, distributed computing.
-  
-  The Apache Hadoop software library is a framework that allows for the 
-  distributed processing of large data sets across clusters of computers using 
-  simple programming models. It is designed to scale up from single servers to 
-  thousands of machines, each offering local computation and storage. Rather 
-  than rely on hardware to deliver high-availability, the library itself is 
-  designed to detect and handle failures at the application layer, so delivering
-  a highly-available service on top of a cluster of computers, each of which may
-  be prone to failures. The detail information can be found [here][1]. Hadoop 
-  can be downloaded from this [location][2]*.
+What Is Apache [Hadoop][1]?
+--------------
+*The Apache™ Hadoop® project develops open-source software for reliable, 
+scalable, distributed computing.The Apache Hadoop software library is a framework that allows for the distributed processing of large data sets across clusters of computers using simple programming models. It is designed to scale up from single servers to thousands of machines, each offering local computation and storage. Rather than rely on hardware to deliver high-availability, the library itself is designed to detect and handle failures at the application layer, so delivering a highly-available service on top of a cluster of computers, each of which may be prone to failures. The detail information can be found [here][1]. Hadoop 
+can be downloaded from this [location][2]*.
   
   
-  What Is Apache [Hive][3]?
-  --------------
-  The Apache Hive ™ data warehouse software facilitates querying and managing 
-  large datasets residing in distributed storage. Hive provides a mechanism to 
-  project structure onto this data and query the data using a SQL-like language 
-  called HiveQL. At the same time this language also allows traditional 
-  map/reduce programmers to plug in their custom mappers and reducers when it is
-  inconvenient or inefficient to express this logic in HiveQL*. There are two 
-  version of Hive HiveServer1 and HiveServer2 which can be downloded from this 
-  [4][site].
+What Is Apache [Hive][3]?
+--------------
+*The Apache Hive ™ data warehouse software facilitates querying and managing 
+large datasets residing in distributed storage. Hive provides a mechanism to 
+project structure onto this data and query the data using a SQL-like language 
+called HiveQL. At the same time this language also allows traditional 
+map/reduce programmers to plug in their custom mappers and reducers when it is
+inconvenient or inefficient to express this logic in HiveQL*. 
+
+There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this 
+[4][site].
   
-  Usage
-  -----
+Usage
+-----
   
-  The following parameters can be set on a HiveServer foreign server object:
+The following parameters can be set on a HiveServer foreign server object:
   
     * `host`: Address or hostname of the HiveServer. Defaults to `127.0.0.1`
     * `port`: Port number of the HiveServer. Defaults to `10000`
@@ -45,14 +37,14 @@
     * `connect_timeout`:  Connection timeout, default value is 300 seconds.
     * `query_timeout`:  Query timeout, default value is 300 seconds
   
-  The following parameters can be set on a Hive foreign table object:
+The following parameters can be set on a Hive foreign table object:
   
     * `dbname`: Name of the Hive database to query. This is a mandatory option.
     * `table_name`: Name of the Hive table, default is the same as foreign table.
   
-  Step 1: Download [weblogs_parse][8] and follow instructions from this [site][9].
+Step 1: Download [weblogs_parse][8] and follow instructions from this [site][9].
   
-  Step 2: Upload weblog_parse.txt file using these commands.
+Step 2: Upload weblog_parse.txt file using these commands.
   
   ```sh
   hadoop fs -mkdir /weblogs
@@ -61,17 +53,17 @@
   hadoop fs -cp /weblogs/parse/part-00000 /user/hive/warehouse/weblogs/
   ```
   
-  Step 3: Start HiveServer
+Step 3: Start HiveServer
   
   ```sh
   bin/hive --service hiveserver -v
   ```
-  Step 4: Start Hive client to connect to HiveServer
+Step 4: Start Hive client to connect to HiveServer
   ```sh
   hive -h 127.0.0.1
   ```
   
-  Step 5: Create Table in Hive
+Step 5: Create Table in Hive
   ```sql
   CREATE TABLE weblogs (
       client_ip           STRING,
@@ -215,36 +207,36 @@
   See the file INSTALL for instructions on how to build and install
   the extension and it's dependencies. 
   
-  TODO
-  ----
-  1. Hadoop Installation Instructions
-  2. Write-able support
-  3. Flum support
+TODO
+----
+ 1. Hadoop Installation Instructions
+ 2. Write-able support
+ 3. Flum support
   
-  Contributing
-  ------------
-  If you experince any bug create new [issue][6] and if you have fix for that 
-  create a pull request. Before submitting a bugfix or new feature, please read 
-  the [contributing guidlines][7].
+Contributing
+------------
+If you experince any bug create new [issue][6] and if you have fix for that 
+create a pull request. Before submitting a bugfix or new feature, please read 
+the [contributing guidlines][7].
   
-  Support
-  -------
-  This project will be modified to maintain compatibility with new PostgreSQL 
-  and EDB Postgres Advanced Server releases.
+Support
+-------
+This project will be modified to maintain compatibility with new PostgreSQL 
+and EDB Postgres Advanced Server releases.
   
-  If you require commercial support, please contact the EnterpriseDB sales 
-  team, or check whether your existing PostgreSQL support provider can also 
-  support hdfs_fdw.
+If you require commercial support, please contact the EnterpriseDB sales 
+team, or check whether your existing PostgreSQL support provider can also 
+support hdfs_fdw.
   
   
-  Copyright Information
-  ---------------------
-  Copyright (c) 2011 - 2016, EnterpriseDB Corporation
+Copyright Information
+---------------------
+Copyright (c) 2011 - 2016, EnterpriseDB Corporation
   
-  Permission to use, copy, modify, and distribute this software and its
-  documentation for any purpose, without fee, and without a written agreement is
-  hereby granted, provided that the above copyright notice and this paragraph 
-  and the following two paragraphs appear in all copies.
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose, without fee, and without a written agreement is
+hereby granted, provided that the above copyright notice and this paragraph 
+and the following two paragraphs appear in all copies.
   
   IN NO EVENT SHALL ENTERPRISEDB CORPORATION BE LIABLE TO ANY PARTY FOR
   DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING 
@@ -258,7 +250,7 @@
   AND ENTERPRISEDB CORPORATION HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, 
   SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
    
-  See the [`LICENSE`][10] file for full details.
+See the [`LICENSE`][10] file for full details.
   
 [1]: http://www.apache.org/
   [2]: http://hadoop.apache.org/releases.html
