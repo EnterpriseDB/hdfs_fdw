@@ -7,7 +7,8 @@
   Postgres Advanced Server 9.3, 9.4 and 9.5. Work is underway for certification 
   with 9.6Beta.
 
-  * What Is Apache [Hadoop][1]?
+  What Is Apache [Hadoop][1]?
+  --------------
   The Apache™ Hadoop® project develops open-source software for reliable, 
   scalable, distributed computing.
   
@@ -22,7 +23,8 @@
   can be downloaded from this [location][2]*.
   
   
-  * What Is Apache [Hive][3]?
+  What Is Apache [Hive][3]?
+  --------------
   The Apache Hive ™ data warehouse software facilitates querying and managing 
   large datasets residing in distributed storage. Hive provides a mechanism to 
   project structure onto this data and query the data using a SQL-like language 
@@ -213,17 +215,20 @@
   See the file INSTALL for instructions on how to build and install
   the extension and it's dependencies. 
   
-  * TODO
+  TODO
+  ----
   1. Hadoop Installation Instructions
   2. Write-able support
   3. Flum support
   
-  * Contributing
+  Contributing
+  ------------
   If you experince any bug create new [issue][6] and if you have fix for that 
   create a pull request. Before submitting a bugfix or new feature, please read 
   the [contributing guidlines][7].
   
-  * Support
+  Support
+  -------
   This project will be modified to maintain compatibility with new PostgreSQL 
   and EDB Postgres Advanced Server releases.
   
@@ -232,7 +237,8 @@
   support hdfs_fdw.
   
   
-  ###Copyright Information###
+  Copyright Information
+  ---------------------
   Copyright (c) 2011 - 2016, EnterpriseDB Corporation
   
   Permission to use, copy, modify, and distribute this software and its
@@ -254,15 +260,16 @@
    
   See the [`LICENSE`][10] file for full details.
   
-
-  [1]: http://www.apache.org/
+[1]: http://www.apache.org/
   [2]: http://hadoop.apache.org/releases.html
   [3]: https://hive.apache.org/
   [4]: https://hive.apache.org/downloads.html
   [5]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
   [6]: https://github.com/EnterpriseDB/hdfs_fdw/issues/new
   [7]: CONTRIBUTING.md
-  [8]: http://wiki.pentaho.com/download/attachments/23531451/weblogs_parse.zip?version=
-       1&modificationDate=1327096242000
+  [8]: http://wiki.pentaho.com/download/attachments/23531451/weblogs_parse.zip?version=1&modificationDate=1327096242000
   [9]: http://wiki.pentaho.com/display/BAD/Transforming+Data+within+Hive
   [10]: LICENSE
+
+
+  
