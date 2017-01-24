@@ -217,7 +217,139 @@ Using HDFS FDW with Apache Spark on top of Hadoop
 -----
 
 
+1. Install PPAS 9.5 and hdfs_fdw using installer.
+2. At the edb-psql prompt issue the following commands:
+  ```sql
+  CREATE EXTENSION hdfs_fdw;
+  CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
+  OPTIONS (host '127.0.0.1',port '10000',client_type 'hiveserver2');
+  CREATE USER MAPPING FOR enterprisedb server hdfs_svr;
+  CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
+  OPTIONS (dbname 'testdb', table_name 'my_names_tab');
+  ```
+Please note that we are using the same port and client_type while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark without any code changes.
+3. Download & install Apache Spark in local mode
 
+4. Test Spark installation using spark shell
+    ```sql
+    ./spark-shell
+    Spark session available as 'spark'.
+    Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 2.1.0
+      /_/
+        
+    Using Scala version 2.11.8 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_111)
+    Type in expressions to have them evaluated.
+    Type :help for more information.
+
+    scala> val no = Array(1, 2, 3, 4, 5,6,7,8,9,10)
+    no: Array[Int] = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    scala> val noData = sc.parallelize(no)
+    scala> noData.sum
+    res0: Double = 55.0
+    ```
+5. In the folder ``$SPARK_HOME/conf`` create a file ``spark-defaults.conf`` containing the following line
+    ```sql
+    spark.sql.warehouse.dir hdfs://localhost:9000/user/hive/warehouse
+    ```
+
+   By default spark uses derby for both meta data and the data itself (called warehouse in spark)
+   In order to have spark use hadoop as warehouse we have to add this property.
+
+6. Start Spark Thrift Server
+    ```sql
+    ./start-thriftserver.sh
+    ```
+
+7. Make sure Spark thrift server is running using log file
+
+8. Run the following commands in beeline command line tool
+
+  ```sql
+  ./beeline
+  Beeline version 1.0.1 by Apache Hive
+  beeline> !connect jdbc:hive2://localhost:10000 abbasbutt '' org.apache.hive.jdbc.HiveDriver
+  Connecting to jdbc:hive2://localhost:10000
+  Connected to: Spark SQL (version 2.1.0)
+  Driver: Hive JDBC (version 1.0.1)
+  Transaction isolation: TRANSACTION_REPEATABLE_READ
+  0: jdbc:hive2://localhost:10000> create database my_test_db;
+  +---------+--+
+  | Result  |
+  +---------+--+
+  +---------+--+
+  No rows selected (0.379 seconds)
+  0: jdbc:hive2://localhost:10000> use my_test_db;
+  +---------+--+
+  | Result  |
+  +---------+--+
+  +---------+--+
+  No rows selected (0.03 seconds)
+  0: jdbc:hive2://localhost:10000> create table my_names_tab(a int, name string)
+                                   row format delimited fields terminated by ' ';
+  +---------+--+
+  | Result  |
+  +---------+--+
+  +---------+--+
+  No rows selected (0.11 seconds)
+  0: jdbc:hive2://localhost:10000>
+
+  0: jdbc:hive2://localhost:10000> load data local inpath '/path/to/file/names.txt'
+                                   into table my_names_tab;
+  +---------+--+
+  | Result  |
+  +---------+--+
+  +---------+--+
+  No rows selected (0.33 seconds)
+  0: jdbc:hive2://localhost:10000> select * from my_names_tab;
+  +-------+---------+--+
+  |   a   |  name   |
+  +-------+---------+--+
+  | 1     | abcd    |
+  | 2     | pqrs    |
+  | 3     | wxyz    |
+  | 4     | a_b_c   |
+  | 5     | p_q_r   |
+  | NULL  | NULL    |
+  +-------+---------+--+
+  ```
+9. Stop thrift server
+    ```sql
+    ./stop-thriftserver.sh
+    ```
+
+10. Start thrift server with no authentication
+    ```sql
+    ./start-thriftserver.sh --hiveconf hive.server2.authentication=NOSASL
+    ```
+
+11. Run the following command in edb-psql
+    ```sql
+    select * from f_names_tab;
+     a |  name 
+    ---+--------
+     1 | abcd
+     2 | pqrs
+     3 | wxyz
+     4 | a_b_c
+     5 | p_q_r
+     0 |
+    (6 rows)
+    ```
+Here are the corresponding files in hadoop
+    ```sql
+$ hadoop fs -ls /user/hive/warehouse/
+Found 1 items
+drwxrwxr-x - user supergroup 0 2017-01-19 10:47 /user/hive/warehouse/my_test_db.db
+
+$ hadoop fs -ls /user/hive/warehouse/my_test_db.db/
+Found 1 items
+drwxrwxr-x - user supergroup 0 2017-01-19 10:50 /user/hive/warehouse/my_test_db.db/my_names_tab
+    ```
+    
 How to build
 -----
   
