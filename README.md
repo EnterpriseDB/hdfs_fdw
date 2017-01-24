@@ -24,23 +24,33 @@ map/reduce programmers to plug in their custom mappers and reducers when it is
 inconvenient or inefficient to express this logic in HiveQL*. 
 
 There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [site][4].
+
+  
+What Is Apache [Spark][11]?
+--------------
+The Apache Spark ™ is a general purpose distributed computing framework which supports a wide variety of uses cases. It provides real time stream as well as batch processing with speed, ease of use and sophisticated analytics. Spark does not provide storage layer, it relies on third party storage providers like Hadoop, HBASE, Cassandra, S3 etc. Spark integrates seamlessly with Hadoop and can process existing data. Spark SQL is 100% compatible with HiveQL and can be used as a replacement of hiveserver2, using Spark Thrift Server.
+
   
 Usage
 -----
   
-The following parameters can be set on a HiveServer foreign server object:
+While creating the foreign server object for HDFS FDW the following can be specified in options:
   
-    * `host`: Address or hostname of the HiveServer. Defaults to `127.0.0.1`
-    * `port`: Port number of the HiveServer. Defaults to `10000`
+    * `host`: IP Address or hostname of the Hive Thrift Server OR Spark Thrift Server. Defaults to `127.0.0.1`
+    * `port`: Port number of the Hive Thrift Server OR Spark Thrift Server. Defaults to `10000`
     * `client_type`:  HiveServer1 or HiveServer2. Default is HiveServer1
     * `connect_timeout`:  Connection timeout, default value is 300 seconds.
     * `query_timeout`:  Query timeout, default value is 300 seconds
   
-The following parameters can be set on a Hive foreign table object:
+HDFS can be used through either Hive or Spark. In this case both Hive and Spark store metadata in the configured metastore. In the metastore databases and tables can be created using HiveQL. While creating foreign table object for the foreign server the following can be specified in options:
   
-    * `dbname`: Name of the Hive database to query. This is a mandatory option.
-    * `table_name`: Name of the Hive table, default is the same as foreign table.
+    * `dbname`: Name of the metastore database to query. This is a mandatory option.
+    * `table_name`: Name of the metastore table, default is the same as foreign table name.
+
   
+Using HDFS FDW with Apache Hive on top of Hadoop
+-----
+    
 Step 1: Download [weblogs_parse][8] and follow instructions from this [site][9].
   
 Step 2: Upload weblog_parse.txt file using these commands.
@@ -202,9 +212,20 @@ Step 5: Create Table in Hive
                        Remote SQL: SELECT client_ip FROM weblogs WHERE ((year = 
   '2011'))
   ```
+
+Using HDFS FDW with Apache Spark on top of Hadoop
+-----
+
+
+
+How to build
+-----
   
   See the file INSTALL for instructions on how to build and install
   the extension and it's dependencies. 
+  
+  
+    
   
 TODO
 ----
@@ -261,6 +282,7 @@ See the [`LICENSE`][10] file for full details.
 [8]: http://wiki.pentaho.com/download/attachments/23531451/weblogs_parse.zip?version=1&modificationDate=1327096242000
 [9]: http://wiki.pentaho.com/display/BAD/Transforming+Data+within+Hive
 [10]: LICENSE
+[11]: http://spark.apache.org/
 
 
   
