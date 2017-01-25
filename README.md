@@ -218,16 +218,19 @@ Using HDFS FDW with Apache Spark on top of Hadoop
 
 
 1. Install PPAS 9.5 and hdfs_fdw using installer.
-2. At the edb-psql prompt issue the following commands:
-  ```sql
-  CREATE EXTENSION hdfs_fdw;
-  CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
-  OPTIONS (host '127.0.0.1',port '10000',client_type 'hiveserver2');
-  CREATE USER MAPPING FOR enterprisedb server hdfs_svr;
-  CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
-  OPTIONS (dbname 'testdb', table_name 'my_names_tab');
-  ```
+
+2. At the edb-psql prompt issue the following commands.
+    ```sql
+        CREATE EXTENSION hdfs_fdw;
+        CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
+        OPTIONS (host '127.0.0.1',port '10000',client_type 'hiveserver2');
+        CREATE USER MAPPING FOR enterprisedb server hdfs_svr;
+        CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
+        OPTIONS (dbname 'testdb', table_name 'my_names_tab');
+    ```
+  
 Please note that we are using the same port and client_type while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark without any code changes.
+
 3. Download & install Apache Spark in local mode
 
 4. Test Spark installation using spark shell
