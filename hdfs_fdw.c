@@ -176,8 +176,12 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	 * columns used in them.  Doesn't seem worth detecting that case though.)
 	 */
 	fpinfo->attrs_used = NULL;
-	pull_varattnos((Node *) baserel->reltargetlist, baserel->relid,
-				   &fpinfo->attrs_used);
+
+#if PG_VERSION_NUM >= 90600
+	pull_varattnos((Node *) baserel->reltarget->exprs, baserel->relid, &fpinfo->attrs_used);
+#else
+	pull_varattnos((Node *) baserel->reltargetlist, baserel->relid, &fpinfo->attrs_used);
+#endif
 	foreach(lc, fpinfo->local_conds)
 	{
 		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
@@ -215,6 +219,9 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 	 * to estimate cost and size of this path.
 	 */
 	path = create_foreignscan_path(root, baserel,
+#if PG_VERSION_NUM >= 90600
+								   NULL,  /* default pathtarget */
+#endif
 								   fpinfo->rows,
 								   fpinfo->fdw_startup_cost,
 								   total_cost,
