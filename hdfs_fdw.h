@@ -16,7 +16,7 @@
 #ifndef HADOOP_FDW_H
 #define HADOOP_FDW_H
 
-#include "libhive/odbc/hiveclient.h"
+#include "libhive/jdbc/hiveclient.h"
 
 
 #include "foreign/foreign.h"
@@ -33,10 +33,20 @@
 #define HDFS_VARCHAR     5
 #define HDFS_CHAR        6
 #define HDFS_TIMESTAMPS  7
-#define HDFS_DACIMAL     8
+#define HDFS_DECIMAL     8
 #define HDFS_DATE        9
 #define HDFS_DOUBLE      10
 #define HDFS_BOLEAN      11
+
+/* Default connection parameters */
+/* Default Hive database name */
+static const char* DEFAULT_DATABASE = "default";
+/* Default Hive Server host */
+static const char* DEFAULT_HOST     = "localhost";
+/* Default Hive Server port */
+static const char* DEFAULT_PORT     = "10000";
+
+
 typedef enum CLIENT_TYPE
 {
 	HIVESERVER1,
@@ -70,8 +80,8 @@ typedef struct hdfsFdwExecutionState
 {
 	char            *query;
 	MemoryContext batch_cxt;
-	HiveResultSet   *result;
-	HiveConnection *conn;
+	bool			query_executed;
+	int				con_index;
 	Relation        rel;              /* relcache entry for the foreign table */
 	List	        *retrieved_attrs; /* list of retrieved attribute numbers */
 	List	        *col_list;        /* list of remote column's type */
@@ -157,8 +167,8 @@ typedef struct
 hdfs_opt* hdfs_get_options(Oid foreigntableid);
 
 /* Functions prototypes for hdfs_connection.c file */
-HiveConnection *hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt);
-void hdfs_rel_connection(HiveConnection *conn);
+int hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt);
+void hdfs_rel_connection(int con_index);
 
 /* Functions prototypes for hdfs_deparse.c file */
 extern void hdfs_deparse_select(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, Bitmapset *attrs_used, List **retrieved_attrs);
@@ -168,25 +178,31 @@ extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
 extern void deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_attrs);
 extern void deparseStringLiteral(StringInfo buf, const char *val);
 
-List *hdfs_desc_query(HiveConnection *conn, hdfs_opt *opt);
+List *hdfs_desc_query(int con_index, hdfs_opt *opt);
 
 void hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt);
-void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
+void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf,
+						PlannerInfo *root, RelOptInfo *baserel,
+						HDFSFdwRelationInfo *fpinfo);
 void hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt);
 
-size_t hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs);
-size_t hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col);
-HiveReturn hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs);
-char* hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len);
+int hdfs_get_column_count(int con_index, hdfs_opt *opt);
+int hdfs_fetch(int con_index, hdfs_opt *opt);
+char* hdfs_get_field_as_cstring(int con_index, hdfs_opt *opt, int idx, bool *is_null);
 
-Datum
-hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len, int col_type);
+Datum hdfs_get_value(int con_index, hdfs_opt *opt, Oid pgtyp, int pgtypmod,
+					int idx, bool *is_null, int col_type);
 
-HiveResultSet* hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query);
-void hdfs_close_result_set(hdfs_opt *opt, HiveResultSet *rs);
+bool hdfs_query_execute(int con_index, hdfs_opt *opt, char *query);
+bool hdfs_query_execute_utility(int con_index, hdfs_opt *opt, char *query);
+void hdfs_close_result_set(int con_index, hdfs_opt *opt);
 
-double hdfs_rowcount(HiveConnection *conn, hdfs_opt *opt, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
-double hdfs_describe(HiveConnection *conn, hdfs_opt *opt);
-void hdfs_analyze(HiveConnection *conn, hdfs_opt *opt);
+double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
+					RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
+double hdfs_describe(int con_index, hdfs_opt *opt);
+void hdfs_analyze(int con_index, hdfs_opt *opt);
+
+extern void _PG_init(void);
+extern void _PG_fini(void);
 
 #endif   /* HADOOP_FDW_H */

@@ -17,9 +17,11 @@
 
 -- Connection Settings.
 
-\set HIVE_SERVER                '\'hive.server\''
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE           '\'hiveserver2\''
-\set HIVE_PORT                  '\'10000\''
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 
 -- Create the database.
 
@@ -47,7 +49,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
 
 -- Create Hadoop USER MAPPING.
 
-CREATE USER MAPPING FOR postgres SERVER hdfs_server;
+CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 
 
 --=========================================================================================================
@@ -338,7 +340,7 @@ CREATE TYPE dnametype AS ENUM ('ACCOUNTING', 'RESEARCH','OPERATIONS','SALES');
 CREATE FOREIGN TABLE dept_dt_enum1 (
     deptno          INT,
     dname           dnametype,
-    loc             VARCHAR2(13)
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -586,8 +588,8 @@ DROP FOREIGN TABLE dept_dt_var;
 
 CREATE FOREIGN TABLE emp_dt_date (
     empno           INT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INT,
     hiredate        DATE,
     sal             INT,
@@ -604,8 +606,8 @@ DROP FOREIGN TABLE emp_dt_date;
 
 CREATE FOREIGN TABLE emp_dt_time_tm (
     empno           INT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INT,
     hiredate        TIMESTAMP,
     sal             INT,
@@ -620,8 +622,8 @@ DROP FOREIGN TABLE emp_dt_time_tm;
 
 CREATE FOREIGN TABLE emp_dt_time (
     empno           INT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INT,
     hiredate        TIMESTAMP with time zone,
     sal             INT,
@@ -636,8 +638,8 @@ DROP FOREIGN TABLE emp_dt_time;
 
 CREATE FOREIGN TABLE emp_dt_time_otm (
     empno           INT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INT,
     hiredate        TIMESTAMP without time zone,
     sal             INT,
@@ -676,8 +678,8 @@ DROP FOREIGN TABLE emp_dt_bol1;
 
 CREATE FOREIGN TABLE dept_dt_car (
     deptno          CHAR,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -687,8 +689,8 @@ DROP FOREIGN TABLE dept_dt_car;
 
 CREATE FOREIGN TABLE dept_dt_car1 (
     deptno          CHAR(10),
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -699,9 +701,9 @@ DROP FOREIGN TABLE dept_dt_car1;
 -- Create Table with datatypes VARCHAR2 mapped to INT in Hadoop, data will be displayed.
 
 CREATE FOREIGN TABLE dept_dt_var2 (
-    deptno          VARCHAR2(10),
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    deptno          VARCHAR(10),
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -711,8 +713,8 @@ DROP FOREIGN TABLE dept_dt_var2;
 
 CREATE FOREIGN TABLE dept_dt_var3 (
     deptno          VARCHAR(10),
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -724,8 +726,8 @@ DROP FOREIGN TABLE dept_dt_var3;
 
 CREATE FOREIGN TABLE dept_dt_txt (
     deptno          TEXT,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -737,8 +739,8 @@ DROP FOREIGN TABLE dept_dt_txt;
 
 CREATE FOREIGN TABLE dept_dt_dt (
     deptno          DATE,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -750,8 +752,8 @@ DROP FOREIGN TABLE dept_dt_dt;
 
 CREATE FOREIGN TABLE dept_dt_tm (
     deptno          TIMESTAMP,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -763,8 +765,8 @@ DROP FOREIGN TABLE dept_dt_tm;
 
 CREATE FOREIGN TABLE dept_dt_tme (
     deptno          TIME,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -777,7 +779,7 @@ DROP FOREIGN TABLE dept_dt_tme;
 CREATE FOREIGN TABLE dept_dt_con_var (
     deptno          INT,
     dname           INT,
-    loc             VARCHAR2(13)
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -790,7 +792,7 @@ DROP FOREIGN TABLE dept_dt_con_var;
 CREATE FOREIGN TABLE dept_dt_con_date (
     deptno          INT,
     dname           DATE,
-    loc             VARCHAR2(13)
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -803,7 +805,7 @@ DROP FOREIGN TABLE dept_dt_con_date;
 CREATE FOREIGN TABLE dept_dt_con_tmpstmp (
     deptno          INT,
     dname           TIMESTAMP,
-    loc             VARCHAR2(13)
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
@@ -841,8 +843,8 @@ DROP FOREIGN TABLE dept_dt_mp2;
 
 CREATE FOREIGN TABLE emp_dt_mp1 (
     empno           SMALLINT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             BIGINT,
     hiredate        DATE,
     sal             INT,
@@ -859,8 +861,8 @@ DROP FOREIGN TABLE emp_dt_mp1;
 
 CREATE FOREIGN TABLE emp2 (
     empno           real,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             double precision,
     hiredate        DATE,
     sal             FLOAT,
@@ -903,10 +905,10 @@ DROP FOREIGN TABLE dept_dt32;
 
 CREATE FOREIGN TABLE emp_dt_mp2 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
-    hiredate        VARCHAR2(10),
+    hiredate        VARCHAR(10),
     sal             INTEGER,
     comm            INTEGER,
     deptno          INTEGER
@@ -921,8 +923,8 @@ DROP FOREIGN TABLE emp_dt_mp2;
 
 CREATE FOREIGN TABLE emp_dt_mp3 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        CHAR,
     sal             INTEGER,
@@ -939,8 +941,8 @@ DROP FOREIGN TABLE emp_dt_mp3;
 
 CREATE FOREIGN TABLE emp_dt_mp4 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        CHAR(20),
     sal             INTEGER,
@@ -957,8 +959,8 @@ DROP FOREIGN TABLE emp_dt_mp4;
 
 CREATE FOREIGN TABLE emp_dt_mp5 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        TEXT,
     sal             INTEGER,
@@ -975,8 +977,8 @@ DROP FOREIGN TABLE emp_dt_mp5;
 
 CREATE FOREIGN TABLE emp_dt_mp6 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	TIME,
     sal             INTEGER,
@@ -993,8 +995,8 @@ DROP FOREIGN TABLE emp_dt_mp6;
 
 CREATE FOREIGN TABLE emp_dt_mp7 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	TIMESTAMP,
     sal             INTEGER,
@@ -1011,8 +1013,8 @@ DROP FOREIGN TABLE emp_dt_mp7;
 
 CREATE FOREIGN TABLE emp_dt_mp8 (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	BOOLEAN,
     sal             INTEGER,
@@ -1029,8 +1031,8 @@ DROP FOREIGN TABLE emp_dt_mp8;
 
 CREATE FOREIGN TABLE emp_dt_mp9 (
     empno           BOOLEAN,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	DATE,
     sal             INTEGER,
@@ -1048,7 +1050,7 @@ DROP FOREIGN TABLE emp_dt_mp9;
 CREATE FOREIGN TABLE emp_dt_mp10 (
     empno           INT,
     ename           BOOLEAN,
-    job             VARCHAR2(9),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	DATE,
     sal             INTEGER,
@@ -1065,8 +1067,8 @@ DROP FOREIGN TABLE emp_dt_mp10;
 
 CREATE FOREIGN TABLE emp18 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	smallint,
     sal             INTEGER,
@@ -1083,8 +1085,8 @@ DROP FOREIGN TABLE emp18;
 
 CREATE FOREIGN TABLE emp_dt_mp11 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	INTEGER,
     sal             INTEGER,
@@ -1101,8 +1103,8 @@ DROP FOREIGN TABLE emp_dt_mp11;
 
 CREATE FOREIGN TABLE emp20 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	bigint,
     sal             INTEGER,
@@ -1119,8 +1121,8 @@ DROP FOREIGN TABLE emp20;
 
 CREATE FOREIGN TABLE emp23 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	real,
     sal             INTEGER,
@@ -1137,8 +1139,8 @@ DROP FOREIGN TABLE emp23;
 
 CREATE FOREIGN TABLE emp24 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	double precision,
     sal             INTEGER,
@@ -1155,8 +1157,8 @@ DROP FOREIGN TABLE emp24;
 
 CREATE FOREIGN TABLE emp25 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	smallserial,
     sal             INTEGER,
@@ -1173,8 +1175,8 @@ DROP FOREIGN TABLE emp25;
 
 CREATE FOREIGN TABLE emp26 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	serial,
     sal             INTEGER,
@@ -1191,8 +1193,8 @@ DROP FOREIGN TABLE emp26;
 
 CREATE FOREIGN TABLE emp27 (
     empno           INT,
-    ename           VARCHAR2(20),
-    job             VARCHAR2(9),
+    ename           VARCHAR(20),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate       	bigserial,
     sal             INTEGER,
@@ -1209,8 +1211,8 @@ DROP FOREIGN TABLE emp27;
 
 CREATE FOREIGN TABLE dept_dt_mp1 (
     deptno          INTEGER,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
@@ -1222,8 +1224,8 @@ DROP FOREIGN TABLE dept_dt_mp1;
 
 CREATE FOREIGN TABLE dept_dt_mp_2 (
     deptno          SMALLINT,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
@@ -1235,8 +1237,8 @@ DROP FOREIGN TABLE dept_dt_mp_2;
 
 CREATE FOREIGN TABLE dept_dt_mp3 (
     deptno          INT,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
@@ -1248,8 +1250,8 @@ DROP FOREIGN TABLE dept_dt_mp3;
 
 CREATE FOREIGN TABLE dept_dt_mp4 (
     deptno          CHAR(2),
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
@@ -1260,9 +1262,9 @@ DROP FOREIGN TABLE dept_dt_mp4;
 -- Mapp VARCHAR2 with TINYINT, data will be displayed.
 
 CREATE FOREIGN TABLE dept_dt_mp5 (
-    deptno             VARCHAR2(10),
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    deptno             VARCHAR(10),
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
@@ -1274,8 +1276,8 @@ DROP FOREIGN TABLE dept_dt_mp5;
 
 CREATE FOREIGN TABLE dept_dt_mp7 (
     deptno            bigint,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 
@@ -1453,7 +1455,7 @@ DROP FOREIGN TABLE emp_dt_bool2;
 -- Mapp VARCHAR2 with BOOLEAN, data will be displayed.
 
 CREATE FOREIGN TABLE emp_dt_bool3 (
-    bol1           VARCHAR2(6),
+    bol1           VARCHAR(6),
     bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
@@ -1590,8 +1592,8 @@ DROP FOREIGN TABLE str_int;
 
 CREATE FOREIGN TABLE emp_dt_1 (
     empno           SMALLINT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        TIMESTAMP,
     sal             INTEGER,
@@ -1608,8 +1610,8 @@ DROP FOREIGN TABLE emp_dt_1;
 
 CREATE FOREIGN TABLE emp_dt_2 (
     empno           SMALLINT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             INTEGER,
@@ -1626,8 +1628,8 @@ DROP FOREIGN TABLE emp_dt_2;
 
 CREATE FOREIGN TABLE emp_fr4 (
     empno           bigint,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        INTERVAL,
     sal             double precision,
@@ -1644,8 +1646,8 @@ DROP FOREIGN TABLE emp_fr4;
 
 CREATE FOREIGN TABLE emp_fr5 (
     empno           bigint,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             double precision,
@@ -1686,8 +1688,8 @@ DROP FOREIGN TABLE emp_fr3;
 
 CREATE FOREIGN TABLE emp_fr6 (
     empno           REAL,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        timestamp with time zone,
     sal             double precision,
@@ -1704,8 +1706,8 @@ DROP FOREIGN TABLE emp_fr6;
 
 CREATE FOREIGN TABLE emp_fr7 (
     empno           double precision,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        timestamp without time zone,
     sal             double precision,
@@ -1722,8 +1724,8 @@ DROP FOREIGN TABLE emp_fr7;
 
 CREATE FOREIGN TABLE emp_fr12 (
     empno           TEXT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        CHAR(30),
     sal             FLOAT,
@@ -1739,9 +1741,9 @@ DROP FOREIGN TABLE emp_fr12;
 -- Create Foreign Table, data will be displayed.
 
 CREATE FOREIGN TABLE emp_fr13 (
-    empno           VARCHAR2(10),
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    empno           VARCHAR(10),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             FLOAT,
@@ -1758,8 +1760,8 @@ DROP FOREIGN TABLE emp_fr13;
 
 CREATE FOREIGN TABLE emp_fr14 (
     empno           CHAR(10),
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             FLOAT,
@@ -1776,8 +1778,8 @@ DROP FOREIGN TABLE emp_fr14;
 
 CREATE FOREIGN TABLE emp_fro14 (
     empno           FLOAT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             FLOAT,
     hiredate        DATE,
     sal             FLOAT,
@@ -1794,8 +1796,8 @@ DROP FOREIGN TABLE emp_fro14;
 
 CREATE FOREIGN TABLE emp_fr15 (
     empno           DATE,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             FLOAT,
@@ -1812,12 +1814,12 @@ DROP FOREIGN TABLE emp_fr15;
 
 CREATE FOREIGN TABLE emp_fr16 (
     empno           TEXT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             FLOAT,
-    comm            VARCHAR2(9),
+    comm            VARCHAR(9),
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
@@ -1830,12 +1832,12 @@ DROP FOREIGN TABLE emp_fr16;
 
 CREATE FOREIGN TABLE emp_fr17 (
     empno           TEXT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
-    sal             VARCHAR2(9),
-    comm            VARCHAR2(9),
+    sal             VARCHAR(9),
+    comm            VARCHAR(9),
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
@@ -1848,8 +1850,8 @@ DROP FOREIGN TABLE emp_fr17;
 
 CREATE FOREIGN TABLE emp_fr18 (
     empno           TEXT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             CHAR(10),
@@ -1866,8 +1868,8 @@ DROP FOREIGN TABLE emp_fr18;
 
 CREATE FOREIGN TABLE emp_fr19 (
     empno           TEXT,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             BLOB,
@@ -2143,8 +2145,8 @@ DROP FOREIGN TABLE emp_float14;
 
 CREATE FOREIGN TABLE dept_dt_mp_4 (
     deptno          CHAR(0),
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
 
@@ -2181,9 +2183,9 @@ DROP FOREIGN TABLE dept_dt_mp_42;
 -- Mapp DECIMAL with BIGINT, error will be displayed.
 
 CREATE FOREIGN TABLE emp_dt_bg1 (
-    empno           VARCHAR2(10),
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    empno           VARCHAR(10),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             FLOAT,

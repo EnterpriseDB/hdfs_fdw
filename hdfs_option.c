@@ -17,7 +17,7 @@
 
 #include "hdfs_fdw.h"
 
-#include "libhive/odbc/hiveclient.h"
+#include "libhive/jdbc/hiveclient.h"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -212,15 +212,13 @@ hdfs_get_options(Oid foreigntableid)
 
 		if (strcmp(def->defname, "client_type") == 0)
 		{
-			if (strcasecmp(defGetString(def), "hiveserver1") == 0)
-				opt->client_type = HIVESERVER1;
-			else if (strcasecmp(defGetString(def), "hiveserver2") == 0)
+			if (strcasecmp(defGetString(def), "hiveserver2") == 0)
 				opt->client_type = HIVESERVER2;
 			else
 				ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME), 
 						errmsg("invalid option \"%s\"", defGetString(def)), 
-							errhint("Valid client_type are hiveserver1 and hiveserver2")));
+							errhint("Valid client_type is hiveserver2, this option will be deprecated soon")));
 		}
 
 		if (strcmp(def->defname, "use_remote_estimate") == 0)

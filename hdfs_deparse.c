@@ -624,7 +624,8 @@ is_builtin(Oid oid)
 }
 
 void
-hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root, RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
+hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
+					RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
 {
 	List *params_list = NIL;
 	appendStringInfo(buf, "SELECT COUNT(*) FROM ");

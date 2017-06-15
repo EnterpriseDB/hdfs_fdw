@@ -14,9 +14,11 @@
  *---------------------------------------------------------------------------------------------------------------------
  */
 -- Connection Settings.
-\set HIVE_SERVER                '\'hive.server\''
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE           '\'hiveserver2\''
-\set HIVE_PORT                  '\'10000\''
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 CREATE DATABASE fdw_regression;
 \c fdw_regression postgres
 --create a non superuser
@@ -96,6 +98,7 @@ ALTER EXTENSION hdfs_fdw SET SCHEMA public;
 (1 row)
 
 -- Create a view to add as member to extension
+CREATE TABLE DUAL (a INTEGER);
 CREATE VIEW ext_v1 AS SELECT * FROM DUAL;
 ALTER EXTENSION hdfs_fdw ADD VIEW ext_v1; 
 --should list the view in the members list
@@ -135,14 +138,8 @@ CREATE SERVER hdfs_srv1 FOREIGN DATA WRAPPER hdfs_fdw OPTIONS (client_type :HIVE
 (1 row)
 
 --test server
-CREATE USER MAPPING FOR postgres SERVER hdfs_srv1;
-\deu+
-        List of user mappings
-  Server   | User name | FDW Options 
------------+-----------+-------------
- hdfs_srv1 | postgres  | 
-(1 row)
-
+CREATE USER MAPPING FOR postgres SERVER hdfs_srv1 OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+--\deu+  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
 --test ALTER SERVER OWNER TO, and RENAME to clauses
 ALTER SERVER hdfs_srv1 RENAME TO hdfs_srv1_renamed;
 \des+ hdfs_srv1
@@ -179,19 +176,13 @@ OPTIONS (host '127.0.0.1', PORT:HIVE_PORT,Client_Type :HIVE_CLIENT_TYPE);
 --Create a server providing valid OPTIONS (HOST,PORT,CLIENT_TYPE,connect_timeout,query_timeout)
 CREATE SERVER hdfs_srv3a FOREIGN DATA WRAPPER hdfs_fdw 
  OPTIONS (host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, connect_timeout '4000',query_timeout '4000');
-\des+ hdfs_srv3a
-                                                                                            List of foreign servers
-    Name    |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                 FDW Options                                                 | Description 
-------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------------------------------+-------------
- hdfs_srv3a | postgres | hdfs_fdw             |                   |      |         | (host 'hive.server', port '10000', client_type 'hiveserver2', connect_timeout '4000', query_timeout '4000') | 
-(1 row)
-
+--\des+ hdfs_srv3a  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
 --test server
-CREATE USER MAPPING FOR postgres SERVER hdfs_srv3a;
+CREATE USER MAPPING FOR postgres SERVER hdfs_srv3a OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 CREATE FOREIGN TABLE dept (
 deptno INTEGER,
-dname VARCHAR2(14),
-loc VARCHAR2(13)
+dname VARCHAR(14),
+loc VARCHAR(13)
 )
 SERVER hdfs_srv3a OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept; 
@@ -206,13 +197,7 @@ SELECT * FROM dept;
 --test port
 --negative, raise error
 ALTER SERVER hdfs_srv3a OPTIONS (SET port '-1');
-\des+ hdfs_srv3a
-                                                                                          List of foreign servers
-    Name    |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                               FDW Options                                                | Description 
-------------+----------+----------------------+-------------------+------+---------+----------------------------------------------------------------------------------------------------------+-------------
- hdfs_srv3a | postgres | hdfs_fdw             |                   |      |         | (host 'hive.server', port '-1', client_type 'hiveserver2', connect_timeout '4000', query_timeout '4000') | 
-(1 row)
-
+--\des+ hdfs_srv3a  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
 SELECT * FROM dept;
 ERROR:  invalid port number: -1
 --zero, raise error
@@ -246,24 +231,24 @@ SELECT * FROM dept;
 --empty string, should fail
 ALTER SERVER hdfs_srv3a OPTIONS (SET host '');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (Could not resolve host for client socket.)
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db within 4000000 seconds)
 --test cient_type
 --set to hiveserver1, should error when querying 
 --since the target is hiveserver2
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'hiverserver1');
 SELECT * FROM dept;
 ERROR:  invalid option "hiverserver1"
-HINT:  Valid client_type are hiveserver1 and hiveserver2
+HINT:  Valid client_type is hiveserver2, this option will be deprecated soon
 --set to invalid value, should error when querying 
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
-HINT:  Valid client_type are hiveserver1 and hiveserver2
+HINT:  Valid client_type is hiveserver2, this option will be deprecated soon
 --set to invalid value, should error when querying 
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
-HINT:  Valid client_type are hiveserver1 and hiveserver2
+HINT:  Valid client_type is hiveserver2, this option will be deprecated soon
 --test DROP SERVER
 --should fail, RESTRICT enforced
 DROP SERVER hdfs_srv3a;
@@ -297,5 +282,6 @@ DROP EXTENSION hdfs_fdw;
 DROP SCHEMA test_ext_schema;
 DROP ROLE low_priv_user;
 DROP VIEW ext_v1;
+DROP TABLE DUAL;
 \c postgres postgres
 DROP DATABASE fdw_regression;

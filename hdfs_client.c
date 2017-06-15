@@ -3,6 +3,8 @@
  * hdfs_client.c
  * 		Foreign-data wrapper for remote Hadoop servers
  *
+ * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * 
  * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
@@ -18,57 +20,49 @@
 #include "catalog/pg_type.h"
 #include "utils/syscache.h"
 
-#include "libhive/odbc/hiveclient.h"
+#include "libhive/jdbc/hiveclient.h"
 
 #include "hdfs_fdw.h"
 
-HiveReturn
-hdfs_fetch(hdfs_opt *opt, HiveResultSet *rs)
+int
+hdfs_fetch(int con_index, hdfs_opt *opt)
 {
-	HiveReturn r;
-	char err_buf[512];
-	r = DBFetch(rs, err_buf, sizeof(err_buf));
-	if (r == HIVE_ERROR)
+	int		rc;
+	char	*err = "unknown";
+	char	*err_buf = err;
+
+	rc = DBFetch(con_index, &err_buf);
+	if (rc < -1)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 				errmsg("failed to fetch data from HiveServer: %s", err_buf)));
-	return r;
+	return rc;
 }
 
-size_t
-hdfs_get_column_count(hdfs_opt *opt, HiveResultSet *rs)
+int
+hdfs_get_column_count(int con_index, hdfs_opt *opt)
 {
-	size_t count = 0;
-	char err_buf[512];
-	if (DBGetColumnCount(rs, &count, err_buf, sizeof(err_buf)) == HIVE_ERROR)
+	int		count;
+	char	*err = "unknown";
+	char	*err_buf = err;
+
+	count = DBGetColumnCount(con_index, &err_buf);
+	if (count < 0)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 				errmsg("failed to get column count HiveServer: %s", err_buf)));
 	return count;
 }
 
-size_t
-hdfs_get_field_data_len(hdfs_opt *opt, HiveResultSet *rs, int col)
-{
-	size_t len;
-	char err_buf[512];
-	if (DBGetFieldDataLen(rs, col, &len, err_buf, sizeof(err_buf)) == HIVE_ERROR)
-		ereport(ERROR,
-			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
-				errmsg("failed to fetch field length from HiveServer: %s", err_buf)));
-	return len;
-}
-
 Datum
-hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int idx, bool *is_null, int len, int col_type)
+hdfs_get_value(int con_index, hdfs_opt *opt, Oid pgtyp, int pgtypmod,
+				int idx, bool *is_null, int col_type)
 {
 	Datum      value_datum = 0;
-	Datum      valueDatum = 0;
 	regproc    typeinput;
 	HeapTuple  tuple;
 	int        typemod;
-	char *value;
-	char str[10];
+	char       *value;
 
 	/* get the type's output function */
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(pgtyp));
@@ -93,123 +87,97 @@ hdfs_get_value(hdfs_opt *opt, Oid pgtyp, int pgtypmod, HiveResultSet *rs, int id
 		case TIMESTAMPTZOID:
 		case FLOAT4OID:
  		case FLOAT8OID:
- 		{
-			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
-			switch (col_type)
-			{
-				case HDFS_TINYINT:
-				{
-					if (strlen(value) == 0)
-					{
-						*is_null = true;
-					}
-					else
-					{
-						sprintf(str, "%d", value[0]);
-						valueDatum = CStringGetDatum((char*)str);
-						value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
-					}
-				}
-				break;
-				default:
-				{
-					/* libhive return an empty string for null value */
-					if (strlen(value) == 0)
-					{
-						*is_null = true;
-					}
-					else
-					{
-						valueDatum = CStringGetDatum((char*)value);
-						value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
-					}
-				}
-				break;
-			}
-			pfree(value);
-		}
-		break;
 		case CHAROID:
 		case NAMEOID:
 		case TEXTOID:
 		case BPCHAROID:
 		case VARCHAROID:
 		{
-			value = hdfs_get_field_as_cstring(opt, rs, idx, is_null, len);
-			switch (col_type)
+			value = hdfs_get_field_as_cstring(con_index, opt, idx, is_null);
+			if (*is_null == true || strlen(value) == 0)
 			{
-				case HDFS_TINYINT:
-				{
-					if (strlen(value) == 0)
-					{
-						*is_null = true;
-					}
-					else
-					{
-						sprintf(str, "%d", value[0]);
-						valueDatum = CStringGetDatum((char*)str);
-						value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
-					}
-				}
-				break;
-				default:
-				{
-					valueDatum = CStringGetDatum((char*)value);
-					value_datum = OidFunctionCall3(typeinput, valueDatum, ObjectIdGetDatum(pgtyp), Int32GetDatum(typemod));
-				}
-				break;
+				*is_null = true;
 			}
-			pfree(value);
+			else
+			{
+				value_datum = OidFunctionCall3(typeinput, CStringGetDatum(value),
+												ObjectIdGetDatum(pgtyp),
+												Int32GetDatum(typemod));
+			}
 		}
 		break;
 		default:
+		{
+			hdfs_close_result_set(con_index, opt);
+			hdfs_rel_connection(con_index);
+
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
 								errmsg("unsupported PostgreSQL data type"),
 								errhint("Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : %u", pgtyp)));
                         break;
-
+		}
 	}
 	return value_datum;
 }
 
-
 char *
-hdfs_get_field_as_cstring(hdfs_opt *opt, HiveResultSet *rs, int idx, bool *is_null, int len)
+hdfs_get_field_as_cstring(int con_index, hdfs_opt *opt, int idx, bool *is_null)
 {
-	size_t  bs;
-	char    *value = NULL;
+	int		size;
+	char    *value;
 	int     isnull = 1;
-	char    err_buf[512];
+	char	*err = "unknown";
+	char	*err_buf = err;
 
-	value = (char*) palloc(len);
-	if (DBGetFieldAsCString(rs, idx, value, len, &bs, &isnull, err_buf, sizeof(err_buf)) == HIVE_ERROR)
+	size = DBGetFieldAsCString(con_index, idx, &value, &err_buf);
+	if (size < -1)
 		ereport(ERROR,
 				(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 					errmsg("failed to fetch field from HiveServer: %s", err_buf)));
 
-	if (isnull == 0)
-		*is_null = false;
-	else
+	if (size == -1)
+	{
 		*is_null = true;
+	}
+	else
+	{
+		*is_null = false;
+	}
+
 	return value;
 }
 
-HiveResultSet*
-hdfs_query_execute(HiveConnection *conn, hdfs_opt *opt, char *query)
+bool
+hdfs_query_execute(int con_index, hdfs_opt *opt, char *query)
 {
-	HiveResultSet *rs = NULL;
-	char  err_buf[512];
+	char	*err = "unknown";
+	char	*err_buf = err;
 
-	if (DBExecute(conn, query, &rs, 1000, err_buf, sizeof(err_buf)) != HIVE_SUCCESS)
+	if (DBExecute(con_index, query, 1000, &err_buf) < 0)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 				errmsg("failed to fetch execute query: %s", err_buf)));
-	return rs;
+	return true;
+}
+
+bool
+hdfs_query_execute_utility(int con_index, hdfs_opt *opt, char *query)
+{
+	char	*err = "unknown";
+	char	*err_buf = err;
+
+	if (DBExecuteUtility(con_index, query, &err_buf) < 0)
+		ereport(ERROR,
+			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
+				errmsg("failed to fetch execute query: %s", err_buf)));
+	return true;
 }
 
 void
-hdfs_close_result_set(hdfs_opt *opt, HiveResultSet *rs)
+hdfs_close_result_set(int con_index, hdfs_opt *opt)
 {
-	char  err_buf[512];
-	DBCloseResultSet(rs, err_buf, sizeof(err_buf));
+	char	*err = "unknown";
+	char	*err_buf = err;
+
+	DBCloseResultSet(con_index, &err_buf);
 }

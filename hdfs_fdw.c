@@ -17,6 +17,7 @@
 
 #include "hdfs_fdw.h"
 
+#include "access/xact.h"
 #include "access/htup_details.h"
 #include "access/sysattr.h"
 #include "commands/defrem.h"
@@ -41,6 +42,8 @@
 #include "utils/memutils.h"
 #include "storage/ipc.h"
 
+#include <unistd.h>
+
 PG_MODULE_MAGIC;
 
 /* Default CPU cost to start up a foreign query. */
@@ -49,12 +52,10 @@ PG_MODULE_MAGIC;
 /* Default CPU cost to process 1 row  */
 #define DEFAULT_FDW_TUPLE_COST      0.01
 
-extern void _PG_init(void);
-
 PG_FUNCTION_INFO_V1(hdfs_fdw_handler);
 
 static hdfs_opt *GetOptions(Oid foreigntableid);
-static HiveConnection* GetConnection(hdfs_opt *opt, Oid foreigntableid);
+static int GetConnection(hdfs_opt *opt, Oid foreigntableid);
 
 static void hdfsGetForeignRelSize(PlannerInfo *root,RelOptInfo *baserel, Oid foreigntableid);
 static void hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
@@ -64,7 +65,8 @@ static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
 										List *tlist, List *scan_clauses, Plan *outer_plan);
 #else
 static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
-									   Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses);
+									   Oid foreigntableid, ForeignPath *best_path,
+									   List *tlist, List *scan_clauses);
 #endif
 static void hdfsBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *hdfsIterateForeignScan(ForeignScanState *node);
@@ -73,6 +75,87 @@ static void hdfsEndForeignScan(ForeignScanState *node);
 static void hdfsExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static bool hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func,
                                       BlockNumber *totalpages);
+
+#ifdef EDB_NATIVE_LANG
+	#if PG_VERSION_NUM >= 90300
+		#define XACT_CB_SIGNATURE XactEvent event, void *arg, bool spl_commit
+	#else
+		#define XACT_CB_SIGNATURE XactEvent event, void *arg
+	#endif
+#else
+	#define XACT_CB_SIGNATURE XactEvent event, void *arg
+#endif
+
+static void hdfs_fdw_xact_callback(XACT_CB_SIGNATURE);
+
+void
+_PG_init(void)
+{
+	int rc = 0;
+
+	ereport(LOG, (errmsg("HDFS_FDW: loading ...")));
+
+	DefineCustomStringVariable(
+		"hdfs_fdw.classpath",
+		"Specify the path to HiveJdbcClient-X.X.jar, hadoop-common-X.X.X.jar and hive-jdbc-X.X.X-standalone.jar",
+		NULL,
+		&g_classpath,
+		"",
+		PGC_SUSET,
+		0,
+#if PG_VERSION_NUM >= 90100
+		NULL,
+#endif
+		NULL,
+		NULL);
+
+	rc = Initialize();
+	if (rc == -1)
+	{
+		/* TODO: The error hint is linux specific */
+		ereport(ERROR, (
+			errmsg("could not load JVM"),
+			errhint("Add path of jvm library to LD_LIBRARY_PATH")));
+	}
+	if (rc == -2)
+	{
+		ereport(ERROR, (
+			errmsg("class not found"),
+			errhint("Add path of HiveJdbcClient-X.X.jar to hdfs_fdw.classpath")));
+	}
+	if (rc < 0)
+	{
+		ereport(ERROR, (errmsg("Initialize failed with code %d", rc)));
+	}
+
+	ereport(LOG, (errmsg("HDFS_FDW: JVM version 0x%08X loaded", rc)));
+
+	ereport(LOG, (errmsg("HDFS_FDW: loaded")));
+}
+
+void
+_PG_fini(void)
+{
+	Destroy();
+	ereport(LOG, (errmsg("HDFS_FDW: unloaded")));
+}
+
+/*
+ * hdfs_fdw_xact_callback --- cleanup at main-transaction end.
+ */
+static void
+hdfs_fdw_xact_callback(XACT_CB_SIGNATURE)
+{
+	int nestingLevel = 0;
+	nestingLevel = DBCloseAllConnections();
+	if (nestingLevel > 0)
+	{
+		if (nestingLevel > 1)
+			ereport(DEBUG1, (errmsg("HDFS_FDW: %d connections closed", nestingLevel)));
+		else
+			ereport(DEBUG1, (errmsg("HDFS_FDW: %d connection closed", nestingLevel)));
+	}
+}
 
 /*
  * Foreign-data wrapper handler function, return
@@ -98,11 +181,12 @@ hdfs_fdw_handler(PG_FUNCTION_ARGS)
 	/* Support functions for ANALYZE */
 	routine->AnalyzeForeignTable = hdfsAnalyzeForeignTable;
 
+	RegisterXactCallback(hdfs_fdw_xact_callback, NULL);
+
 	PG_RETURN_POINTER(routine);
 }
 
-
-HiveConnection*
+int
 GetConnection(hdfs_opt* opt, Oid foreigntableid)
 {
 	Oid             userid =  GetUserId();
@@ -143,7 +227,8 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	HDFSFdwRelationInfo *fpinfo = NULL;
 	ListCell            *lc = NULL;
 	hdfs_opt            *options = NULL;
-	HiveConnection      *conn;
+	int					con_index = -1;
+
 	/*
 	 * We use HDFSFdwRelationInfo to pass various information to subsequent
 	 * functions.
@@ -153,9 +238,6 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
-
-	/* Connect to HIVE server */
-	conn = GetConnection(options, foreigntableid);
 
 	fpinfo->fdw_startup_cost = DEFAULT_FDW_STARTUP_COST;
 	fpinfo->fdw_tuple_cost = DEFAULT_FDW_TUPLE_COST;
@@ -196,11 +278,18 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	 * if use_remote_estimate is specified in options.
 	 */
 	if (options->use_remote_estimate)
-		baserel->rows = hdfs_rowcount(conn, options, root, baserel, fpinfo);
+	{
+		/* Connect to HIVE server */
+		con_index = GetConnection(options, foreigntableid);
+
+		baserel->rows = hdfs_rowcount(con_index, options, root,
+									baserel, fpinfo);
+
+		hdfs_rel_connection(con_index);
+	}
 
 	fpinfo->rows = baserel->tuples = baserel->rows;
 }
-
 
 static void
 hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
@@ -362,19 +451,20 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	festate = (hdfsFdwExecutionState *) palloc(sizeof(hdfsFdwExecutionState));
 
 	/* Connect to HIVE server */
-	festate->conn = GetConnection(opt, foreigntableid);
+	festate->con_index = GetConnection(opt, foreigntableid);
 
 	node->fdw_state = (void *) festate;
 	festate->batch_cxt = AllocSetContextCreate(estate->es_query_cxt,
-                                                                                           "hdfs_fdw tuple data",
-                                                                                           ALLOCSET_DEFAULT_MINSIZE,
-                                                                                           ALLOCSET_DEFAULT_INITSIZE,
-                                                                                           ALLOCSET_DEFAULT_MAXSIZE);
+										   "hdfs_fdw tuple data",
+										   ALLOCSET_DEFAULT_MINSIZE,
+										   ALLOCSET_DEFAULT_INITSIZE,
+										   ALLOCSET_DEFAULT_MAXSIZE);
 
-	festate->col_list = hdfs_desc_query(festate->conn, opt);
-	festate->result = NULL;
+	festate->col_list = hdfs_desc_query(festate->con_index, opt);
+	festate->query_executed = false;
 	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
 	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private, 1);
+	return;
 }
 
 static TupleTableSlot *
@@ -384,7 +474,6 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	Datum	               *values;
 	bool	               *nulls;
 	char                   *value = NULL;
-	unsigned int           len = 0;
 	int                    attid;
 	hdfs_opt               *options = NULL;
 	ListCell               *lc = NULL;
@@ -392,8 +481,8 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	hdfsFdwExecutionState  *festate = (hdfsFdwExecutionState *) node->fdw_state;
 	TupleDesc              tupdesc = node->ss.ss_currentRelation->rd_att;
 	TupleTableSlot         *slot = node->ss.ss_ScanTupleSlot;
-	HiveReturn             r;
-	MemoryContext oldcontext;
+	MemoryContext			oldcontext = NULL;
+	int						r;
 
 	ExecClearTuple(slot);
 	/* Get the options */
@@ -409,59 +498,52 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	/* Initialize to nulls for any columns not present in result */
 	memset(nulls, true, tupdesc->natts * sizeof(bool));
 
-
-
-	if (!festate->result)
-		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
-
-	r = hdfs_fetch(options, festate->result);
-	switch(r)
+	if (!festate->query_executed)
 	{
-		case HIVE_SUCCESS:
-		case HIVE_SUCCESS_WITH_MORE_DATA:
+		festate->query_executed = hdfs_query_execute(festate->con_index,
+													options,
+													festate->query);
+	}
+
+	r = hdfs_fetch(festate->con_index, options);
+	if (r == 0)
+	{
+		attid = 0;
+		foreach(lc, festate->retrieved_attrs)
 		{
-			attid = 0;
-			foreach(lc, festate->retrieved_attrs)
+			int         len;
+			bool        isnull = true;
+			int         attnum = lfirst_int(lc) - 1;
+			Oid         pgtype = tupdesc->attrs[attnum]->atttypid;
+			int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
+			Datum       v;
+			char        *attrname;
+			hdfs_column *cols = NULL;
+			ListCell    *list_cell;
+
+			attrname = NameStr(tupdesc->attrs[attnum]->attname);
+			foreach(list_cell, festate->col_list)
 			{
-				int         len;
-				bool        isnull = true;
-				int         attnum = lfirst_int(lc) - 1;
-				Oid         pgtype = tupdesc->attrs[attnum]->atttypid;
-				int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
-				Datum       v;
-				char        *attrname;
-				hdfs_column *cols = NULL;
-				ListCell    *list_cell;
+				cols = (hdfs_column *) lfirst(list_cell);
 
-				attrname = NameStr(tupdesc->attrs[attnum]->attname);
-				foreach(list_cell, festate->col_list)
-				{
-					cols = (hdfs_column *) lfirst(list_cell);
-
-					if (cols != NULL && strcmp(cols->col_name, attrname) == 0)
-						break;
-				}
-				if (cols)
-				{
-					len = hdfs_get_field_data_len(options, festate->result, attid);
-					v = hdfs_get_value(options, pgtype, pgtypmod, festate->result, attid, &isnull, len + 1, cols->col_type);
-
-					if (!isnull)
-					{
-						nulls[attnum] = false;
-						values[attnum] = v;
-					}
-					attid++;
-				}
+				if (cols != NULL && strcmp(cols->col_name, attrname) == 0)
+					break;
 			}
-			tuple = heap_form_tuple(tupdesc, values, nulls);
-			ExecStoreTuple(tuple, slot, InvalidBuffer, true);
+			if (cols)
+			{
+				v = hdfs_get_value(festate->con_index, options, pgtype,
+									pgtypmod, attid, &isnull,
+									cols->col_type);
+				if (!isnull)
+				{
+					nulls[attnum] = false;
+					values[attnum] = v;
+				}
+				attid++;
+			}
 		}
-		break;
-		case HIVE_NO_MORE_DATA:
-		case HIVE_STILL_EXECUTING:
-		case HIVE_ERROR:
-		break;
+		tuple = heap_form_tuple(tupdesc, values, nulls);
+		ExecStoreTuple(tuple, slot, InvalidBuffer, true);
 	}
 	MemoryContextSwitchTo(oldcontext);
 	return slot;
@@ -477,11 +559,14 @@ hdfsReScanForeignScan(ForeignScanState *node)
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
-	if (festate->result)
+	if (festate->query_executed)
 	{
-		hdfs_close_result_set(options, festate->result);
-		festate->result = hdfs_query_execute(festate->conn, options, festate->query);
+		hdfs_close_result_set(festate->con_index, options);
+		festate->query_executed = hdfs_query_execute(festate->con_index,
+													options,
+													festate->query);
 	}
+	return;
 }
 
 static void
@@ -510,10 +595,10 @@ hdfsAcquireSampleRowsFunc(Relation relation, int elevel,
 static bool
 hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func, BlockNumber *totalpages)
 {
-	long          ts = 0;
-	hdfs_opt      *options = NULL;
-	Oid           foreigntableid = RelationGetRelid(relation);
-	HiveConnection *conn;
+	long		ts = 0;
+	hdfs_opt	*options = NULL;
+	Oid			foreigntableid = RelationGetRelid(relation);
+	int			con_index = -1;
 
 	*func = hdfsAcquireSampleRowsFunc;
 
@@ -521,10 +606,10 @@ hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func, BlockNum
 	options = GetOptions(foreigntableid);
 
 	/* Connect to HIVE server */
-	conn = GetConnection(options, foreigntableid);
+	con_index = GetConnection(options, foreigntableid);
 
-	hdfs_analyze(conn, options);
-	ts = hdfs_describe(conn, options);
+	hdfs_analyze(con_index, options);
+	ts = hdfs_describe(con_index, options);
 
 	*totalpages = ts/BLCKSZ;
 	return true;
@@ -540,14 +625,11 @@ hdfsEndForeignScan(ForeignScanState *node)
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
-	if (festate->result)
+	if (festate->query_executed)
 	{
-		hdfs_close_result_set(options, festate->result);
-		festate->result = NULL;
+		hdfs_close_result_set(festate->con_index, options);
+		festate->query_executed = false;
 	}
-	if(festate->conn)
-	{
-		hdfs_rel_connection(festate->conn);
-		festate->conn = NULL;
-	}
+	hdfs_rel_connection(festate->con_index);
+	return;
 }

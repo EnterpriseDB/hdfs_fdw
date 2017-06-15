@@ -17,9 +17,11 @@
 
 -- Connection Settings.
 
-\set HIVE_SERVER                '\'hive.server\''
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE           '\'hiveserver2\''
-\set HIVE_PORT                  '\'10000\''
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 
 -- Create the database.
 
@@ -45,7 +47,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
 
 -- Create Hadoop USER MAPPING.
 
-CREATE USER MAPPING FOR postgres SERVER hdfs_server;
+CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 
 -- Create Foreign Tables.
 
@@ -72,15 +74,15 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'weblogs');
 
 CREATE FOREIGN TABLE dept (
     deptno          INTEGER,
-    dname           VARCHAR2(14),
-    loc             VARCHAR2(13)
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
 CREATE FOREIGN TABLE emp (
     empno           INTEGER,
-    ename           VARCHAR2(10),
-    job             VARCHAR2(9),
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
     mgr             INTEGER,
     hiredate        DATE,
     sal             INTEGER,
@@ -94,30 +96,13 @@ CREATE FOREIGN TABLE jobhist
     empno           INTEGER,
     startdate       DATE,
     enddate         DATE,
-    job             VARCHAR2(9),
+    job             VARCHAR(9),
     sal             INTEGER,
     comm            INTEGER,
     deptno          INTEGER,
-    chgdesc         VARCHAR2(80)
+    chgdesc         VARCHAR(80)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'jobhist');
-
--- Create the Stored Procedure to display the Remote Query.
-
-CREATE OR REPLACE PROCEDURE checkqryplan(query TEXT) AS
-  plan             TEXT := '';
-  partname         TEXT := '';
-  qry		   TEXT;
-BEGIN
-  FOR step IN EXECUTE 'EXPLAIN VERBOSE ' || query LOOP
-	  
- 	IF (step LIKE '%Remote SQL%') THEN
-                partname := rtrim(substring(step from position('Remote SQL:' in step)),'{")}');
-  		DBMS_OUTPUT.SERVEROUTPUT(TRUE);
-		DBMS_OUTPUT.PUT_LINE(partname);
-	  END IF;
-  END LOOP;
-END;
 
 -- Retrive Data from Foreign Table using SELECT Statement.
 
@@ -393,65 +378,34 @@ OVER (PARTITION BY deptno ORDER BY sal) FROM emp;
 
 EXPLAIN (COSTS OFF) SELECT * FROM DEPT;
 
-EXEC checkqryplan($$SELECT * FROM DEPT$$);
-
 EXPLAIN (COSTS OFF) SELECT deptno,dname,loc FROM DEPT;
-
-EXEC checkqryplan($$SELECT deptno,dname,loc FROM DEPT$$);
 
 EXPLAIN (COSTS OFF) SELECT * FROM EMP ORDER BY deptno;
 
-EXEC checkqryplan($$SELECT * FROM EMP ORDER BY deptno$$);
-
 EXPLAIN (COSTS OFF) SELECT empno,ename FROM EMP ORDER BY deptno;
-
-EXEC checkqryplan($$SELECT empno,ename FROM EMP ORDER BY deptno$$);
 
 EXPLAIN (COSTS OFF) SELECT empno,ename FROM EMP;
 
-EXEC checkqryplan($$SELECT empno,ename FROM EMP$$);
-
 EXPLAIN (COSTS OFF) SELECT DISTINCT deptno FROM EMP;
-
-EXEC checkqryplan($$SELECT DISTINCT deptno FROM EMP$$);
 
 EXPLAIN (COSTS OFF) SELECT DISTINCT mgr, deptno FROM EMP;
 
-EXEC checkqryplan($$SELECT DISTINCT mgr, deptno FROM EMP$$);
-
 EXPLAIN (COSTS OFF) SELECT ename as "Employee Name" FROM emp;
-
-EXEC checkqryplan($$SELECT ename as "Employee Name" FROM emp$$);
 
 EXPLAIN (COSTS OFF) SELECT COUNT(*) FROM jobhist;
 
-EXEC checkqryplan($$SELECT COUNT(*) FROM jobhist$$);
-
 EXPLAIN (COSTS OFF) SELECT * FROM jobhist LIMIT 2;
 
-EXEC checkqryplan($$SELECT * FROM jobhist LIMIT 2$$);
-
 EXPLAIN (COSTS OFF) SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
-
-EXEC checkqryplan($$SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1$$);
 
 EXPLAIN (COSTS OFF) SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp
 GROUP BY deptno
 HAVING SUM(sal) > 8750
 ORDER BY deptno;
 
-EXEC checkqryplan($$SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp
-GROUP BY deptno
-HAVING SUM(sal) > 8750
-ORDER BY deptno$$);
-
 EXPLAIN (COSTS OFF) SELECT * FROM emp
 WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
 ORDER BY empno;
-
-EXEC checkqryplan($$SELECT * FROM emp
-WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
-ORDER BY empno$$);
 
 EXPLAIN (COSTS OFF) 
 SELECT deptno,dname FROM dept 
@@ -459,37 +413,20 @@ UNION
 SELECT empno,ename FROM emp
 ORDER BY deptno;
 
-EXEC checkqryplan($$SELECT deptno,dname FROM dept 
-UNION
-SELECT empno,ename FROM emp
-ORDER BY deptno$$);
-
 EXPLAIN (COSTS OFF)
 SELECT ename FROM emp WHERE empno >= 7788 
 INTERSECT
 SELECT ename FROM emp WHERE empno >= 7566
 ORDER BY ename;
 
-EXEC checkqryplan($$SELECT ename FROM emp WHERE empno >= 7788 
-INTERSECT
-SELECT ename FROM emp WHERE empno >= 7566
-ORDER BY ename$$);
-
 EXPLAIN (COSTS OFF)
 SELECT dept.dname, emp.ename FROM dept CROSS JOIN emp
 ORDER BY dept.deptno;
-
-EXEC checkqryplan($$SELECT dept.dname, emp.ename FROM dept CROSS JOIN emp
-ORDER BY dept.deptno$$);
 
 EXPLAIN (COSTS OFF)
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d INNER JOIN emp e
 ON d.deptno=e.deptno
 ORDER BY d.deptno;
-
-EXEC checkqryplan($$SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d INNER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno$$);
 
 EXPLAIN (COSTS OFF)
 SELECT ename FROM emp 
@@ -497,19 +434,10 @@ EXCEPT
 SELECT ename FROM emp WHERE empno > 7839
 ORDER BY ename;
 
-EXEC checkqryplan($$SELECT ename FROM emp 
-EXCEPT
-SELECT ename FROM emp WHERE empno > 7839
-ORDER BY ename$$);
-
 EXPLAIN (COSTS OFF)
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
 ORDER BY d.deptno;
-
-EXEC checkqryplan($$SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d LEFT OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno$$);
 
 EXPLAIN (COSTS OFF)
 WITH dept_count AS 
@@ -525,34 +453,17 @@ dept_count dc
 WHERE e.deptno = dc.deptno
 ORDER BY e.deptno, e.ename;
 
-EXEC checkqryplan($$WITH dept_count AS 
-(
-SELECT deptno, COUNT(*) AS dept_count
-FROM emp
-GROUP BY deptno
-)
-SELECT e.ename AS Employee_Name,
-dc.dept_count AS "Employee in Same Dept"
-FROM emp e,
-dept_count dc
-WHERE e.deptno = dc.deptno
-ORDER BY e.deptno, e.ename$$);
-
 EXPLAIN (COSTS OFF)
 SELECT deptno, empno, sal, AVG(sal) OVER (PARTITION BY deptno) 
 FROM emp
 ORDER BY deptno, empno;
 
-EXEC checkqryplan($$SELECT deptno, empno, sal, AVG(sal) OVER (PARTITION BY deptno) 
-FROM emp
-ORDER BY deptno, empno$$);
-
 -- Retrive Data from Foreign Table using Query Optimizer.
 
 CREATE TABLE dept_lcl (
-deptno NUMBER(2) NOT NULL CONSTRAINT dept_pk PRIMARY KEY,
-dname VARCHAR2(14) CONSTRAINT dept_dname_uq UNIQUE,
-loc VARCHAR2(13)
+deptno INTEGER NOT NULL CONSTRAINT dept_pk PRIMARY KEY,
+dname VARCHAR(14) CONSTRAINT dept_dname_uq UNIQUE,
+loc VARCHAR(13)
 );
 
 INSERT INTO dept_lcl VALUES (10,'ACCOUNTING','NEW YORK');
@@ -566,9 +477,6 @@ ORDER BY dept_lcl.deptno;
 EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp.ename FROM dept_lcl CROSS JOIN emp
 ORDER BY dept_lcl.deptno;
 
-EXEC checkqryplan($$SELECT dept_lcl.dname, emp.ename FROM dept_lcl CROSS JOIN emp
-ORDER BY dept_lcl.deptno$$);
-
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
 WHERE d.deptno=e.deptno
 ORDER BY d.deptno;
@@ -576,10 +484,6 @@ ORDER BY d.deptno;
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
 WHERE d.deptno=e.deptno
 ORDER BY d.deptno;
-
-EXEC checkqryplan($$SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
-WHERE d.deptno=e.deptno
-ORDER BY d.deptno$$);
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
@@ -589,16 +493,10 @@ EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM 
 ON d.deptno=e.deptno
 ORDER BY d.deptno;
 
-EXEC checkqryplan($$SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno$$);
-
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
 ORDER BY d.deptno;
 
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno ORDER BY d.deptno;
-
-EXEC checkqryplan($$SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno ORDER BY d.deptno$$);
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d FULL OUTER JOIN emp e
 ON d.deptno=e.deptno
@@ -606,9 +504,6 @@ ORDER BY d.deptno;
 
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d FULL OUTER JOIN emp e
 ON d.deptno=e.deptno ORDER BY d.deptno;
-
-EXEC checkqryplan($$SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d FULL OUTER JOIN emp e
-ON d.deptno=e.deptno ORDER BY d.deptno$$);
 
 --VACUUM, ANAYLZE
 
@@ -669,7 +564,7 @@ SELECT * FROM dept;
 
 --Cleanup
 
-DROP SYNONYM syn_dept;
+--DROP SYNONYM syn_dept;
 
 DROP VIEW smpl_vw;
 
@@ -688,8 +583,6 @@ DROP FOREIGN TABLE jobhist;
 DROP TABLE dept_lcl;
 
 DROP EXTENSION hdfs_fdw CASCADE;
-
-DROP PROCEDURE checkqryplan; 
 
 \c postgres postgres
 
