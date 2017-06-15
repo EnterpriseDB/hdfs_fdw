@@ -392,10 +392,11 @@ TODO
   
 Contributing
 ------------
-If you experince any bug create new [issue][6] and if you have fix for that 
-create a pull request. Before submitting a bugfix or new feature, please read 
-the [contributing guidlines][7].
-  
+If you experience any bug create new [issue][6] and if you have fix for that
+create a pull request. Before submitting a bug-fix or new feature, please read
+the [contributing guidelines][7].
+
+
 Support
 -------
 This project will be modified to maintain compatibility with new PostgreSQL 
@@ -433,7 +434,6 @@ See the [`LICENSE`][10] file for full details.
 [2]: http://hadoop.apache.org/releases.html
 [3]: https://hive.apache.org/
 [4]: https://hive.apache.org/downloads.html
-[5]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
 [6]: https://github.com/EnterpriseDB/hdfs_fdw/issues/new
 [7]: CONTRIBUTING.md
 [8]: http://wiki.pentaho.com/download/attachments/23531451/weblogs_parse.zip?version=1&modificationDate=1327096242000

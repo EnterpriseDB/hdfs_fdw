@@ -78,4 +78,6 @@
   4.  Execute the Regression using the following command.
   
       `hdfs_fdw/make installcheck`
-  
+
+[5]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
+
