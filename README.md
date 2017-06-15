@@ -23,11 +23,20 @@ map/reduce programmers to plug in their custom mappers and reducers when it is
 inconvenient or inefficient to express this logic in HiveQL*. 
 
 There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [site][4].
+The FDW supports only HiveServer2.
 
   
 What Is Apache [Spark][11]?
 --------------
 The Apache Spark ™ is a general purpose distributed computing framework which supports a wide variety of uses cases. It provides real time stream as well as batch processing with speed, ease of use and sophisticated analytics. Spark does not provide storage layer, it relies on third party storage providers like Hadoop, HBASE, Cassandra, S3 etc. Spark integrates seamlessly with Hadoop and can process existing data. Spark SQL is 100% compatible with HiveQL and can be used as a replacement of hiveserver2, using Spark Thrift Server.
+
+  
+Authentication Support
+-----
+  
+The FDW supports NOSASL and LDAP authentication modes.
+In order to use NOSASL do not specify any OPTIONS while creating user mapping.
+For LDAP username and password must be specified in OPTIONS while creating user mapping.
 
   
 Usage
@@ -37,9 +46,9 @@ While creating the foreign server object for HDFS FDW the following can be speci
   
     * `host`: IP Address or hostname of the Hive Thrift Server OR Spark Thrift Server. Defaults to `127.0.0.1`
     * `port`: Port number of the Hive Thrift Server OR Spark Thrift Server. Defaults to `10000`
-    * `client_type`:  HiveServer1 or HiveServer2. Default is HiveServer1
+    * `client_type`:  HiveServer2. HiveServer1 is not supported. This option will be deprecated soon.
     * `connect_timeout`:  Connection timeout, default value is 300 seconds.
-    * `query_timeout`:  Query timeout, default value is 300 seconds
+    * `query_timeout`:  Query timeout is not supported by the Hive JDBC driver.
   
 HDFS can be used through either Hive or Spark. In this case both Hive and Spark store metadata in the configured metastore. In the metastore databases and tables can be created using HiveQL. While creating foreign table object for the foreign server the following can be specified in options:
   
@@ -66,9 +75,16 @@ Step 3: Start HiveServer
   ```sh
   bin/hive --service hiveserver -v
   ```
-Step 4: Start Hive client to connect to HiveServer
+Step 4: Start beeline client to connect to HiveServer
   ```sh
-  hive -h 127.0.0.1
+  ./beeline
+  Beeline version 1.0.1 by Apache Hive
+  beeline> !connect jdbc:hive2://localhost:10000 'ldapadm' 'abcdef'  org.apache.hive.jdbc.HiveDriver
+  Connecting to jdbc:hive2://localhost:10000
+  Connected to: Spark SQL (version 2.1.0)
+  Driver: Hive JDBC (version 1.0.1)
+  Transaction isolation: TRANSACTION_REPEATABLE_READ
+  0: jdbc:hive2://localhost:10000>
   ```
   
 Step 5: Create Table in Hive
@@ -98,6 +114,14 @@ Step 5: Create Table in Hive
   these steps.
   
   ```sql
+  -- export LD_LIBRARY_PATH before starting the server, for example
+  export LD_LIBRARY_PATH=/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/:/usr/local/edb95/lib/postgresql/
+  
+  -- set the GUC class path variable
+  hdfs_fdw.classpath='/usr/local/edb95/lib/postgresql/HiveJdbcClient-1.0.jar:
+                      /home/edb/Projects/hadoop_fdw/hadoop/share/hadoop/common/hadoop-common-2.6.4.jar:
+                      /home/edb/Projects/hadoop_fdw/apache-hive-1.0.1-bin/lib/hive-jdbc-1.0.1-standalone.jar'
+  
   -- load extension first time after install
   CREATE EXTENSION hdfs_fdw;
   
@@ -108,7 +132,7 @@ Step 5: Create Table in Hive
   
   -- create user mapping
   CREATE USER MAPPING FOR postgres
-      SERVER hdfs_server;
+      SERVER hdfs_server OPTIONS (username 'ldapadm', password 'abcdef');
   
   -- create foreign table
   CREATE FOREIGN TABLE weblogs
@@ -218,21 +242,29 @@ Using HDFS FDW with Apache Spark on top of Hadoop
 
 1. Install PPAS 9.5 and hdfs_fdw using installer.
 
-2. At the edb-psql prompt issue the following commands.
+2. Export LD_LIBRARY_PATH before starting the server, for example
+  export LD_LIBRARY_PATH=/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/:/usr/local/edb95/lib/postgresql/
+  
+3. Set the GUC class path variable
+  hdfs_fdw.classpath='/usr/local/edb95/lib/postgresql/HiveJdbcClient-1.0.jar:
+                      /home/edb/Projects/hadoop_fdw/hadoop/share/hadoop/common/hadoop-common-2.6.4.jar:
+                      /home/edb/Projects/hadoop_fdw/apache-hive-1.0.1-bin/lib/hive-jdbc-1.0.1-standalone.jar'
+  
+4. At the edb-psql prompt issue the following commands.
     ```sql
         CREATE EXTENSION hdfs_fdw;
         CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
         OPTIONS (host '127.0.0.1',port '10000',client_type 'hiveserver2');
-        CREATE USER MAPPING FOR enterprisedb server hdfs_svr;
+        CREATE USER MAPPING FOR enterprisedb server hdfs_svr OPTIONS (username 'ldapadm', password 'abcdef');
         CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
         OPTIONS (dbname 'testdb', table_name 'my_names_tab');
     ```
   
 Please note that we are using the same port and client_type while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark without any code changes.
 
-3. Download & install Apache Spark in local mode
+5. Download & install Apache Spark in local mode
 
-4. Test Spark installation using spark shell
+6. Test Spark installation using spark shell
     ```sql
     ./spark-shell
     Spark session available as 'spark'.
@@ -253,7 +285,7 @@ Please note that we are using the same port and client_type while creating forei
     scala> noData.sum
     res0: Double = 55.0
     ```
-5. In the folder ``$SPARK_HOME/conf`` create a file ``spark-defaults.conf`` containing the following line
+7. In the folder ``$SPARK_HOME/conf`` create a file ``spark-defaults.conf`` containing the following line
     ```sql
     spark.sql.warehouse.dir hdfs://localhost:9000/user/hive/warehouse
     ```
@@ -261,19 +293,19 @@ Please note that we are using the same port and client_type while creating forei
    By default spark uses derby for both meta data and the data itself (called warehouse in spark)
    In order to have spark use hadoop as warehouse we have to add this property.
 
-6. Start Spark Thrift Server
+8. Start Spark Thrift Server
     ```sql
     ./start-thriftserver.sh
     ```
 
-7. Make sure Spark thrift server is running using log file
+9. Make sure Spark thrift server is running using log file
 
-8. Run the following commands in beeline command line tool
+10. Run the following commands in beeline command line tool
 
   ```sql
   ./beeline
   Beeline version 1.0.1 by Apache Hive
-  beeline> !connect jdbc:hive2://localhost:10000 abbasbutt '' org.apache.hive.jdbc.HiveDriver
+  beeline> !connect jdbc:hive2://localhost:10000 'ldapadm' 'abcdef'  org.apache.hive.jdbc.HiveDriver
   Connecting to jdbc:hive2://localhost:10000
   Connected to: Spark SQL (version 2.1.0)
   Driver: Hive JDBC (version 1.0.1)
@@ -318,15 +350,6 @@ Please note that we are using the same port and client_type while creating forei
   | NULL  | NULL    |
   +-------+---------+--+
   ```
-9. Stop thrift server
-    ```sql
-    ./stop-thriftserver.sh
-    ```
-
-10. Start thrift server with no authentication
-    ```sql
-    ./start-thriftserver.sh --hiveconf hive.server2.authentication=NOSASL
-    ```
 
 11. Run the following command in edb-psql
     ```sql

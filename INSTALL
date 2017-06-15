@@ -1,61 +1,29 @@
                Installation
 
   - There are two options for installation. If you have an EDB Postgres 
-  Subscription, you can us the Interactive Installers provided via StackBuilder 
+  Subscription, you can use the Interactive Installers provided via StackBuilder
   Plus or the RPMs from the yum.enterprisedb.com site. Otherwise, you can compile 
   the source code
 
   HDFS FDW Installation from Source Code
 
-  To compile the [Hadoop][1] foreign data wrapper, we need Boost, Thrift, FB303 and
-  Hive C client libraries.
-
-  * Boost
-    Download boost tarball from http://www.boost.org/
- 
-    - Steps to install Boost
-    tar -jxvf boost_1_60_0.tar.bz2
-    sh bootstrap.sh
-    ./b2 --prefix=PREFIX link=shared install
-
-  * Thrift
-    Download thrift from http://apache.osuosl.org/thrift
-
-    - Steps to compile thrift:
-    tar -zxvf thrift-0.9.2.tar.gz
-    cd thrift-0.9.2
-    ./configure
-    make
-    make install
-
-  * fb303 module
-    
-    - Steps to compile fb303:
-    cd thrift-0.9.2
-    cd contrib/fb303
-    ./bootstrap.sh
-    ./configure
-    make
-    make install
-
-  The detail installation manual can be found at 
-  http://thrift.apache.org/docs/install/
+  To compile the [Hadoop][1] foreign data wrapper, we need Java Compiler,
+  JDK Include files and the JVM Library.
+  We have used jdk-8u111-linux-x64.tar.gz.
 
   * HiveClient library
+  - Steps to compile hiveclient
 
-  The libhive library files for Hiveserver1 are downloaded from these sites. The 
-  Hiveserver2 support added to these files. You don't need to download these files. These 
-  fiiles are present in libhive folder.
-  
-  https://svn.apache.org/repos/asf/hive/trunk/service/src/gen/thrift/gen-cpp/
-  https://svn.apache.org/repos/asf/hive/trunk/odbc/src/cpp
-  https://svn.apache.org/repos/asf/hive/trunk/ql/src/gen/thrift/gen-cpp/
-  https://svn.apache.org/repos/asf/hive/trunk/metastore/src/gen/thrift/gen-cpp/
- 
-  - Steps to compile hiveclient 
+  For C/C++ part:
   cd libhive
   make
   make install
+
+  For Java part:
+  javac MsgBuf.java
+  javac HiveJdbcClient.java
+  jar cf HiveJdbcClient-1.0.jar *.class
+  cp HiveJdbcClient-1.0.jar /path/to/install/folder/lib/postgresql/
 
   Now that all the required dependencies are built, 
 
@@ -70,8 +38,8 @@
     make USE_PGXS=1
     make USE_PGXS=1 install
 
-  Please note that the HDFS_FDW extension has only been tested on ubuntu systems 
-  but it should work on other *UNIX's systems without any problems.
+  Please note that the HDFS_FDW extension has only been tested on ubuntu and CentOS
+  systems but it should work on other *UNIX's systems without any problems.
   
   
   * How To Start Hadoop.
@@ -86,37 +54,28 @@
   # sbin/stop-yarn.sh
   # sbin/start-yarn.sh
   
-  * How to Start HiveServer
-  cd /usr/local/hive/
-  bin/hive --service hiveserver -v
-  
   * Starting HiveServer2
   cd /usr/local/hive/
-  bin/hive --service hiveserver2 --hiveconf hive.server2.authentication=NOSASL
+  bin/hive --service hiveserver2
   
-
   ##Regression
   
   To execute the Regression, follow the below steps.
   
   1.  Open /etc/hosts and add the following line (the IP Address is of the Hive 
-  Server Machine).
+      Server Machine).
   
       `127.0.0.1 hive.server`
   
-  2.  Run Hive Server without NOSASL Authentication using the following command.
+  2.  Run Hive Server using the following command.
   
       `./hive --service hiveserver2`
   
   3.  Load sample data for the test cases by using the following command.
   
       `hdfs_fdw/test/insert_hive.sh`
-  
-  4.  Run Hive Server with NOSASL Authentication using the following command.
-  
-      `./hive --service hiveserver2 --hiveconf hive.server2.authentication=NOSASL`
-  
-  5.  Execute the Regression using the following command.
+
+  4.  Execute the Regression using the following command.
   
       `hdfs_fdw/make installcheck`
   

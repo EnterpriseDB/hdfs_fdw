@@ -23,25 +23,27 @@
 #include "utils/memutils.h"
 #include "utils/resowner.h"
 
-HiveConnection*
+int
 hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt)
 {
-	HiveConnection *conn = NULL;
-	char           err_buf[512];
+	int		conn;
+	char	*err = "unknown";
+	char	*err_buf = err;
 
-	conn = DBOpenConnection(opt->dbname,
-				opt->host,
-				opt->port,
-				0,
-				opt->client_type,
-				opt->connect_timeout,
-				opt->receive_timeout,
-				err_buf,
-				512);
-	if (!conn)
+	conn = DBOpenConnection(opt->host,
+							opt->port,
+							opt->dbname,
+							opt->username,
+							opt->password,
+							opt->connect_timeout,
+							opt->receive_timeout,
+							&err_buf);
+	if (conn < 0)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_OUT_OF_MEMORY),
 				errmsg("failed to initialize the HDFS connection object (%s)", err_buf)));
+
+	ereport(DEBUG1, (errmsg("HDFS_FDW: connection opened %d", conn)));
 
 	return conn;
 }
@@ -50,15 +52,15 @@ hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt)
  * Release connection created by calling GetConnection.
  */
 void
-hdfs_rel_connection(HiveConnection *conn)
+hdfs_rel_connection(int con_index)
 {
-	char err_buf[512];
-	HiveReturn r;
-	r = DBCloseConnection(conn,
-			      err_buf,
-			      512);
-	if (r == HIVE_ERROR)
+	int		r;
+
+	r = DBCloseConnection(con_index);
+	if (r < 0)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_OUT_OF_MEMORY),
-				errmsg("failed to close HDFS connection object (%s)", err_buf)));
+				errmsg("failed to close HDFS connection object")));
+
+	ereport(DEBUG1, (errmsg("HDFS_FDW: connection closed %d", con_index)));
 }
