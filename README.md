@@ -255,7 +255,7 @@ Using HDFS FDW with Apache Spark on top of Hadoop
         CREATE EXTENSION hdfs_fdw;
         CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
         OPTIONS (host '127.0.0.1',port '10000',client_type 'hiveserver2');
-        CREATE USER MAPPING FOR enterprisedb server hdfs_svr OPTIONS (username 'ldapadm', password 'abcdef');
+        CREATE USER MAPPING FOR postgres server hdfs_svr OPTIONS (username 'ldapadm', password 'ldapadm');
         CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
         OPTIONS (dbname 'testdb', table_name 'my_names_tab');
     ```
@@ -365,6 +365,8 @@ Please note that we are using the same port and client_type while creating forei
     (6 rows)
     ```
 Here are the corresponding files in hadoop
+
+
     ```sql
 $ hadoop fs -ls /user/hive/warehouse/
 Found 1 items
@@ -409,7 +411,7 @@ support hdfs_fdw.
   
 Copyright Information
 ---------------------
-Copyright (c) 2011 - 2016, EnterpriseDB Corporation
+Copyright (c) 2011 - 2017, EnterpriseDB Corporation
   
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose, without fee, and without a written agreement is
