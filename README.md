@@ -368,13 +368,13 @@ Here are the corresponding files in hadoop
 
 
     ```sql
-$ hadoop fs -ls /user/hive/warehouse/
-Found 1 items
-drwxrwxr-x - user supergroup 0 2017-01-19 10:47 /user/hive/warehouse/my_test_db.db
+    $ hadoop fs -ls /user/hive/warehouse/
+    Found 1 items
+    drwxrwxr-x - user supergroup 0 2017-01-19 10:47 /user/hive/warehouse/my_test_db.db
 
-$ hadoop fs -ls /user/hive/warehouse/my_test_db.db/
-Found 1 items
-drwxrwxr-x - user supergroup 0 2017-01-19 10:50 /user/hive/warehouse/my_test_db.db/my_names_tab
+    $ hadoop fs -ls /user/hive/warehouse/my_test_db.db/
+    Found 1 items
+    drwxrwxr-x - user supergroup 0 2017-01-19 10:50 /user/hive/warehouse/my_test_db.db/my_names_tab
     ```
     
 How to build
@@ -382,7 +382,6 @@ How to build
   
   See the file INSTALL for instructions on how to build and install
   the extension and it's dependencies. 
-  
   
     
   
