@@ -22,7 +22,7 @@ called HiveQL. At the same time this language also allows traditional
 map/reduce programmers to plug in their custom mappers and reducers when it is
 inconvenient or inefficient to express this logic in HiveQL*. 
 
-There are two version of Hive HiveServer1 and HiveServer2 which can be downloded from this [site][4].
+There are two version of Hive HiveServer1 and HiveServer2 which can be downloaded from this [site][4].
 The FDW supports only HiveServer2.
 
   
