@@ -76,30 +76,24 @@ END;
 -- To verify that error message displayed when invalid LDAP User is used
 --**************************************************************************************************
 SELECT  verify_auth(:AUTH_TYPE,'wronguser','edb');
- verify_auth 
--------------
- 
-(1 row)
-
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+CONTEXT:  SQL statement "SELECT * FROM dept_dt_mp1"
+PL/pgSQL function verify_auth(character varying,character varying,character varying) line 29 at EXECUTE
 --SELECT  verify_auth('ldap','wronguser','edb');
 --**************************************************************************************************
 -- To verify that error message displayed when invalid LDAP User password is used
 --**************************************************************************************************
 SELECT  verify_auth(:AUTH_TYPE,'kzeeshan','wrong');
- verify_auth 
--------------
- 
-(1 row)
-
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+CONTEXT:  SQL statement "SELECT * FROM dept_dt_mp1"
+PL/pgSQL function verify_auth(character varying,character varying,character varying) line 29 at EXECUTE
 --**************************************************************************************************
 -- To verify that error message displayed when invalid LDAP User and invalid password is used
 --**************************************************************************************************
 SELECT  verify_auth(:AUTH_TYPE,'wrong','wrong');
- verify_auth 
--------------
- 
-(1 row)
-
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+CONTEXT:  SQL statement "SELECT * FROM dept_dt_mp1"
+PL/pgSQL function verify_auth(character varying,character varying,character varying) line 29 at EXECUTE
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to server hdfs_server
 \c postgres postgres

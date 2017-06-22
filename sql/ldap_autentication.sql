@@ -21,6 +21,7 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'`            --possible values ldap/nosasl
 
 -- Create the database.
 
@@ -44,97 +45,73 @@ CREATE EXTENSION hdfs_fdw;
 
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE);
 
+-- Create function to verify the authenication with LDAP.
+
+CREATE OR REPLACE FUNCTION verify_auth(auth VARCHAR(70),user_name VARCHAR(30),pass VARCHAR(30)) 
+    RETURNS void AS $$
+DECLARE
+	d_sql text;
+BEGIN
+     
+	IF auth = 'ldap' THEN
+
+		-- Create postgres USER MAPPING with incorrect LDAP User.
+
+		d_sql := 'CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username '' || user_name || '' , password '' || pass || '')';
+
+		EXECUTE d_sql;
+
+		-- Create Foreign Tables.
+
+		d_sql := 'CREATE FOREIGN TABLE dept_dt_mp1 
+				(
+					deptno INTEGER, 
+					dname VARCHAR(14), 
+					loc VARCHAR(13) ) 
+			SERVER hdfs_server OPTIONS (dbname ''fdw_db'', table_name ''dept_dt_mp'')';
+
+		EXECUTE d_sql;
+
+		-- Execute Select Statement.
+	
+		d_sql := 'SELECT * FROM dept_dt_mp1';
+
+		EXECUTE d_sql;
+
+
+		--Cleanup
+
+		DROP FOREIGN TABLE dept_dt_mp1;
+
+	END IF;
+
+END;
+    $$ LANGUAGE plpgsql;
+
 --**************************************************************************************************
 -- To verify that error message displayed when invalid LDAP User is used
 --**************************************************************************************************
 
--- Create postgres USER MAPPING with incorrect LDAP User.
+SELECT  verify_auth(:AUTH_TYPE,'wronguser','edb');
 
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username 'wronguser', password 'edb'); 
-
--- Create Foreign Tables.
-
-CREATE FOREIGN TABLE dept_dt_mp1 
-(
-	deptno INTEGER, 
-	dname VARCHAR(14), 
-	loc VARCHAR(13) ) 
-SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp');
-
--- Error message will be displayed as the wrong LDAP User is mentioned in User Mapping.
-
-SELECT * FROM dept_dt_mp1;
-
--- Drop user mapping and create correct user mapping.
-
-DROP USER MAPPING FOR postgres SERVER hdfs_server;
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Data will be displayed.
-
-SELECT * FROM dept_dt_mp1;
+--SELECT  verify_auth('ldap','wronguser','edb');
 
 --**************************************************************************************************
 -- To verify that error message displayed when invalid LDAP User password is used
 --**************************************************************************************************
 
--- Drop user mapping.
-
-DROP USER MAPPING FOR postgres SERVER hdfs_server;
-
--- Create postgres USER MAPPING with incorrect LDAP User password.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username 'kzeeshan', password 'wrong');
-
--- Error message will be displayed as the wrong LDAP User password is mentioned in User Mapping.
-
-SELECT * FROM dept_dt_mp1;
-
--- Drop user mapping and create correct user mapping.
-
-DROP USER MAPPING FOR postgres SERVER hdfs_server;
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Data will be displayed.
-
-SELECT * FROM dept_dt_mp1;
+SELECT  verify_auth(:AUTH_TYPE,'kzeeshan','wrong');
 
 --**************************************************************************************************
 -- To verify that error message displayed when invalid LDAP User and invalid password is used
 --**************************************************************************************************
 
--- Drop user mapping.
-
-DROP USER MAPPING FOR postgres SERVER hdfs_server;
-
--- Create postgres USER MAPPING with invalid LDAP User and invalid password.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username 'wrong', password 'wrong');
-
--- Error message will be displayed as the wrong LDAP User password is mentioned in User Mapping.
-
-SELECT * FROM dept_dt_mp1;
-
--- Drop user mapping and create correct user mapping.
-
-DROP USER MAPPING FOR postgres SERVER hdfs_server;
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Data will be displayed.
-
-SELECT * FROM dept_dt_mp1;
+SELECT  verify_auth(:AUTH_TYPE,'wrong','wrong');
 
 
 
---Cleanup
-
-DROP FOREIGN TABLE dept_dt_mp1;
 
 DROP EXTENSION hdfs_fdw CASCADE;
-
 
 \c postgres postgres
 
