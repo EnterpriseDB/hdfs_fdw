@@ -12,3 +12,4 @@
  */
 
 extern char *g_classpath;
+extern char *g_jvmpath;

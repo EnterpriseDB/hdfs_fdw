@@ -16,8 +16,13 @@
 #include <iostream>
 #include <string.h>
 
-#include "hiveclient.h"
 
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dlfcn.h>
+
+#include "hiveclient.h"
 
 using namespace std;
 
@@ -40,17 +45,35 @@ static jmethodID g_DBFetch = NULL;
 static jmethodID g_DBGetColumnCount = NULL;
 static jmethodID g_DBGetFieldAsCString = NULL;
 
+typedef jint ((*_JNI_CreateJavaVM_PTR)(JavaVM **p_vm, JNIEnv **p_env, void *vm_args));
+_JNI_CreateJavaVM_PTR _JNI_CreateJavaVM;
+void* hdfs_dll_handle = NULL;
+
 int Initialize()
 {
-	jint ver;
-	jint rc;
-	JavaVMInitArgs vm_args;
-	JavaVMOption* options;
-	jmethodID consMsgBuf;
-	jmethodID consJdbcClient;
-	int len;
+	jint            ver;
+	jint            rc;
+	JavaVMInitArgs  vm_args;
+	JavaVMOption*   options;
+	jmethodID       consMsgBuf;
+	jmethodID       consJdbcClient;
+	int             len;
+    char            *libjvm;
 
-	options = new JavaVMOption[1];
+    len = strlen(g_jvmpath);
+    libjvm = new char[len + 15];
+    sprintf(libjvm, "%s/%s", g_jvmpath, "libjvm.so");
+
+    hdfs_dll_handle = dlopen(libjvm, RTLD_LAZY);
+    if(hdfs_dll_handle == NULL)
+    {
+        return -1;
+    }
+    delete libjvm;
+
+    _JNI_CreateJavaVM = (_JNI_CreateJavaVM_PTR)dlsym(hdfs_dll_handle, "JNI_CreateJavaVM");
+
+    options = new JavaVMOption[1];
 
 	len = strlen(g_classpath) + 100;
 
@@ -63,8 +86,9 @@ int Initialize()
 	vm_args.options = options;
 	vm_args.ignoreUnrecognized = false;
 
-	rc = JNI_CreateJavaVM(&g_jvm, (void**)&g_jni, &vm_args);
-	delete[] options[0].optionString;
+    rc = _JNI_CreateJavaVM(&g_jvm, &g_jni, &vm_args);
+
+    delete[] options[0].optionString;
 	delete options;
 	if (rc != JNI_OK)
 	{
@@ -222,6 +246,7 @@ int Initialize()
 
 int Destroy()
 {
+    dlclose(hdfs_dll_handle);
 	if (g_jvm != NULL)
 		g_jvm->DestroyJavaVM();
 	return(0);

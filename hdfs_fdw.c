@@ -93,13 +93,25 @@ _PG_init(void)
 {
 	int rc = 0;
 
-	ereport(LOG, (errmsg("HDFS_FDW: loading ...")));
-
 	DefineCustomStringVariable(
 		"hdfs_fdw.classpath",
 		"Specify the path to HiveJdbcClient-X.X.jar, hadoop-common-X.X.X.jar and hive-jdbc-X.X.X-standalone.jar",
 		NULL,
 		&g_classpath,
+		"",
+		PGC_SUSET,
+		0,
+#if PG_VERSION_NUM >= 90100
+		NULL,
+#endif
+		NULL,
+		NULL);
+
+	DefineCustomStringVariable(
+		"hdfs_fdw.jvmpath",
+		"Specify the path to libjvm.so",
+		NULL,
+		&g_jvmpath,
 		"",
 		PGC_SUSET,
 		0,
@@ -115,7 +127,7 @@ _PG_init(void)
 		/* TODO: The error hint is linux specific */
 		ereport(ERROR, (
 			errmsg("could not load JVM"),
-			errhint("Add path of jvm library to LD_LIBRARY_PATH")));
+			errhint("Add path of libjvm.so to hdfs_fdw.jvmpath")));
 	}
 	if (rc == -2)
 	{
@@ -125,19 +137,14 @@ _PG_init(void)
 	}
 	if (rc < 0)
 	{
-		ereport(ERROR, (errmsg("Initialize failed with code %d", rc)));
+		ereport(ERROR, (errmsg("initialize failed with code %d", rc)));
 	}
-
-	ereport(LOG, (errmsg("HDFS_FDW: JVM version 0x%08X loaded", rc)));
-
-	ereport(LOG, (errmsg("HDFS_FDW: loaded")));
 }
 
 void
 _PG_fini(void)
 {
 	Destroy();
-	ereport(LOG, (errmsg("HDFS_FDW: unloaded")));
 }
 
 /*
