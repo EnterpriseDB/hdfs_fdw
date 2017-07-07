@@ -17,7 +17,7 @@ OBJS = hdfs_client.o hdfs_query.o hdfs_option.o hdfs_deparse.o hdfs_connection.o
 
 REGRESS = datatype external mapping retrival
 EXTENSION = hdfs_fdw
-DATA = hdfs_fdw--2.0.1.sql hdfs_fdw--2.0--2.0.1.sql hdfs_fdw--1.0--2.0.sql hdfs_fdw--1.0.sql
+DATA = hdfs_fdw--2.0.2.sql hdfs_fdw--2.0.3.sql hdfs_fdw--2.0.1--2.0.2.sql hdfs_fdw--2.0.2--2.0.3.sql hdfs_fdw--2.0.1.sql hdfs_fdw--2.0--2.0.1.sql hdfs_fdw--1.0--2.0.sql hdfs_fdw--1.0.sql
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
