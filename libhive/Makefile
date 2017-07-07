@@ -1,7 +1,7 @@
 .PHONY : clean
 
 CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(JDK_INCLUDE) -I$(JDK_INCLUDE)/linux/ -Ijdbc
-LDFLAGS= -shared -L$(JVM_LIB) -ljvm
+LDFLAGS= -shared
 
 JDBC =	 jdbc/hiveclient.cpp jdbc/data.cpp
 
