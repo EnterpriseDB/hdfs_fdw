@@ -15,17 +15,27 @@
   - Steps to compile hiveclient
 
   For C/C++ part:
-  cd libhive
-  make
-  make install
+  
 
+    export JDK_INCLUDE:=/home/user/Projects/hadoop_fdw/jdk1.8.0_111/include
+    export INSTALL_DIR:=/opt/PPAS_PG/version/lib
+
+    cd libhive
+    make
+    make install
+
+
+  
   For Java part:
-  javac MsgBuf.java
-  javac HiveJdbcClient.java
-  jar cf HiveJdbcClient-1.0.jar *.class
-  cp HiveJdbcClient-1.0.jar /path/to/install/folder/lib/postgresql/
 
-  Now that all the required dependencies are built, 
+
+    javac MsgBuf.java
+    javac HiveJdbcClient.java
+    jar cf HiveJdbcClient-1.0.jar *.class
+    cp HiveJdbcClient-1.0.jar /path/to/install/folder/lib/postgresql/
+  
+
+  Now that all the required dependencies are built we can build and install the fdw.
 
   - Steps to compile the HDFS FDW source code
   
@@ -43,8 +53,8 @@
   
   
   * How To Start Hadoop.
-  The detail installation instruction of hadoop can be found on this [site][5]. 
-  Here are the steps to start and stop the hadoop.
+  The detail installation instruction of Hadoop can be found on this [site][5]. 
+  Here are the steps to start and stop the Hadoop.
    
   * Stop and start Hdfs on Single Node
   # sbin/stop-dfs.sh
