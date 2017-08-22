@@ -38,6 +38,13 @@ typedef enum HIVE_SERVER_TYPE {
   HIVE_SERVER2 =  1
 } HIVE_SERVER_TYPE;
 
+typedef enum AUTH_TYPE
+{
+	AUTH_TYPE_UNSPECIFIED = 0,
+	AUTH_TYPE_NOSASL,
+	AUTH_TYPE_LDAP
+} AUTH_TYPE;
+
 /******************************************************************************
  * Global Hive Client Functions (usable as C callback functions)
  *****************************************************************************/
@@ -85,7 +92,7 @@ int Destroy(void);
 int DBOpenConnection(char *host, int port, char *databaseName,
 					char *username, char *password,
 					int connectTimeout, int receiveTimeout,
-					char **errBuf);
+					AUTH_TYPE auth_type, char **errBuf);
 
 /**
  * @brief Disconnect from a Hive database.
