@@ -70,6 +70,7 @@ static struct HDFSFdwOption valid_options[] =
 	{ "dbname",              ForeignTableRelationId },
 	{ "table_name",          ForeignTableRelationId },
 	{ "client_type",         ForeignServerRelationId },
+	{ "auth_type",           ForeignServerRelationId },
 	{ "use_remote_estimate", ForeignServerRelationId },
 	{ "query_timeout",       ForeignServerRelationId },
 	{ "connect_timeout",     ForeignServerRelationId },
@@ -183,6 +184,8 @@ hdfs_get_options(Oid foreigntableid)
 	/* Set default clinet type to HiverServer2 */
 	opt->client_type = HIVESERVER2;
 
+	opt->auth_type = AUTH_TYPE_UNSPECIFIED;
+
 	/* Loop through the options, and get the server/port */
 	foreach(lc, options)
 	{
@@ -219,6 +222,22 @@ hdfs_get_options(Oid foreigntableid)
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME), 
 						errmsg("invalid option \"%s\"", defGetString(def)), 
 							errhint("Valid client_type is hiveserver2, this option will be deprecated soon")));
+		}
+
+		if (strcmp(def->defname, "auth_type") == 0)
+		{
+			if (strcasecmp(defGetString(def), "NOSASL") == 0)
+				opt->auth_type = AUTH_TYPE_NOSASL;
+			else
+			{
+				if (strcasecmp(defGetString(def), "LDAP") == 0)
+					opt->auth_type = AUTH_TYPE_LDAP;
+				else
+					ereport(ERROR,
+						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+							errmsg("invalid option \"%s\"", defGetString(def)),
+								errhint("Valid auth_type are NOSASL & LDAP")));
+			}
 		}
 
 		if (strcmp(def->defname, "use_remote_estimate") == 0)

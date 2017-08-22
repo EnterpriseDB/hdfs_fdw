@@ -34,6 +34,11 @@ import java.sql.ResultSetMetaData;
 public class HiveJdbcClient
 {
 	private static String		m_driverName = "org.apache.hive.jdbc.HiveDriver";
+
+	private static final int	m_authTypeUnspecified = 0;
+	private static final int	m_authTypeNoSasl = 1;
+	private static final int	m_authTypeLDAP = 2;
+
 	private int					m_queryTimeout = 0;
 	private boolean				m_isDebug = false;
 	private int					m_nestingLimit = 100;
@@ -72,11 +77,11 @@ public class HiveJdbcClient
 		return (-1);
 	}
 
-	/* singature will be (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IILMsgBuf;)I */
+	/* singature will be (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILMsgBuf;)I */
 	public int DBOpenConnection(String host, int port, String databaseName,
 								String userName, String password,
 								int connectTimeout, int receiveTimeout,
-								MsgBuf errBuf)
+								int authType, MsgBuf errBuf)
 	{
 		int index;
 		String hst;
@@ -165,14 +170,58 @@ public class HiveJdbcClient
 
 		try
 		{
-			if (userName == null || userName.equals(""))
+			switch (authType)
 			{
-				conURL += ";auth=noSasl";
-				m_hdfsConnection[index] = DriverManager.getConnection(conURL, "userName", "password");
-			}
-			else
-			{
-				m_hdfsConnection[index] = DriverManager.getConnection(conURL, userName, password);
+				case m_authTypeUnspecified:
+					if (userName == null || userName.equals(""))
+					{
+						conURL += ";auth=noSasl";
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL, "userName", "password");
+					}
+					else
+					{
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL, userName, password);
+					}
+					break;
+
+				case m_authTypeNoSasl:
+					conURL += ";auth=noSasl";
+					if (userName == null || userName.equals(""))
+					{
+						errBuf.catVal("ERROR : A valid user name is required");
+						m_isFree[index] = true;
+						return (-3);
+					}
+					else
+					{
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL, userName, password);
+					}
+					break;
+
+				case m_authTypeLDAP:
+					if (userName == null || userName.equals(""))
+					{
+						errBuf.catVal("ERROR : A valid user name is required");
+						m_isFree[index] = true;
+						return (-4);
+					}
+					else
+					{
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL, userName, password);
+					}
+					break;
+
+				default:
+					if (userName == null || userName.equals(""))
+					{
+						conURL += ";auth=noSasl";
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL, "userName", "password");
+					}
+					else
+					{
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL, userName, password);
+					}
+					break;
 			}
 		}
 		catch (SQLException ex)
@@ -183,7 +232,7 @@ public class HiveJdbcClient
 			errBuf.catVal(DriverManager.getLoginTimeout());
 			errBuf.catVal(" seconds");
 			m_isFree[index] = true;
-			return (-3);
+			return (-5);
 		}
 
 		m_host[index].resetVal();

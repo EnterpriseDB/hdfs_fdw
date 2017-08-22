@@ -71,6 +71,7 @@ typedef struct hdfs_opt
 	char           *dbname;           /* HDFS database name */
 	char           *table_name;       /* HDFS table name */
 	CLIENT_TYPE    client_type;
+	AUTH_TYPE      auth_type;
 	bool           use_remote_estimate;
 	int            connect_timeout;
 	int            receive_timeout;
