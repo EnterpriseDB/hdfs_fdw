@@ -33,10 +33,11 @@
 extern "C" {
 #endif // __cplusplus
 
-typedef enum HIVE_SERVER_TYPE {
-  HIVE_SERVER1 =  0,
-  HIVE_SERVER2 =  1
-} HIVE_SERVER_TYPE;
+typedef enum CLIENT_TYPE
+{
+	HIVESERVER2 = 0,
+	SPARKSERVER
+} CLIENT_TYPE;
 
 typedef enum AUTH_TYPE
 {
