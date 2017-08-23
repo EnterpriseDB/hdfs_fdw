@@ -46,7 +46,8 @@ While creating the foreign server object for HDFS FDW the following can be speci
   
     * `host`: IP Address or hostname of the Hive Thrift Server OR Spark Thrift Server. Defaults to `127.0.0.1`
     * `port`: Port number of the Hive Thrift Server OR Spark Thrift Server. Defaults to `10000`
-    * `client_type`:  HiveServer2. HiveServer1 is not supported. This option will be deprecated soon.
+    * `client_type`:  hiveserver2 or spark. Hive and Spark both support HiveQL and are compatible but ANALYZE command behaves differently. Default is hiveserver2 and will work with Spark too except the ANALYZE command.
+    * `auth_type`:  NOSASL or LDAP. Specify which authentication type is required while connecting to the Hive or Spark server. Default is unspecified and the FDW uses the username option in the user mapping to infer the auth_type. If the username is empty or not specified it uses NOSASL otherwise it uses LDAP.
     * `connect_timeout`:  Connection timeout, default value is 300 seconds.
     * `query_timeout`:  Query timeout is not supported by the Hive JDBC driver.
   
@@ -114,10 +115,9 @@ Step 5: Create Table in Hive
   these steps.
   
   ```sql
-  -- export LD_LIBRARY_PATH before starting the server, for example
-  export LD_LIBRARY_PATH=/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/:/usr/local/edb95/lib/postgresql/
   
-  -- set the GUC class path variable
+  -- set the GUC variables
+  hdfs_fdw.jvmpath='/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/'
   hdfs_fdw.classpath='/usr/local/edb95/lib/postgresql/HiveJdbcClient-1.0.jar:
                       /home/edb/Projects/hadoop_fdw/hadoop/share/hadoop/common/hadoop-common-2.6.4.jar:
                       /home/edb/Projects/hadoop_fdw/apache-hive-1.0.1-bin/lib/hive-jdbc-1.0.1-standalone.jar'
@@ -242,9 +242,8 @@ Using HDFS FDW with Apache Spark on top of Hadoop
 
 1. Install PPAS 9.5 and hdfs_fdw using installer.
 
-2. Export LD_LIBRARY_PATH before starting the server, for example
-  export LD_LIBRARY_PATH=/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/:/usr/local/edb95/lib/postgresql/
-  
+2. Set the GUC JVM path variable
+  hdfs_fdw.jvmpath='/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/'
 3. Set the GUC class path variable
   hdfs_fdw.classpath='/usr/local/edb95/lib/postgresql/HiveJdbcClient-1.0.jar:
                       /home/edb/Projects/hadoop_fdw/hadoop/share/hadoop/common/hadoop-common-2.6.4.jar:
@@ -254,13 +253,13 @@ Using HDFS FDW with Apache Spark on top of Hadoop
     ```sql
         CREATE EXTENSION hdfs_fdw;
         CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
-        OPTIONS (host '127.0.0.1',port '10000',client_type 'hiveserver2');
+        OPTIONS (host '127.0.0.1',port '10000',client_type 'spark');
         CREATE USER MAPPING FOR postgres server hdfs_svr OPTIONS (username 'ldapadm', password 'ldapadm');
         CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
         OPTIONS (dbname 'testdb', table_name 'my_names_tab');
     ```
   
-Please note that we are using the same port and client_type while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark without any code changes.
+Please note that we are using the same port while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark except for the ANALYZE command. It is better to use ALTER SERVER and change the client_type option if Hive is to be replaced with Spark.
 
 5. Download & install Apache Spark in local mode
 

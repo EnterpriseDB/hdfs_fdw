@@ -47,11 +47,6 @@ static const char* DEFAULT_HOST     = "localhost";
 static const char* DEFAULT_PORT     = "10000";
 
 
-typedef enum CLIENT_TYPE
-{
-	HIVESERVER1,
-	HIVESERVER2
-} CLIENT_TYPE;
 
 typedef struct hdfs_col
 {

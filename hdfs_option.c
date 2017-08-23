@@ -218,10 +218,17 @@ hdfs_get_options(Oid foreigntableid)
 			if (strcasecmp(defGetString(def), "hiveserver2") == 0)
 				opt->client_type = HIVESERVER2;
 			else
-				ereport(ERROR,
-					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME), 
-						errmsg("invalid option \"%s\"", defGetString(def)), 
-							errhint("Valid client_type is hiveserver2, this option will be deprecated soon")));
+			{
+				if (strcasecmp(defGetString(def), "spark") == 0)
+					opt->client_type = SPARKSERVER;
+				else
+				{
+					ereport(ERROR,
+						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+							errmsg("invalid option \"%s\"", defGetString(def)),
+								errhint("Valid client_type values are hiveserver2 and spark")));
+				}
+			}
 		}
 
 		if (strcmp(def->defname, "auth_type") == 0)

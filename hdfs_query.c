@@ -50,7 +50,10 @@ hdfs_analyze(int con_index, hdfs_opt *opt)
 
 	initStringInfo(&sql);
 	hdfs_deparse_analyze(&sql, opt);
-	hdfs_query_execute_utility(con_index, opt, sql.data);
+	if (opt->client_type == SPARKSERVER)
+		hdfs_query_execute(con_index, opt, sql.data);
+	else
+		hdfs_query_execute_utility(con_index, opt, sql.data);
 	hdfs_close_result_set(con_index, opt);
 }
 
