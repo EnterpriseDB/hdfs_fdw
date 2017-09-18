@@ -10,7 +10,7 @@ HIVECLIENT_HOME=libhive
 THRIFT_HOME:="$(shell echo $(THRIFT_HOME))"
 
 PG_CPPFLAGS = -Wno-unused-variable -I$(JDK_INCLUDE) -I$(JDK_INCLUDE)/linux/  -I$(HIVECLIENT_HOME) -DHAVE_NETINET_IN_H -DHAVE_INTTYPES_H
-SHLIB_LINK = -L$(HIVECLIENT_HOME) -lhive -lstdc++ -L$(JDK_INCLUDE)
+SHLIB_LINK := -L$(HIVECLIENT_HOME) -lhive -lstdc++ -L$(JDK_INCLUDE) $(LDFLAGS)
 
 
 OBJS = hdfs_client.o hdfs_query.o hdfs_option.o hdfs_deparse.o hdfs_connection.o hdfs_fdw.o
