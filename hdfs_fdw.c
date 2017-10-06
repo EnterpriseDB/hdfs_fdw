@@ -47,12 +47,14 @@
 PG_MODULE_MAGIC;
 
 /* Default CPU cost to start up a foreign query. */
-#define DEFAULT_FDW_STARTUP_COST    100.0
+#define DEFAULT_FDW_STARTUP_COST    100000.0
 
 /* Default CPU cost to process 1 row  */
-#define DEFAULT_FDW_TUPLE_COST      0.01
+#define DEFAULT_FDW_TUPLE_COST      1000.0
 
 PG_FUNCTION_INFO_V1(hdfs_fdw_handler);
+
+#define IS_DEBUG					0
 
 static hdfs_opt *GetOptions(Oid foreigntableid);
 static int GetConnection(hdfs_opt *opt, Oid foreigntableid);
@@ -75,6 +77,16 @@ static void hdfsEndForeignScan(ForeignScanState *node);
 static void hdfsExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static bool hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func,
                                       BlockNumber *totalpages);
+static void prepare_query_params(PlanState *node,
+								List *fdw_exprs,
+								int numParams,
+								List **param_exprs,
+								Oid **param_types);
+static void process_query_params(int index,
+								ExprContext *econtext,
+								List *param_exprs,
+								Oid *param_types);
+
 
 #ifdef EDB_NATIVE_LANG
 	#if PG_VERSION_NUM >= 90300
@@ -158,9 +170,9 @@ hdfs_fdw_xact_callback(XACT_CB_SIGNATURE)
 	if (nestingLevel > 0)
 	{
 		if (nestingLevel > 1)
-			ereport(DEBUG1, (errmsg("HDFS_FDW: %d connections closed", nestingLevel)));
+			ereport(DEBUG1, (errmsg("hdfs_fdw: %d connections closed", nestingLevel)));
 		else
-			ereport(DEBUG1, (errmsg("HDFS_FDW: %d connection closed", nestingLevel)));
+			ereport(DEBUG1, (errmsg("hdfs_fdw: %d connection closed", nestingLevel)));
 	}
 }
 
@@ -236,6 +248,9 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	hdfs_opt            *options = NULL;
 	int					con_index = -1;
 
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw: hdfsGetForeignRelSize starts [%d]", con_index)));
+
 	/*
 	 * We use HDFSFdwRelationInfo to pass various information to subsequent
 	 * functions.
@@ -294,8 +309,10 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 
 		hdfs_rel_connection(con_index);
 	}
-
 	fpinfo->rows = baserel->tuples = baserel->rows;
+
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw: hdfsGetForeignRelSize ends [%f]", baserel->rows)));
 }
 
 static void
@@ -305,7 +322,11 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 	int                 total_cost = 0;
 	ForeignPath         *path = NULL;
 
-	total_cost = fpinfo->fdw_tuple_cost * baserel->rows;
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsGetForeignPaths starts ")));
+
+	total_cost = fpinfo->fdw_startup_cost +
+			fpinfo->fdw_tuple_cost * baserel->rows;
 
 	/*
 	 * Create simplest ForeignScan path node and add it to baserel.  This path
@@ -328,6 +349,8 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 #endif
 								   NIL); /* no fdw_private data */
 	add_path(baserel, (Path *) path);
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsGetForeignPaths ends")));
 }
 
 
@@ -355,15 +378,19 @@ hdfsGetForeignPlan(PlannerInfo *root,
 #endif
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) baserel->fdw_private;
-	Index          scan_relid = baserel->relid;
-	List           *fdw_private;
-	List           *remote_conds = NIL;
-	List           *local_exprs = NIL;
-	List           *params_list = NIL;
-	List           *retrieved_attrs;
+	Index		scan_relid = baserel->relid;
+	List		*fdw_private;
+	List		*remote_conds = NIL;
+	List		*remote_exprs = NIL;
+	List		*local_exprs = NIL;
+	List		*params_list = NIL;
+	List		*retrieved_attrs;
 	StringInfoData sql;
 	ListCell       *lc = NULL;
 	hdfs_opt       *options = NULL;
+
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw: hdfsGetForeignPlan starts")));
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
@@ -398,15 +425,20 @@ hdfsGetForeignPlan(PlannerInfo *root,
 			continue;
 
 		if (list_member_ptr(fpinfo->remote_conds, rinfo))
+		{
 			remote_conds = lappend(remote_conds, rinfo);
+			remote_exprs = lappend(remote_exprs, rinfo->clause);
+		}
 		else if (list_member_ptr(fpinfo->local_conds, rinfo))
 			local_exprs = lappend(local_exprs, rinfo->clause);
 		else if (is_foreign_expr(root, baserel, rinfo->clause))
+		{
 			remote_conds = lappend(remote_conds, rinfo);
+			remote_exprs = lappend(remote_exprs, rinfo->clause);
+		}
 		else
 			local_exprs = lappend(local_exprs, rinfo->clause);
 	}
-
 	/*
 	 * Build the query string to be sent for execution, and identify
 	 * expressions to be sent as parameters.
@@ -418,7 +450,6 @@ hdfsGetForeignPlan(PlannerInfo *root,
 		hdfs_append_where_clause(options, &sql, root, baserel, remote_conds,
 						  true, &params_list);
 
-	elog(DEBUG1, "Remote SQL: %s", sql.data);
 	/*
 	 * Build the fdw_private list that will be available to the executor.
 	 * Items in the list must match enum FdwScanPrivateIndex, above.
@@ -433,6 +464,9 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	 * field of the finished plan node; we can't keep them in private state
 	 * because then they wouldn't be subject to later planner processing.
 	 */
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsGetForeignPlan ends")));
+
 	return make_foreignscan(tlist,
 							local_exprs,
 							scan_relid,
@@ -440,8 +474,8 @@ hdfsGetForeignPlan(PlannerInfo *root,
 							fdw_private
 #if PG_VERSION_NUM >= 90500
 							,NIL
-							,NIL
-							,NULL
+							,remote_exprs
+							,outer_plan
 #endif
 							);
 }
@@ -454,24 +488,46 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	Oid                      foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfs_opt                 *opt = GetOptions(foreigntableid);
 	EState                   *estate = node->ss.ps.state;
+	int						 numParams;
+
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsBeginForeignScan starts")));
 
 	festate = (hdfsFdwExecutionState *) palloc(sizeof(hdfsFdwExecutionState));
-
 	/* Connect to HIVE server */
 	festate->con_index = GetConnection(opt, foreigntableid);
 
 	node->fdw_state = (void *) festate;
 	festate->batch_cxt = AllocSetContextCreate(estate->es_query_cxt,
-										   "hdfs_fdw tuple data",
-										   ALLOCSET_DEFAULT_MINSIZE,
-										   ALLOCSET_DEFAULT_INITSIZE,
-										   ALLOCSET_DEFAULT_MAXSIZE);
+						   "hdfs_fdw tuple data",
+						   ALLOCSET_DEFAULT_MINSIZE,
+						   ALLOCSET_DEFAULT_INITSIZE,
+						   ALLOCSET_DEFAULT_MAXSIZE);
 
-	festate->col_list = hdfs_desc_query(festate->con_index, opt);
 	festate->query_executed = false;
 	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
 	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private, 1);
-	return;
+
+	/*
+	 * Prepare for processing of parameters used in remote query, if any.
+	 */
+	numParams = list_length(fsplan->fdw_exprs);
+
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsBeginForeignScann param count [%d]", numParams)));
+
+	festate->numParams = numParams;
+	festate->rescan_count = 0;
+	if (numParams > 0)
+	{
+		prepare_query_params((PlanState *) node,
+							 fsplan->fdw_exprs,
+							 numParams,
+							 &festate->param_exprs,
+							 &festate->param_types);
+	}
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsBeginForeignScann ends")));
 }
 
 static TupleTableSlot *
@@ -490,6 +546,11 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	TupleTableSlot         *slot = node->ss.ss_ScanTupleSlot;
 	MemoryContext			oldcontext = NULL;
 	int						r;
+	bool					b;
+	ExprContext				*econtext = node->ss.ps.ps_ExprContext;
+
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsIterateForeignScan starts")));
 
 	ExecClearTuple(slot);
 	/* Get the options */
@@ -507,52 +568,52 @@ hdfsIterateForeignScan(ForeignScanState *node)
 
 	if (!festate->query_executed)
 	{
-		festate->query_executed = hdfs_query_execute(festate->con_index,
-													options,
-													festate->query);
+		b = hdfs_query_prepare(festate->con_index,
+								options,
+								festate->query);
+		if (b == true)
+		{
+			/*
+			 * bind parameters
+			 */
+			if (festate->numParams > 0)
+			{
+				process_query_params(festate->con_index,
+									econtext,
+									festate->param_exprs,
+									festate->param_types);
+			}
+			festate->query_executed = hdfs_execute_prepared(festate->con_index);
+		}
 	}
-
 	r = hdfs_fetch(festate->con_index, options);
 	if (r == 0)
 	{
 		attid = 0;
+
 		foreach(lc, festate->retrieved_attrs)
 		{
-			int         len;
 			bool        isnull = true;
 			int         attnum = lfirst_int(lc) - 1;
 			Oid         pgtype = tupdesc->attrs[attnum]->atttypid;
 			int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
 			Datum       v;
-			char        *attrname;
-			hdfs_column *cols = NULL;
-			ListCell    *list_cell;
 
-			attrname = NameStr(tupdesc->attrs[attnum]->attname);
-			foreach(list_cell, festate->col_list)
+			v = hdfs_get_value(festate->con_index, options, pgtype,
+								pgtypmod, attid, &isnull);
+			if (!isnull)
 			{
-				cols = (hdfs_column *) lfirst(list_cell);
-
-				if (cols != NULL && strcmp(cols->col_name, attrname) == 0)
-					break;
+				nulls[attnum] = false;
+				values[attnum] = v;
 			}
-			if (cols)
-			{
-				v = hdfs_get_value(festate->con_index, options, pgtype,
-									pgtypmod, attid, &isnull,
-									cols->col_type);
-				if (!isnull)
-				{
-					nulls[attnum] = false;
-					values[attnum] = v;
-				}
-				attid++;
-			}
+			attid++;
 		}
 		tuple = heap_form_tuple(tupdesc, values, nulls);
 		ExecStoreTuple(tuple, slot, InvalidBuffer, true);
 	}
 	MemoryContextSwitchTo(oldcontext);
+	if (IS_DEBUG)
+		ereport(LOG, (errmsg("hdfs_fdw:hdfsIterateForeignScan ends")));
 	return slot;
 }
 
@@ -562,16 +623,25 @@ hdfsReScanForeignScan(ForeignScanState *node)
 	Oid                    foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfsFdwExecutionState  *festate = (hdfsFdwExecutionState *) node->fdw_state;
 	hdfs_opt               *options = NULL;
+	ExprContext             *econtext = node->ss.ps.ps_ExprContext;
 
 	/* Get the options */
 	options = GetOptions(foreigntableid);
 
 	if (festate->query_executed)
 	{
+		if (options->log_remote_sql)
+			elog(LOG, "hdfs_fdw: rescan remote SQL: [%s] [%d]",
+								festate->query, festate->rescan_count++);
 		hdfs_close_result_set(festate->con_index, options);
-		festate->query_executed = hdfs_query_execute(festate->con_index,
-													options,
-													festate->query);
+		if (festate->numParams > 0)
+		{
+			process_query_params(festate->con_index,
+								econtext,
+								festate->param_exprs,
+								festate->param_types);
+		}
+		festate->query_executed = hdfs_execute_prepared(festate->con_index);
 	}
 	return;
 }
@@ -640,3 +710,72 @@ hdfsEndForeignScan(ForeignScanState *node)
 	hdfs_rel_connection(festate->con_index);
 	return;
 }
+
+/*
+ * Prepare for processing of parameters used in remote query.
+ */
+static void
+prepare_query_params(PlanState *node,
+					List *fdw_exprs,
+					int numParams,
+					List **param_exprs,
+					Oid **param_types)
+{
+	int			i;
+	ListCell	*lc;
+	Oid			*pt;
+
+	Assert(numParams > 0);
+	pt = (Oid *) palloc0(sizeof(Oid) * numParams);
+
+	i = 0;
+	foreach(lc, fdw_exprs)
+	{
+		Node	*param_expr = (Node *) lfirst(lc);
+		Oid		typefnoid;
+		bool	isvarlena;
+
+		pt[i] = exprType(param_expr);
+		getTypeOutputInfo(exprType(param_expr), &typefnoid, &isvarlena);
+		i++;
+	}
+	*param_types = pt;
+	/*
+	 * Prepare remote-parameter expressions for evaluation.  (Note: in
+	 * practice, we expect that all these expressions will be just Params, so
+	 * we could possibly do something more efficient than using the full
+	 * expression-eval machinery for this.  But probably there would be little
+	 * benefit, and it'd require fdw to know more than is desirable
+	 * about Param evaluation.)
+	 */
+	*param_exprs = (List *) ExecInitExpr((Expr *) fdw_exprs, node);
+
+}
+
+static void
+process_query_params(int con_index,
+					ExprContext *econtext,
+					List *param_exprs,
+					Oid *param_types)
+{
+	int			i;
+	ListCell	*lc;
+
+	i = 0;
+	foreach(lc, param_exprs)
+	{
+		ExprState               *expr_state = (ExprState *) lfirst(lc);
+		Datum                   expr_value;
+		bool                    isNull;
+
+		/* Evaluate the parameter expression */
+#if PG_VERSION_NUM >= 100000
+		expr_value = ExecEvalExpr(expr_state, econtext, &isNull);
+#else
+		expr_value = ExecEvalExpr(expr_state, econtext, &isNull, NULL);
+#endif
+		hdfs_bind_var(con_index, param_types[i], expr_value, &isNull);
+		i++;
+	}
+}
+

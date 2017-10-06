@@ -30,6 +30,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
+import java.sql.Date;
 
 public class HiveJdbcClient
 {
@@ -52,24 +53,19 @@ public class HiveJdbcClient
 	private MsgBuf[]			m_host;
 	private int[]				m_port;
 	private MsgBuf[]			m_user;
+	private int[]				m_paramIndex;
+	private int[]				m_fetchCount;
+	private int[]				m_tempCount;
 
 	public int FindFreeSlot()
 	{
-		if (m_isDebug)
-		{
-			for (int i = 0; i < m_nestingLimit; i++)
-			{
-				if (m_isFree[i])
-					System.out.println("Index " + i + " is free");
-				else
-					System.out.println("Index " + i + " is busy");
-			}
-		}
-
 		for (int i = 0; i < m_nestingLimit; i++)
 		{
 			if (m_isFree[i])
 			{
+				if (m_isDebug)
+					System.out.println("Index " + i + " is free");
+
 				m_isFree[i] = false;
 				return (i);
 			}
@@ -101,6 +97,10 @@ public class HiveJdbcClient
 			m_port = new int[m_nestingLimit];
 			m_user = new MsgBuf[m_nestingLimit];
 
+			m_paramIndex = new int[m_nestingLimit];
+			m_fetchCount = new int[m_nestingLimit];
+			m_tempCount = new int[m_nestingLimit];
+
 			for (int i = 0; i < m_nestingLimit; i++)
 			{
 				m_hdfsConnection[i] = null;
@@ -110,6 +110,10 @@ public class HiveJdbcClient
 				m_isFree[i] = true;
 				m_host[i] = new MsgBuf("xxx.xxx.xxx.xxx or localhost");
 				m_port[i] = 0;
+				m_paramIndex[i] = 0;
+				m_fetchCount[i] = 0;
+				m_tempCount[i] = 0;
+
 				m_user[i] = new MsgBuf("store user name here");
 			}
 			m_isInitialized = true;
@@ -167,6 +171,9 @@ public class HiveJdbcClient
 		conURL += port;
 		conURL += "/";
 		conURL += databaseName;
+
+		if (m_isDebug)
+			System.out.println("HiveJdbcClient::DBOpenConnection attempting to connect to " + conURL);
 
 		try
 		{
@@ -226,6 +233,9 @@ public class HiveJdbcClient
 		}
 		catch (SQLException ex)
 		{
+			if (m_isDebug)
+				System.out.println("HiveJdbcClient::DBOpenConnection could not connect to " + conURL);
+
 			errBuf.catVal("ERROR : Could not connect to ");
 			errBuf.catVal(conURL);
 			errBuf.catVal(" within ");
@@ -234,6 +244,9 @@ public class HiveJdbcClient
 			m_isFree[index] = true;
 			return (-5);
 		}
+
+		if (m_isDebug)
+			System.out.println("HiveJdbcClient::DBOpenConnection connected to " + conURL);
 
 		m_host[index].resetVal();
 		m_host[index].catVal(host);
@@ -319,6 +332,304 @@ public class HiveJdbcClient
 			}
 		}
 		return (count);
+	}
+
+	/* singature will be (ILjava/lang/String;ILMsgBuf;)I */
+	public int DBPrepare(int index, String query, int maxRows, MsgBuf errBuf)
+	{
+		if (m_isDebug)
+			System.out.println("HiveJdbcClient::DBPrepare");
+
+		if (m_hdfsConnection[index] == null)
+		{
+			errBuf.catVal("Database is not connected");
+			m_isFree[index] = true;
+			return (-1);
+		}
+
+		if (m_resultSet[index] != null)
+		{
+			try
+			{
+				m_resultSet[index].close();
+				m_resultSet[index] = null;
+			}
+			catch (SQLException e)
+			{
+				m_isFree[index] = true;
+				errBuf.catVal(e.getMessage());
+				return (-2);
+			}
+		}
+
+		if (m_preparedStatement[index] != null)
+		{
+			try
+			{
+				m_preparedStatement[index].close();
+				m_preparedStatement[index] = null;
+			}
+			catch (SQLException e)
+			{
+				m_isFree[index] = true;
+				errBuf.catVal(e.getMessage());
+				return (-3);
+			}
+		}
+
+		try
+		{
+			m_preparedStatement[index] = m_hdfsConnection[index].prepareStatement(query);
+			m_preparedStatement[index].setFetchSize(maxRows);
+			m_paramIndex[index] = 1;
+			m_fetchCount[index] = 0;
+			m_tempCount[index] = 0;
+
+			/* TODO This method is not supported */
+//			m_preparedStatement[index].setQueryTimeout(m_queryTimeout);
+		}
+		catch (SQLException e)
+		{
+			m_isFree[index] = true;
+
+			errBuf.catVal(e.getMessage());
+
+			if (m_preparedStatement[index] != null)
+			{
+				try
+				{
+					m_preparedStatement[index].close();
+					m_preparedStatement[index] = null;
+				}
+				catch (SQLException e1)
+				{
+					/* ignored */
+				}
+			}
+			return (-4);
+		}
+
+		return (0);
+	}
+
+	/* singature will be (ILJDBCType;LMsgBuf;)I */
+	public int DBBindVar(int index, JDBCType paramToBind, MsgBuf errBuf)
+	{
+		if (m_isDebug)
+			System.out.println("HiveJdbcClient::DBBind");
+
+		if (m_hdfsConnection[index] == null)
+		{
+			errBuf.catVal("Database is not connected");
+			m_isFree[index] = true;
+			return (-1);
+		}
+
+		if (m_preparedStatement[index] == null)
+		{
+			errBuf.catVal("Statement is not prepared");
+			m_isFree[index] = true;
+			return (-2);
+		}
+
+		if (paramToBind.getType() < 0)
+		{
+			errBuf.catVal("Invalid parameter type");
+
+			if (m_preparedStatement[index] != null)
+			{
+				try
+				{
+					m_preparedStatement[index].close();
+					m_preparedStatement[index] = null;
+				}
+				catch (SQLException e1)
+				{
+					/* ignored */
+				}
+			}
+
+			m_isFree[index] = true;
+			return (-3);
+		}
+
+		if (m_resultSet[index] != null)
+		{
+			try
+			{
+				m_resultSet[index].close();
+				m_resultSet[index] = null;
+			}
+			catch (SQLException e)
+			{
+				if (m_preparedStatement[index] != null)
+				{
+					try
+					{
+						m_preparedStatement[index].close();
+						m_preparedStatement[index] = null;
+					}
+					catch (SQLException e1)
+					{
+						/* ignored */
+					}
+				}
+
+				m_isFree[index] = true;
+				errBuf.catVal(e.getMessage());
+				return (-4);
+			}
+		}
+
+		try
+		{
+			switch (paramToBind.getType())
+			{
+				case 1:
+					m_preparedStatement[index].setBoolean(m_paramIndex[index]++, paramToBind.getBool());
+					break;
+				case 2:
+					m_preparedStatement[index].setShort(m_paramIndex[index]++, paramToBind.getShort());
+					break;
+				case 3:
+					m_preparedStatement[index].setInt(m_paramIndex[index]++, paramToBind.getInt());
+					break;
+				case 4:
+					m_preparedStatement[index].setLong(m_paramIndex[index]++, paramToBind.getLong());
+					break;
+				case 5:
+					m_preparedStatement[index].setDouble(m_paramIndex[index]++, paramToBind.getDoub());
+					break;
+				case 6:
+					m_preparedStatement[index].setFloat(m_paramIndex[index]++, paramToBind.getFloat());
+					break;
+				case 7:
+					m_preparedStatement[index].setString(m_paramIndex[index]++, paramToBind.getString());
+					break;
+				case 8:
+					m_preparedStatement[index].setDate(m_paramIndex[index]++, paramToBind.getDate());
+					break;
+				/*
+				case 9:
+					m_preparedStatement[index].setTime(m_paramIndex[index]++, paramToBind.getTime());
+					break;
+				*/
+				case 10:
+					m_preparedStatement[index].setTimestamp(m_paramIndex[index]++, paramToBind.getStamp());
+					break;
+			}
+		}
+		catch (SQLException e)
+		{
+			m_isFree[index] = true;
+
+			errBuf.catVal(e.getMessage());
+
+			if (m_preparedStatement[index] != null)
+			{
+				try
+				{
+					m_preparedStatement[index].close();
+					m_preparedStatement[index] = null;
+				}
+				catch (SQLException e1)
+				{
+					/* ignored */
+				}
+			}
+			return (-5);
+		}
+		return (0);
+	}
+
+	/* singature will be (ILMsgBuf;)I */
+	public int DBExecutePrepared(int index, MsgBuf errBuf)
+	{
+		if (m_isDebug)
+			System.out.println("HiveJdbcClient::DBExecutePrepared");
+
+		if (m_hdfsConnection[index] == null)
+		{
+			errBuf.catVal("Database is not connected");
+			m_isFree[index] = true;
+			return (-1);
+		}
+
+		if (m_preparedStatement[index] == null)
+		{
+			errBuf.catVal("Statement is not prepared");
+			m_isFree[index] = true;
+			return (-2);
+		}
+
+		if (m_resultSet[index] != null)
+		{
+			try
+			{
+				m_resultSet[index].close();
+				m_resultSet[index] = null;
+			}
+			catch (SQLException e)
+			{
+				if (m_preparedStatement[index] != null)
+				{
+					try
+					{
+						m_preparedStatement[index].close();
+						m_preparedStatement[index] = null;
+					}
+					catch (SQLException e1)
+					{
+						/* ignored */
+					}
+				}
+
+				m_isFree[index] = true;
+				errBuf.catVal(e.getMessage());
+				return (-3);
+			}
+		}
+
+		try
+		{
+			m_resultSet[index] = m_preparedStatement[index].executeQuery();
+			m_resultSetMetaData[index] = m_resultSet[index].getMetaData();
+		}
+		catch (SQLException e)
+		{
+			m_isFree[index] = true;
+
+			errBuf.catVal(e.getMessage());
+
+			if (m_resultSet[index] != null)
+			{
+				try
+				{
+					m_resultSet[index].close();
+					m_resultSet[index] = null;
+				}
+				catch (SQLException e1)
+				{
+					/* ignored */
+				}
+			}
+
+			if (m_preparedStatement[index] != null)
+			{
+				try
+				{
+					m_preparedStatement[index].close();
+					m_preparedStatement[index] = null;
+				}
+				catch (SQLException e1)
+				{
+					/* ignored */
+				}
+			}
+			return (-5);
+		}
+
+		return (0);
 	}
 
 	/* singature will be (ILjava/lang/String;ILMsgBuf;)I */
@@ -430,9 +741,9 @@ public class HiveJdbcClient
 			}
 			return (-5);
 		}
-
 		return (0);
 	}
+
 
 	/* singature will be (ILjava/lang/String;LMsgBuf;)I */
 	public int DBExecuteUtility(int index, String query, MsgBuf errBuf)
@@ -559,6 +870,18 @@ public class HiveJdbcClient
 			m_isFree[index] = true;
 			errBuf.catVal("Resultset is null");
 			return (-2);
+		}
+
+//		if (m_isDebug)
+		{
+			m_tempCount[index]++;
+			m_fetchCount[index]++;
+
+			if (m_tempCount[index] > 100000)
+			{
+				m_tempCount[index] = 0;
+				System.out.println("HiveJdbcClient::DBFetch [" + m_fetchCount[index] + "]");
+			}
 		}
 
 		/* The hive JDBC driver does not support isClosed or isAfterLast methods */

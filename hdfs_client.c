@@ -19,6 +19,9 @@
 #include "access/htup_details.h"
 #include "catalog/pg_type.h"
 #include "utils/syscache.h"
+#include "utils/builtins.h"
+#include "utils/date.h"
+#include "utils/timestamp.h"
 
 #include "libhive/jdbc/hiveclient.h"
 
@@ -56,7 +59,7 @@ hdfs_get_column_count(int con_index, hdfs_opt *opt)
 
 Datum
 hdfs_get_value(int con_index, hdfs_opt *opt, Oid pgtyp, int pgtypmod,
-				int idx, bool *is_null, int col_type)
+				int idx, bool *is_null)
 {
 	Datum      value_datum = 0;
 	regproc    typeinput;
@@ -148,15 +151,47 @@ hdfs_get_field_as_cstring(int con_index, hdfs_opt *opt, int idx, bool *is_null)
 }
 
 bool
+hdfs_execute_prepared(int con_index)
+{
+    char    *err = "unknown";
+    char    *err_buf = err;
+
+    if (DBExecutePrepared(con_index, &err_buf) < 0)
+        ereport(ERROR,
+            (errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
+                errmsg("failed to execute query: %s", err_buf)));
+    return true;
+}
+
+bool
 hdfs_query_execute(int con_index, hdfs_opt *opt, char *query)
 {
 	char	*err = "unknown";
 	char	*err_buf = err;
 
-	if (DBExecute(con_index, query, 1000, &err_buf) < 0)
+	if (opt->log_remote_sql)
+		elog(LOG, "hdfs_fdw: execute remote SQL: [%s] [%d]", query, opt->fetch_size);
+
+	if (DBExecute(con_index, query, opt->fetch_size, &err_buf) < 0)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
-				errmsg("failed to fetch execute query: %s", err_buf)));
+				errmsg("failed to execute query: %s", err_buf)));
+	return true;
+}
+
+bool
+hdfs_query_prepare(int con_index, hdfs_opt *opt, char *query)
+{
+	char	*err = "unknown";
+	char	*err_buf = err;
+
+	if (opt->log_remote_sql)
+		elog(LOG, "hdfs_fdw: prepare remote SQL: [%s] [%d]", query, opt->fetch_size);
+
+	if (DBPrepare(con_index, query, opt->fetch_size, &err_buf) < 0)
+		ereport(ERROR,
+			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
+				errmsg("failed to prepare query: %s", err_buf)));
 	return true;
 }
 
@@ -166,10 +201,151 @@ hdfs_query_execute_utility(int con_index, hdfs_opt *opt, char *query)
 	char	*err = "unknown";
 	char	*err_buf = err;
 
+	if (opt->log_remote_sql)
+		elog(LOG, "hdfs_fdw: utility remote SQL: [%s] [%d]", query, opt->fetch_size);
+
 	if (DBExecuteUtility(con_index, query, &err_buf) < 0)
 		ereport(ERROR,
 			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
 				errmsg("failed to fetch execute query: %s", err_buf)));
+	return true;
+}
+
+bool
+hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
+{
+	char	*err = "unknown";
+	char	*err_buf = err;
+	int		ret;
+
+	if (*isnull)
+	{
+		/* TODO: Bind null as a param value yet to handle */
+		ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+						errmsg("cannot bind null parameter"),
+						errhint("Parameter type: %u", type)));
+	}
+
+	switch(type)
+	{
+		case INT2OID:
+		{
+			int16 dat = DatumGetInt16(value);
+			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			break;
+		}
+		case INT4OID:
+		{
+			int32 dat = DatumGetInt32(value);
+			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			break;
+		}
+		case INT8OID:
+		{
+			int64 dat = DatumGetInt64(value);
+			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			break;
+		}
+		case FLOAT4OID:
+		{
+			float4 dat = DatumGetFloat4(value);
+			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			break;
+		}
+		case FLOAT8OID:
+		{
+			float8 dat = DatumGetFloat8(value);
+			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			break;
+		}
+		case NUMERICOID:
+		{
+			Datum valueDatum = DirectFunctionCall1(numeric_float8, value);
+			float8 dat = DatumGetFloat8(valueDatum);
+			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			break;
+		}
+		case BOOLOID:
+		{
+			int32 dat = DatumGetInt32(value);
+			bool v;
+			if (dat == 0)
+				v = false;
+			else
+				v = true;
+			ret = DBBindVar(con_index, type, &v, isnull, &err_buf);
+			break;
+		}
+
+		case BPCHAROID:
+		case VARCHAROID:
+		case TEXTOID:
+		case JSONOID:
+		{
+			char *outputString = NULL;
+			Oid outputFunctionId = InvalidOid;
+			bool typeVarLength = false;
+			getTypeOutputInfo(type, &outputFunctionId, &typeVarLength);
+			outputString = OidOutputFunctionCall(outputFunctionId, value);
+			ret = DBBindVar(con_index, type, outputString, isnull, &err_buf);
+			break;
+		}
+		case NAMEOID:
+		{
+			char *outputString = NULL;
+			Oid outputFunctionId = InvalidOid;
+			bool typeVarLength = false;
+			getTypeOutputInfo(type, &outputFunctionId, &typeVarLength);
+			outputString = OidOutputFunctionCall(outputFunctionId, value);
+			ret = DBBindVar(con_index, type, outputString, isnull, &err_buf);
+			break;
+		}
+		case DATEOID:
+		{
+			Datum valueDatum = DirectFunctionCall1(date_timestamp, value);
+			Timestamp valueTimestamp = DatumGetTimestamp(valueDatum);
+			ret = DBBindVar(con_index, type, &valueTimestamp, isnull, &err_buf);
+			break;
+		}
+		case TIMEOID:
+		case TIMESTAMPOID:
+		case TIMESTAMPTZOID:
+		{
+			Timestamp valueTimestamp = DatumGetTimestamp(value);
+			ret = DBBindVar(con_index, type, &valueTimestamp, isnull, &err_buf);
+			break;
+		}
+		case BITOID:
+		{
+			char *outputString = NULL;
+			Oid outputFunctionId = InvalidOid;
+			bool typeVarLength = false;
+			bool v;
+			getTypeOutputInfo(type, &outputFunctionId, &typeVarLength);
+			outputString = OidOutputFunctionCall(outputFunctionId, value);
+
+			if (strcmp(outputString, "0") == 0)
+				v = false;
+			else
+				v = true;
+			ret = DBBindVar(con_index, type, &v, isnull, &err_buf);
+
+			break;
+		}
+
+		default:
+		{
+			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+							errmsg("cannot bind parameter"),
+							errhint("Parameter type: %u", type)));
+			break;
+		}
+	}
+
+	if (ret < 0)
+		ereport(ERROR,
+			(errcode(ERRCODE_FDW_UNABLE_TO_CREATE_EXECUTION),
+				errmsg("failed to bind variable: %d", type)));
 	return true;
 }
 
