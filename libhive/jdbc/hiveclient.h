@@ -149,6 +149,49 @@ int DBCloseAllConnections();
 int DBExecute(int con_index, const char* query, int maxRows, char **errBuf);
 
 /**
+ * @brief Prepare a query for execution later.
+ *
+ * Prepares a query on a Hive connection.
+ *
+ * @see DBExecutePrepared()
+ *
+ * @param index          Index of the result set object to use.
+ * @param query          The HQL query string to be prepared.
+ * @param maxRows        Max number of rows to buffer in the result set for the query results
+ * @param errBuf         Buffer to receive an error message if any.
+ *                       It receives a copy of the pointer to the already allocated
+ *                       memory that the caller does not need to worry about.
+ *
+ * @return Any negative value indicates an error, 0 means success.
+ *         Error messages will be stored in errBuf.
+ */
+int DBPrepare(int con_index, const char* query, int maxRows, char **errBuf);
+
+/**
+ * @brief Execute a prepared query.
+ *
+ * Executes a query on a Hive connection and associates a result set with it.
+ * There is no need for this function to return result set to the caller.
+ * The result set can be held by the underlying java object
+ * and there is no need to return it to the caller.
+ * This design change simplifies and reduces the amount of coding we have to do
+ * while trying to write the JNI code to access Java class functions from C++.
+ * Caller is responsible for deallocating the result set object by
+ * calling DBCloseResultSet.
+ *
+ * @see DBCloseResultSet()
+ *
+ * @param index          Index of the result set object to use.
+ * @param errBuf         Buffer to receive an error message if any.
+ *                       It receives a copy of the pointer to the already allocated
+ *                       memory that the caller does not need to worry about.
+ *
+ * @return Any negative value indicates an error, 0 means success.
+ *         Error messages will be stored in errBuf.
+ */
+int DBExecutePrepared(int con_index, char **errBuf);
+
+/**
  * @brief Execute a utility query.
  *
  * Utility queries are not supposed to return any result set
@@ -235,6 +278,25 @@ int DBGetColumnCount(int con_index, char **errBuf);
  *         Error messages will be stored in errBuf.
  */
 int DBGetFieldAsCString(int con_index, int columnIdx, char **buffer, char **errBuf);
+
+
+/**
+ * @brief Bind a value to a parameter in a parameterized query
+ *
+ * The function keeps track of the parameter number itself.
+ *
+ * @param index          Index of the result set object to use.
+ * @param type           PG Type of the parameter.
+ * @param value          PG value of the parameter.
+ * @param isnull         Is value to be bound a null.
+ * @param errBuf         Buffer to receive an error message if any.
+ *                       It receives a copy of the pointer to the already allocated
+ *                       memory that the caller does not need to worry about.
+ *
+ * @return Any negative value indicates an error, 0 means success.
+ *         Error messages will be stored in errBuf.
+ */
+int DBBindVar(int con_index, Oid type, void *value, bool *isnull, char **errBuf);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -25,19 +25,6 @@
 #include "utils/rel.h"
 #include "access/htup.h"
 
-#define HDFS_TINYINT     0
-#define HDFS_SMALLINT    1
-#define HDFS_INT         2
-#define HDFS_BIGINT      3
-#define HDFS_STRING      4
-#define HDFS_VARCHAR     5
-#define HDFS_CHAR        6
-#define HDFS_TIMESTAMPS  7
-#define HDFS_DECIMAL     8
-#define HDFS_DATE        9
-#define HDFS_DOUBLE      10
-#define HDFS_BOLEAN      11
-
 /* Default connection parameters */
 /* Default Hive database name */
 static const char* DEFAULT_DATABASE = "default";
@@ -46,13 +33,6 @@ static const char* DEFAULT_HOST     = "localhost";
 /* Default Hive Server port */
 static const char* DEFAULT_PORT     = "10000";
 
-
-
-typedef struct hdfs_col
-{
-	char *col_name;
-	int  col_type;
-} hdfs_column;
 
 
 /*
@@ -70,6 +50,8 @@ typedef struct hdfs_opt
 	bool           use_remote_estimate;
 	int            connect_timeout;
 	int            receive_timeout;
+	int            fetch_size;
+	bool           log_remote_sql;
 } hdfs_opt;
 
 typedef struct hdfsFdwExecutionState
@@ -80,7 +62,13 @@ typedef struct hdfsFdwExecutionState
 	int				con_index;
 	Relation        rel;              /* relcache entry for the foreign table */
 	List	        *retrieved_attrs; /* list of retrieved attribute numbers */
-	List	        *col_list;        /* list of remote column's type */
+
+	/* for remote query execution */
+	int          numParams;         /* number of parameters passed to query */
+	List         *param_exprs;      /* executable expressions for param values */
+	Oid          *param_types;      /* type of query parameters */
+
+	int			rescan_count;		/* Number of times a foreign scan is restarted */
 } hdfsFdwExecutionState;
 
 
@@ -108,7 +96,6 @@ typedef struct HDFSFdwRelationInfo
 	Cost        total_cost;
 
 	/* Options extracted from catalogs. */
-	bool		use_remote_estimate;
 	Cost		fdw_startup_cost;
 	Cost		fdw_tuple_cost;
 
@@ -131,25 +118,12 @@ typedef struct HDFSFdwScanState
 	List       *retrieved_attrs;  /* list of retrieved attribute numbers */
 
 	/* for remote query execution */
-	unsigned int cursor_number;   /* quasi-unique ID for my cursor */
-	bool         cursor_exists;   /* have we created the cursor? */
-	int          numParams;       /* number of parameters passed to query */
-	FmgrInfo     *param_flinfo;   /* output conversion functions for them */
-	List         *param_exprs;    /* executable expressions for param values */
-	const char   **param_values;  /* textual values of query parameters */
-
-	/* for storing result tuples */
-	HeapTuple  *tuples;         /* array of currently-retrieved tuples */
-	int        num_tuples;     /* # of tuples in array */
-	int        next_tuple;     /* index of next one to return */
-
-	/* batch-level state, for optimizing rewinds and avoiding useless fetch */
-	int   fetch_ct_2;     /* Min(# of fetches done, 2) */
-	bool  eof_reached;    /* true if last fetch reached EOF */
+	int          numParams;         /* number of parameters passed to query */
+	List         *param_exprs;      /* executable expressions for param values */
+	Oid          *param_types;      /* type of query parameters */
 
 	/* working memory contexts */
 	MemoryContext batch_cxt;    /* context holding current batch of tuples */
-	MemoryContext temp_cxt;     /* context for per-tuple temporary data */
 } HDFSFdwScanState;
 
 /* Callback argument for ec_member_matches_foreign */
@@ -174,29 +148,31 @@ extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
 extern void deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_attrs);
 extern void deparseStringLiteral(StringInfo buf, const char *val);
 
-List *hdfs_desc_query(int con_index, hdfs_opt *opt);
-
 void hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt);
 void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf,
 						PlannerInfo *root, RelOptInfo *baserel,
 						HDFSFdwRelationInfo *fpinfo);
 void hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt);
-
+double hdfs_find_row_count(char *src);
 int hdfs_get_column_count(int con_index, hdfs_opt *opt);
 int hdfs_fetch(int con_index, hdfs_opt *opt);
 char* hdfs_get_field_as_cstring(int con_index, hdfs_opt *opt, int idx, bool *is_null);
 
 Datum hdfs_get_value(int con_index, hdfs_opt *opt, Oid pgtyp, int pgtypmod,
-					int idx, bool *is_null, int col_type);
+					int idx, bool *is_null);
 
 bool hdfs_query_execute(int con_index, hdfs_opt *opt, char *query);
+bool hdfs_query_prepare(int con_index, hdfs_opt *opt, char *query);
+bool hdfs_execute_prepared(int con_index);
 bool hdfs_query_execute_utility(int con_index, hdfs_opt *opt, char *query);
 void hdfs_close_result_set(int con_index, hdfs_opt *opt);
+void hdfs_rewind_result_set(int con_index, hdfs_opt *opt);
 
 double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 					RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
 double hdfs_describe(int con_index, hdfs_opt *opt);
 void hdfs_analyze(int con_index, hdfs_opt *opt);
+bool hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull);
 
 extern void _PG_init(void);
 extern void _PG_fini(void);

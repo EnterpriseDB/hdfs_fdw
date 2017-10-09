@@ -34,6 +34,8 @@
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
+#include "utils/date.h"
+#include "utils/datetime.h"
 
 
 /*
@@ -267,8 +269,17 @@ foreign_expr_walker(Node *node,
 			break;
 		case T_Param:
 			{
-				/* We are not supporting param push down*/
-				return false;
+				Param	   *p = (Param *) node;
+
+				/*
+				 * Collation rule is same as for Consts and non-foreign Vars.
+				 */
+				collation = p->paramcollid;
+				if (collation == InvalidOid ||
+					collation == DEFAULT_COLLATION_OID)
+					state = FDW_COLLATE_NONE;
+				else
+					state = FDW_COLLATE_UNSAFE;
 			}
 			break;
 		case T_ArrayRef:
@@ -628,11 +639,16 @@ hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
 					RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
 {
 	List *params_list = NIL;
-	appendStringInfo(buf, "SELECT COUNT(*) FROM ");
-	appendStringInfo(buf, "%s.%s", opt->dbname, opt->table_name);
-	if (fpinfo->remote_conds)
-		hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds, true, &params_list);
-
+	appendStringInfo(buf, "EXPLAIN SELECT * FROM ");
+	appendStringInfo(buf, "%s", opt->table_name);
+	/*
+	 * For accurate row counts we should append where clauses
+	 * with the statement, but if where clause is parameterized
+	 * we should handle it the way pg fdw does
+	 * TODO
+	 * if (fpinfo->remote_conds)
+	 * 	hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds, true, &params_list);
+	 */
 }
 
 void
@@ -1069,6 +1085,25 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 
 	switch (node->consttype)
 	{
+		case DATEOID:
+			appendStringInfo(buf, "'%s'", extval);
+			break;
+		case TIMEOID:
+			appendStringInfo(buf, "'%s'", extval);
+			break;
+		case TIMESTAMPOID:
+			appendStringInfo(buf, "'%s'", extval);
+			break;
+		case TIMESTAMPTZOID:
+			appendStringInfo(buf, "'%s'", extval);
+			break;
+		case INTERVALOID:
+			appendStringInfo(buf, "'%s'", extval);
+			break;
+		case TIMETZOID:
+			appendStringInfo(buf, "'%s'", extval);
+			break;
+
 		case INT2OID:
 		case INT4OID:
 		case INT8OID:
@@ -1092,7 +1127,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 			deparseStringLiteral(buf, extval);
 			break;
 	}
-
 }
 
 /*
@@ -1601,7 +1635,7 @@ printRemoteParam(int paramindex, Oid paramtype, int32 paramtypmod,
 	StringInfo	buf = context->buf;
 	char	   *ptypename = format_type_with_typemod(paramtype, paramtypmod);
 
-	appendStringInfo(buf, "$%d", paramindex);
+	appendStringInfo(buf, "?");
 }
 
 /*

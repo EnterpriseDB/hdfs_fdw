@@ -1,6 +1,7 @@
 .PHONY : clean
 
-CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(JDK_INCLUDE) -I$(JDK_INCLUDE)/linux/ -Ijdbc
+PG_INC_PATH=$(shell pg_config --includedir-server)
+CPPFLAGS= -Wno-unused-variable -fPIC -Wall -g -I$(PG_INC_PATH) -I$(JDK_INCLUDE) -I$(JDK_INCLUDE)/linux/ -Ijdbc
 LDFLAGS:= $(LDFLAGS) -shared
 
 JDBC =	 jdbc/hiveclient.cpp jdbc/data.cpp

@@ -44,7 +44,7 @@ hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt)
 			(errcode(ERRCODE_FDW_OUT_OF_MEMORY),
 				errmsg("failed to initialize the HDFS connection object (%s)", err_buf)));
 
-	ereport(DEBUG1, (errmsg("HDFS_FDW: connection opened %d", conn)));
+	ereport(DEBUG1, (errmsg("hdfs_fdw: connection opened %d", conn)));
 
 	return conn;
 }
@@ -63,5 +63,5 @@ hdfs_rel_connection(int con_index)
 			(errcode(ERRCODE_FDW_OUT_OF_MEMORY),
 				errmsg("failed to close HDFS connection object")));
 
-	ereport(DEBUG1, (errmsg("HDFS_FDW: connection closed %d", con_index)));
+	ereport(DEBUG1, (errmsg("hdfs_fdw: connection closed %d", con_index)));
 }

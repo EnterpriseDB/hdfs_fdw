@@ -18,6 +18,72 @@
 #include "libhive/jdbc/hiveclient.h"
 #include "hdfs_fdw.h"
 
+/*
+ * In order to get number of rows in a hive table we use
+ * explain select * from names_tab;
+ * It produces a result similar to the following
++--------------------------------------------------------------------------------------------+--+
+|                                          Explain                                           |
++--------------------------------------------------------------------------------------------+--+
+| STAGE DEPENDENCIES:                                                                        |
+|   Stage-0 is a root stage                                                                  |
+|                                                                                            |
+| STAGE PLANS:                                                                               |
+|   Stage: Stage-0                                                                           |
+|     Fetch Operator                                                                         |
+|       limit: -1                                                                            |
+|       Processor Tree:                                                                      |
+|         TableScan                                                                          |
+|           alias: names_tab                                                                 |
+|           Statistics: Num rows: 10 Data size: 36 Basic stats: PARTIAL Column stats: NONE   |
+|           Select Operator                                                                  |
+|             expressions: id (type: int), name (type: string)                               |
+|             outputColumnNames: _col0, _col1                                                |
+|             Statistics: Num rows: 10 Data size: 36 Basic stats: PARTIAL Column stats: NONE |
+|             ListSink                                                                       |
+|                                                                                            |
++--------------------------------------------------------------------------------------------+--+
+17 rows selected (0.706 seconds)
+ *
+ * In order to extract number of rows from this output,
+ * each row of explain output is sent one by one to this function.
+ * The function tries to find the keyword "Statistics: Num rows:"
+ * in each row, if the row does not contain any such keyword
+ * it is rejected. Otherwise the characters from the line are
+ * picked right after the keyword and till a space is encountered.
+ * The characters are then converted to a float, and is used
+ * as row count.
+ */
+
+double
+hdfs_find_row_count(char *src)
+{
+	char	rc[100];
+	int	i;
+
+	memset(rc, 0, 100);
+	if (src == NULL || strlen(src) < 80)
+		return 0;
+
+	/* does the passed line of explain output contain the keyword? */
+	if (strstr(src, "          Statistics: Num rows: ") == NULL)
+		return 0;
+
+	/* copy characters after the keyword in the line */
+	strncpy(rc, src + 32, 80);
+
+	/* separate the characters till space is found in the line */
+	for (i = 0; i < 50; i++)
+	{
+		if (rc[i] == ' ')
+		{
+			rc[i] = '\0';
+			return atof(rc);
+		}
+	}
+	return 0;
+}
+
 double
 hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 				RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
@@ -25,19 +91,41 @@ hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 	bool            is_null;
 	char            *value = NULL;
 	int             idx = 0;
-	double          rows = 0;
+	double          rows = 1000.0;
 	StringInfoData  sql;
+	int		i;
+	double		rc;
 
 	initStringInfo(&sql);
 	hdfs_deparse_explain(opt, &sql, root, baserel, fpinfo);
-
 	hdfs_query_execute(con_index, opt, sql.data);
-	if (hdfs_fetch(con_index, opt) == 0)
+
+	rc = 0.0;
+	while (1)
 	{
-		value = hdfs_get_field_as_cstring(con_index, opt, idx, &is_null);
-		if (!is_null)
-			rows = atof(value);
-		pfree(value);
+		if (hdfs_fetch(con_index, opt) == 0)
+		{
+			value = hdfs_get_field_as_cstring(con_index, opt, idx, &is_null);
+			if (!is_null)
+			{
+				rc = hdfs_find_row_count(value);
+				if (rc != 0.0)
+				{
+					/*
+					 * Any value below 1000 is going to caluse materilization
+					 * step to be skipped from the plan, which is very
+					 * crucial to avoid requery in rescan
+					 */
+					if (rc > 1000)
+						rows = rc;
+					break;
+				}
+			}
+		}
+		else
+		{
+			break;
+		}
 	}
 	hdfs_close_result_set(con_index, opt);
 	return rows;
@@ -56,102 +144,6 @@ hdfs_analyze(int con_index, hdfs_opt *opt)
 		hdfs_query_execute_utility(con_index, opt, sql.data);
 	hdfs_close_result_set(con_index, opt);
 }
-
-List *
-hdfs_desc_query(int con_index, hdfs_opt *opt)
-{
-	char            *value;
-	double          rows = 0;
-	StringInfoData  sql;
-	int             i = 0;
-	int             count;
-	bool            is_null;
-	int             found = 0;
-	List            *col_list = NULL;
-	hdfs_column     *cols;
-	char            *col_type = NULL;
-
-	initStringInfo(&sql);
-
-	appendStringInfo(&sql, "DESC %s", opt->table_name);
-	hdfs_query_execute(con_index, opt, sql.data);
-
-	elog(DEBUG1, "Remote Describe SQL: %s", sql.data);
-
-	while (hdfs_fetch(con_index, opt) == 0)
-	{
-		cols = palloc0(sizeof(hdfs_column));
-		cols->col_name = hdfs_get_field_as_cstring(con_index, opt, 0, &is_null);
-		if (is_null)
-			continue;
-		col_type = hdfs_get_field_as_cstring(con_index, opt, 1, &is_null);
-		if (col_type == NULL || is_null)
-			continue;
-
-		if (strcasecmp(col_type, "TINYINT") == 0)
-			cols->col_type = HDFS_TINYINT;
-
-		else if (strcasecmp(col_type, "SMALLINT") == 0)
-			cols->col_type = HDFS_SMALLINT;
-
-		else if (strcasecmp(col_type, "INT") == 0)
-			cols->col_type = HDFS_INT;
-
-		else if (strcasecmp(col_type, "double") == 0)
-			cols->col_type = HDFS_DOUBLE;
-
-		else if (strcasecmp(col_type, "BIGINT") == 0)
-			cols->col_type = HDFS_BIGINT;
-
-		else if (strcasecmp(col_type, "Boolean") == 0)
-			cols->col_type = HDFS_BOLEAN;
-
-		else if (strcasecmp(col_type, "String") == 0)
-			cols->col_type = HDFS_STRING;
-
-		else if (strcasecmp(col_type, "Varchar") == 0)
-			cols->col_type = HDFS_VARCHAR;
-
-		else if (strcasecmp(col_type, "CHAR") == 0)
-			cols->col_type = HDFS_CHAR;
-
-		else if (strstr(col_type, "char") != 0)
-			cols->col_type = HDFS_CHAR;
-
-		else if (strcasecmp(col_type, "Timestamps") == 0)
-			cols->col_type = HDFS_TIMESTAMPS;
-
-		else if (strcasecmp(col_type, "timestamp") == 0)
-			cols->col_type = HDFS_TIMESTAMPS;
-
-		else if (strcasecmp(col_type, "Decimal") == 0)
-			cols->col_type = HDFS_DECIMAL;
-
-		else if (strstr(col_type, "decimal") != 0)
-			cols->col_type = HDFS_DECIMAL;
-
-		else if (strcasecmp(col_type, "Date") == 0)
-			cols->col_type = HDFS_DATE;
-
-		else if (strstr(col_type, "varchar") != 0)
-			cols->col_type = HDFS_VARCHAR;
-
-		else
-		{
-			hdfs_close_result_set(con_index, opt);
-			hdfs_rel_connection(con_index);
-
-			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
-				errmsg("unsupported Hive data type"),
-					errhint("Supported data types are TINYINT, SMALLINT, INT, BIGINT, BOOLEAN, DOUBLE, STRING, CHAR, TIMESTAMP, DECIMAL, DATE and VARCHAR: %s", col_type)));
-
-		}
-		col_list = lappend(col_list, cols);
-	}
-	hdfs_close_result_set(con_index, opt);
-	return col_list;
-}
-
 
 double
 hdfs_describe(int con_index, hdfs_opt *opt)

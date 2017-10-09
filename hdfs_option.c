@@ -74,6 +74,8 @@ static struct HDFSFdwOption valid_options[] =
 	{ "use_remote_estimate", ForeignServerRelationId },
 	{ "query_timeout",       ForeignServerRelationId },
 	{ "connect_timeout",     ForeignServerRelationId },
+	{ "fetch_size",          ForeignServerRelationId },
+	{ "log_remote_sql",      ForeignServerRelationId },
 	{ NULL,                  InvalidOid }
 };
 
@@ -168,6 +170,8 @@ hdfs_get_options(Oid foreigntableid)
 
 	opt->receive_timeout = 1000 * 300;  /* Default timeout is 300 seconds */
 	opt->connect_timeout = 1000 * 300;  /* Default timeout is 300 seconds */
+	opt->fetch_size = 10000;			/* Default fetch size */
+	opt->log_remote_sql = false;
 
 	/*
 	 * Extract options from FDW objects.
@@ -247,8 +251,14 @@ hdfs_get_options(Oid foreigntableid)
 			}
 		}
 
+		if (strcmp(def->defname, "log_remote_sql") == 0)
+			opt->log_remote_sql = defGetBoolean(def);
+
 		if (strcmp(def->defname, "use_remote_estimate") == 0)
 			opt->use_remote_estimate = defGetBoolean(def);
+
+		if (strcmp(def->defname, "fetch_size") == 0)
+			opt->fetch_size = atoi(defGetString(def));
 
 		if (strcmp(def->defname, "query_timeout") == 0)
 		{
