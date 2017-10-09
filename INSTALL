@@ -85,7 +85,23 @@
   
       `hdfs_fdw/test/insert_hive.sh`
 
-  4.  Execute the Regression using the following command.
+  4.  In the terminal where Regression will be executed, set following envirement variables using export command.
+      
+      HIVE_SERVER
+      HIVE_PORT
+      HIVE_USER  (LDAP User when HiveServer running with LDAP Mode, empty when HiveServer running with NOSASL Mode)
+      HIVE_PASSWORD
+      AUTH_TYPE (ldap when HiveServer running with LDAP Mode, nosasl when HiveServer running with NOSASL Mode)
+
+      e.g
+
+      export HIVE_SERVER='127.0.0.1'
+      export HIVE_PORT='10000'
+      export HIVE_USER='kzeeshan'
+      export HIVE_PASSWORD='edb'
+      export AUTH_TYPE='ldap'
+
+  5.  Execute the Regression using the following command.
   
       `hdfs_fdw/make installcheck`
 
