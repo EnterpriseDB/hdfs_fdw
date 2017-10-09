@@ -24,7 +24,7 @@
  
 --possible values ldap/nosasl
 
-\set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'`           
+\set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'`
 
 
 -- Create the database.
