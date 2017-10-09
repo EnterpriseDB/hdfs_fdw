@@ -21,7 +21,11 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
-\set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'`            --possible values ldap/nosasl
+ 
+--possible values ldap/nosasl
+
+\set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'`           
+
 
 -- Create the database.
 
