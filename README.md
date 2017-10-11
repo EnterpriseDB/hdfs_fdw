@@ -50,6 +50,9 @@ While creating the foreign server object for HDFS FDW the following can be speci
     * `auth_type`:  NOSASL or LDAP. Specify which authentication type is required while connecting to the Hive or Spark server. Default is unspecified and the FDW uses the username option in the user mapping to infer the auth_type. If the username is empty or not specified it uses NOSASL otherwise it uses LDAP.
     * `connect_timeout`:  Connection timeout, default value is 300 seconds.
     * `query_timeout`:  Query timeout is not supported by the Hive JDBC driver.
+    * `fetch_size`:  A user-specified value that is provided as a parameter to the JDBC API setFetchSize . The default value is 10,000..
+    * `log_remote_sql`:  If true , logging will include SQL commands executed on the remote hive server and the number of times that a scan is repeated. The default is false.
+    * `use_remote_estimate`:  Include the use_remote_estimate to instruct the server to use EXPLAIN commands on the remote server when estimating processing costs. By default, use_remote_estimate is false, and remote tables are assumed to have 1000 rows.
   
 HDFS can be used through either Hive or Spark. In this case both Hive and Spark store metadata in the configured metastore. In the metastore databases and tables can be created using HiveQL. While creating foreign table object for the foreign server the following can be specified in options:
   
@@ -382,7 +385,83 @@ How to build
   See the file INSTALL for instructions on how to build and install
   the extension and it's dependencies. 
   
+  
     
+Results of running TPC-H benchmark
+-----
+The TPCH is an OLAP benchmark and very well suited for HDFS FDW testing.
+It consist of complex queries performing joins across Hive and EDBAS, aggregates and sort operations.The TPCH results shown below are for the test carried out with couple of GB's of data, the HDFS_FDW is currently not ready to run these complex queries with very large volume of data. This might be doable in the next release of HDFS_FDW where we add further push down capabilities to HDFS_FDW, these capabilities will include join, aggregate, sort and other push down functionality that is part of PG FDW machinery. Currently HDFS_FDW is only pushing down where clause and select target list. 
+
+In order to run the TPC-H queries the following steps were performed
+
+ 1. Install Hadoop, Hive & beeline on one AWS instance,
+    Install EDB Postgres and HDFS_FDW on another AWS instance.
+ 2. Modify postgresql.conf
+    *) edb_redwood_date has to be set to off to make sure EDBAS does not
+       translate DATE to TIMESTAMP. If the translation happens EDBAS makes
+       '1995-03-15' → '1995-03-15 00:00:00'
+       making date comparisons produce wrong results.
+    *) datestyle = 'iso, dmy'
+ 3. Build TPC-H to get utilities dbgen and qgen
+ 4. Use dbgen to generate data files
+     ./dbgen -vf -s 1
+ 5. Use qgen to generate query files
+     ./qgen -a -d
+ 6. Create tables supplier, part, partsupp, customer, nation & region in EDBAS.
+ 7. Load data in the above tables using COPY command and data files generated in step 4.
+ 8. Create Indexes.
+ 9. Create Foreign Keys
+ 10. Create tables in Hive: orders, lineitem.
+ 11. Load data in hive tables.
+ 12. Create extension.
+ 13. Create Foreign server
+     CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS (
+                           host 'xx.yy.zz.aa',
+                           use_remote_estimate 'true',
+                           fetch_size '100000',
+                           log_remote_sql 'true');
+ 14. Create user mapping
+ 15. Create foreign tables.
+ 16. Run the queries using command similar to:
+    ./edb-psql -U enterprisedb tpch --file=/tmp/q/q01.sql
+                                    --output=/tmp/qr/q01.out
+
+    Results of running the test are as follows:
+    
+    First column contains TPC-H query number.
+    Second column contains time taken by the query when run by creating all tables on EDBAS.
+    Third column contains the time taken by the query when run by shifting orders and lineitem table to hive and queried through the FDW foreign tables.
+
+
+    
+    +---------+--------------+-----------------+
+    | Query   | EDBAS        | HDFS_FDW & Hive |
+    +---------+--------------+-----------------+
+    | q01.sql | 11133.314 ms |   142025.891 ms |
+    | q02.sql |   475.662 ms |      456.878 ms |
+    | q03.sql |  1766.410 ms |    63910.958 ms |
+    | q04.sql |   528.400 ms |    39178.100 ms |
+    | q05.sql |   675.116 ms |   101228.701 ms |
+    | q06.sql |  1403.158 ms |    12842.752 ms |
+    | q07.sql |   830.123 ms |    63667.713 ms |
+    | q08.sql |   297.577 ms |   136960.311 ms |
+    | q09.sql |  1728.352 ms | Too long        |
+    | q10.sql |  1156.813 ms |    29011.168 ms |
+    | q11.sql |    86.869 ms |       97.651 ms |
+    | q12.sql |   690.191 ms |    27728.749 ms |
+    | q13.sql |  1297.897 ms |    17865.871 ms |
+    | q14.sql |  1348.768 ms |    11676.062 ms |
+    | q15.sql |  2703.175 ms |    26029.393 ms |
+    | q16.sql |   925.071 ms |      937.924 ms |
+    | q17.sql |    28.979 ms | Too long        |
+    | q18.sql |  4015.639 ms |   197237.092 ms |
+    | q19.sql |    25.906 ms |    12822.285 ms |
+    | q20.sql |   103.492 ms | Too long        |
+    | q21.sql |  1714.323 ms |   159932.527 ms |
+    | q22.sql |    85.349 ms |    12200.344 ms |
+    +---------+--------------+---------------- +
+  
+
   
 TODO
 ----
