@@ -93,7 +93,7 @@ int Destroy(void);
 int DBOpenConnection(char *host, int port, char *databaseName,
 					char *username, char *password,
 					int connectTimeout, int receiveTimeout,
-					AUTH_TYPE auth_type, char **errBuf);
+					AUTH_TYPE auth_type, CLIENT_TYPE client_type, char **errBuf);
 
 /**
  * @brief Disconnect from a Hive database.

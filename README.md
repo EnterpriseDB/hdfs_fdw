@@ -46,7 +46,7 @@ While creating the foreign server object for HDFS FDW the following can be speci
   
     * `host`: IP Address or hostname of the Hive Thrift Server OR Spark Thrift Server. Defaults to `127.0.0.1`
     * `port`: Port number of the Hive Thrift Server OR Spark Thrift Server. Defaults to `10000`
-    * `client_type`:  hiveserver2 or spark. Hive and Spark both support HiveQL and are compatible but ANALYZE command behaves differently. Default is hiveserver2 and will work with Spark too except the ANALYZE command.
+    * `client_type`:  hiveserver2 or spark. Hive and Spark both support HiveQL and are compatible but there are few differences like the behaviour of ANALYZE command and connection string for the NOSASL case.
     * `auth_type`:  NOSASL or LDAP. Specify which authentication type is required while connecting to the Hive or Spark server. Default is unspecified and the FDW uses the username option in the user mapping to infer the auth_type. If the username is empty or not specified it uses NOSASL otherwise it uses LDAP.
     * `connect_timeout`:  Connection timeout, default value is 300 seconds.
     * `query_timeout`:  Query timeout is not supported by the Hive JDBC driver.
@@ -259,7 +259,7 @@ Using HDFS FDW with Apache Spark on top of Hadoop
         OPTIONS (dbname 'testdb', table_name 'my_names_tab');
     ```
   
-Please note that we are using the same port while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark except for the ANALYZE command. It is better to use ALTER SERVER and change the client_type option if Hive is to be replaced with Spark.
+Please note that we are using the same port while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark except for the behaviour of ANALYZE command and the connection string in case of NOSASL. It is better to use ALTER SERVER and change the client_type option if Hive is to be replaced with Spark.
 
 5. Download & install Apache Spark in local mode
 
