@@ -205,7 +205,7 @@ int Initialize()
 	}
 
 	g_DBOpenConnection = g_jni->GetMethodID(g_clsJdbcClient, "DBOpenConnection",
-				"(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILMsgBuf;)I");
+				"(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIILMsgBuf;)I");
 	if (g_DBOpenConnection == NULL)
 	{
 		g_jvm->DestroyJavaVM();
@@ -397,7 +397,7 @@ int Destroy()
 int DBOpenConnection(char *host, int port, char *databaseName,
 					char *username, char *password,
 					int connectTimeout, int receiveTimeout,
-					AUTH_TYPE auth_type, char **errBuf)
+					AUTH_TYPE auth_type, CLIENT_TYPE client_type, char **errBuf)
 {
 	int rc;
 	jstring rv;
@@ -419,6 +419,7 @@ int DBOpenConnection(char *host, int port, char *databaseName,
 							connectTimeout,
 							receiveTimeout,
 							auth_type,
+							client_type,
 							g_objMsgBuf);
 
 	rv = (jstring)g_jni->CallObjectMethod(g_objMsgBuf, g_getVal);
