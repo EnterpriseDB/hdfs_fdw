@@ -245,7 +245,7 @@ int Initialize()
 		return(-30);
 	}
 
-	g_DBBindVar = g_jni->GetMethodID(g_clsJdbcClient, "DBBindVar", "(ILJDBCType;LMsgBuf;)I");
+	g_DBBindVar = g_jni->GetMethodID(g_clsJdbcClient, "DBBindVar", "(IILJDBCType;LMsgBuf;)I");
 	if (g_DBBindVar == NULL)
 	{
 		g_jvm->DestroyJavaVM();
@@ -357,7 +357,7 @@ int Initialize()
 		return(-60);
 	}
 
-	g_setDate = g_jni->GetMethodID(g_clsJDBCType, "setDate", "(Ljava/sql/Date;)V");
+	g_setDate = g_jni->GetMethodID(g_clsJDBCType, "setDate", "(Ljava/lang/String;)V");
 	if (g_setDate == NULL)
 	{
 		g_jvm->DestroyJavaVM();
@@ -365,17 +365,15 @@ int Initialize()
 		return(-62);
 	}
 
-	/*
-	g_setTime = g_jni->GetMethodID(g_clsJDBCType, "setTime", "(Ljava/util/Time;)V");
+	g_setTime = g_jni->GetMethodID(g_clsJDBCType, "setTime", "(Ljava/lang/String;)V");
 	if (g_setTime == NULL)
 	{
 		g_jvm->DestroyJavaVM();
 		g_jvm = NULL;
 		return(-64);
 	}
-	*/
 
-	g_setStamp = g_jni->GetMethodID(g_clsJDBCType, "setStamp", "(Ljava/sql/Timestamp;)V");
+	g_setStamp = g_jni->GetMethodID(g_clsJDBCType, "setStamp", "(Ljava/lang/String;)V");
 	if (g_setStamp == NULL)
 	{
 		g_jvm->DestroyJavaVM();
@@ -446,7 +444,8 @@ int DBCloseAllConnections()
 	return g_jni->CallIntMethod(g_objJdbcClient, g_DBCloseAllConnections);
 }
 
-int DBBindVar(int con_index, Oid type, void *value, bool *isnull, char **errBuf)
+int DBBindVar(int con_index, int param_index, Oid type,
+				void *value, bool *isnull, char **errBuf)
 {
 	int rc;
 	jstring rv;
@@ -520,27 +519,32 @@ int DBBindVar(int con_index, Oid type, void *value, bool *isnull, char **errBuf)
 		case JSONOID:
 		{
 			char *outputString =(char *)value;
-			g_jni->CallVoidMethod(objJDBCType, g_setString, outputString);
+			g_jni->CallVoidMethod(objJDBCType, g_setString, g_jni->NewStringUTF(outputString));
 			break;
 		}
 		case NAMEOID:
 		{
 			char *outputString = (char *)value;
-			g_jni->CallVoidMethod(objJDBCType, g_setString, outputString);
+			g_jni->CallVoidMethod(objJDBCType, g_setString, g_jni->NewStringUTF(outputString));
 			break;
 		}
 		case DATEOID:
 		{
-			Timestamp valueTimestamp = *((Timestamp *)value);
-			g_jni->CallVoidMethod(objJDBCType, g_setStamp, valueTimestamp);
+			char *valueDate =(char *)value;
+			g_jni->CallVoidMethod(objJDBCType, g_setDate, g_jni->NewStringUTF(valueDate));
 			break;
 		}
 		case TIMEOID:
+		{
+			char *valueTime =(char *)value;
+			g_jni->CallVoidMethod(objJDBCType, g_setTime, g_jni->NewStringUTF(valueTime));
+			break;
+		}
 		case TIMESTAMPOID:
 		case TIMESTAMPTZOID:
 		{
-			Timestamp valueTimestamp = *((Timestamp *)value);
-			g_jni->CallVoidMethod(objJDBCType, g_setStamp, valueTimestamp);
+			char *valueTimestamp =(char *)value;
+			g_jni->CallVoidMethod(objJDBCType, g_setStamp, g_jni->NewStringUTF(valueTimestamp));
 			break;
 		}
 		case BITOID:
@@ -560,6 +564,7 @@ int DBBindVar(int con_index, Oid type, void *value, bool *isnull, char **errBuf)
 
 	rc = g_jni->CallIntMethod(g_objJdbcClient, g_DBBindVar,
 							con_index,
+							param_index,
 							objJDBCType,
 							g_objMsgBuf);
 	if (rc < 0)

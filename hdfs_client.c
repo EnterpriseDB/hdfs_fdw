@@ -212,7 +212,8 @@ hdfs_query_execute_utility(int con_index, hdfs_opt *opt, char *query)
 }
 
 bool
-hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
+hdfs_bind_var(int con_index, int param_index, Oid type,
+					Datum value, bool *isnull)
 {
 	char	*err = "unknown";
 	char	*err_buf = err;
@@ -231,38 +232,38 @@ hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
 		case INT2OID:
 		{
 			int16 dat = DatumGetInt16(value);
-			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &dat, isnull, &err_buf);
 			break;
 		}
 		case INT4OID:
 		{
 			int32 dat = DatumGetInt32(value);
-			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &dat, isnull, &err_buf);
 			break;
 		}
 		case INT8OID:
 		{
 			int64 dat = DatumGetInt64(value);
-			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &dat, isnull, &err_buf);
 			break;
 		}
 		case FLOAT4OID:
 		{
 			float4 dat = DatumGetFloat4(value);
-			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &dat, isnull, &err_buf);
 			break;
 		}
 		case FLOAT8OID:
 		{
 			float8 dat = DatumGetFloat8(value);
-			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &dat, isnull, &err_buf);
 			break;
 		}
 		case NUMERICOID:
 		{
 			Datum valueDatum = DirectFunctionCall1(numeric_float8, value);
 			float8 dat = DatumGetFloat8(valueDatum);
-			ret = DBBindVar(con_index, type, &dat, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &dat, isnull, &err_buf);
 			break;
 		}
 		case BOOLOID:
@@ -273,7 +274,7 @@ hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
 				v = false;
 			else
 				v = true;
-			ret = DBBindVar(con_index, type, &v, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &v, isnull, &err_buf);
 			break;
 		}
 
@@ -287,7 +288,7 @@ hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
 			bool typeVarLength = false;
 			getTypeOutputInfo(type, &outputFunctionId, &typeVarLength);
 			outputString = OidOutputFunctionCall(outputFunctionId, value);
-			ret = DBBindVar(con_index, type, outputString, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, outputString, isnull, &err_buf);
 			break;
 		}
 		case NAMEOID:
@@ -297,24 +298,71 @@ hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
 			bool typeVarLength = false;
 			getTypeOutputInfo(type, &outputFunctionId, &typeVarLength);
 			outputString = OidOutputFunctionCall(outputFunctionId, value);
-			ret = DBBindVar(con_index, type, outputString, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, outputString, isnull, &err_buf);
 			break;
 		}
 		case DATEOID:
 		{
-			Datum valueDatum = DirectFunctionCall1(date_timestamp, value);
-			Timestamp valueTimestamp = DatumGetTimestamp(valueDatum);
-			ret = DBBindVar(con_index, type, &valueTimestamp, isnull, &err_buf);
+			Datum			valueDatum = DirectFunctionCall1(date_timestamp, value);
+			Timestamp		valueTimestamp = DatumGetTimestamp(valueDatum);
+			struct pg_tm	tt, *tm = &tt;
+			fsec_t			fsec;
+			char			buf[101];
+
+			if (timestamp2tm(valueTimestamp, NULL, tm, &fsec, NULL, NULL) != 0)
+			{
+				ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+						errmsg("error bindintg parameter"),
+						errhint("Parameter type: %u", type)));
+			}
+			memset(buf, 0, 101);
+			snprintf(buf,100, "%d-%d-%d",
+			tm->tm_year, tm->tm_mon, tm->tm_mday);
+			ret = DBBindVar(con_index, param_index, type, buf, isnull, &err_buf);
 			break;
 		}
 		case TIMEOID:
+		{
+			Timestamp		valueTimestamp = DatumGetTimestamp(value);
+			struct pg_tm	tt, *tm = &tt;
+			fsec_t			fsec;
+			char			buf[101];
+
+			if (timestamp2tm(valueTimestamp, NULL, tm, &fsec, NULL, NULL) != 0)
+			{
+				ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+						errmsg("error bindintg parameter"),
+						errhint("Parameter type: %u", type)));
+			}
+			memset(buf, 0, 101);
+			snprintf(buf,100, "%d:%d:%d",
+			tm->tm_hour, tm->tm_min, tm->tm_sec);
+			ret = DBBindVar(con_index, param_index, type, buf, isnull, &err_buf);
+			break;
+		}
+
 		case TIMESTAMPOID:
 		case TIMESTAMPTZOID:
 		{
-			Timestamp valueTimestamp = DatumGetTimestamp(value);
-			ret = DBBindVar(con_index, type, &valueTimestamp, isnull, &err_buf);
+			Timestamp		valueTimestamp = DatumGetTimestamp(value);
+			struct pg_tm	tt, *tm = &tt;
+			fsec_t			fsec;
+			char			buf[101];
+
+			if (timestamp2tm(valueTimestamp, NULL, tm, &fsec, NULL, NULL) != 0)
+			{
+				ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
+						errmsg("error bindintg parameter"),
+						errhint("Parameter type: %u", type)));
+			}
+			memset(buf, 0, 101);
+			snprintf(buf,100, "%d-%d-%d %d:%d:%d.%d",
+			tm->tm_year, tm->tm_mon, tm->tm_mday,
+			tm->tm_hour, tm->tm_min, tm->tm_sec,fsec);
+			ret = DBBindVar(con_index, param_index, type, buf, isnull, &err_buf);
 			break;
 		}
+
 		case BITOID:
 		{
 			char *outputString = NULL;
@@ -328,7 +376,7 @@ hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull)
 				v = false;
 			else
 				v = true;
-			ret = DBBindVar(con_index, type, &v, isnull, &err_buf);
+			ret = DBBindVar(con_index, param_index, type, &v, isnull, &err_buf);
 
 			break;
 		}

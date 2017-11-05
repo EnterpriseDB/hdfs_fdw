@@ -172,7 +172,8 @@ double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 					RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
 double hdfs_describe(int con_index, hdfs_opt *opt);
 void hdfs_analyze(int con_index, hdfs_opt *opt);
-bool hdfs_bind_var(int con_index, Oid type, Datum value, bool *isnull);
+bool hdfs_bind_var(int con_index, int param_index, Oid type,
+								Datum value, bool *isnull);
 
 extern void _PG_init(void);
 extern void _PG_fini(void);

@@ -286,6 +286,7 @@ int DBGetFieldAsCString(int con_index, int columnIdx, char **buffer, char **errB
  * The function keeps track of the parameter number itself.
  *
  * @param index          Index of the result set object to use.
+ * @param param_index    One based Index of the param to bind.
  * @param type           PG Type of the parameter.
  * @param value          PG value of the parameter.
  * @param isnull         Is value to be bound a null.
@@ -296,7 +297,7 @@ int DBGetFieldAsCString(int con_index, int columnIdx, char **buffer, char **errB
  * @return Any negative value indicates an error, 0 means success.
  *         Error messages will be stored in errBuf.
  */
-int DBBindVar(int con_index, Oid type, void *value, bool *isnull, char **errBuf);
+int DBBindVar(int con_index, int param_index, Oid type, void *value, bool *isnull, char **errBuf);
 
 #ifdef __cplusplus
 } // extern "C"

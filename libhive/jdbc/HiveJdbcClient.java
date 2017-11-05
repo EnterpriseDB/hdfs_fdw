@@ -56,7 +56,6 @@ public class HiveJdbcClient
 	private MsgBuf[]			m_host;
 	private int[]				m_port;
 	private MsgBuf[]			m_user;
-	private int[]				m_paramIndex;
 	private int[]				m_fetchCount;
 	private int[]				m_tempCount;
 
@@ -100,7 +99,6 @@ public class HiveJdbcClient
 			m_port = new int[m_nestingLimit];
 			m_user = new MsgBuf[m_nestingLimit];
 
-			m_paramIndex = new int[m_nestingLimit];
 			m_fetchCount = new int[m_nestingLimit];
 			m_tempCount = new int[m_nestingLimit];
 
@@ -113,7 +111,6 @@ public class HiveJdbcClient
 				m_isFree[i] = true;
 				m_host[i] = new MsgBuf("xxx.xxx.xxx.xxx or localhost");
 				m_port[i] = 0;
-				m_paramIndex[i] = 0;
 				m_fetchCount[i] = 0;
 				m_tempCount[i] = 0;
 
@@ -390,10 +387,8 @@ public class HiveJdbcClient
 		{
 			m_preparedStatement[index] = m_hdfsConnection[index].prepareStatement(query);
 			m_preparedStatement[index].setFetchSize(maxRows);
-			m_paramIndex[index] = 1;
 			m_fetchCount[index] = 0;
 			m_tempCount[index] = 0;
-
 			/* TODO This method is not supported */
 //			m_preparedStatement[index].setQueryTimeout(m_queryTimeout);
 		}
@@ -417,12 +412,11 @@ public class HiveJdbcClient
 			}
 			return (-4);
 		}
-
 		return (0);
 	}
 
 	/* singature will be (ILJDBCType;LMsgBuf;)I */
-	public int DBBindVar(int index, JDBCType paramToBind, MsgBuf errBuf)
+	public int DBBindVar(int index, int paramIndex, JDBCType paramToBind, MsgBuf errBuf)
 	{
 		if (m_isDebug)
 			System.out.println("HiveJdbcClient::DBBind");
@@ -489,42 +483,39 @@ public class HiveJdbcClient
 				return (-4);
 			}
 		}
-
 		try
 		{
 			switch (paramToBind.getType())
 			{
 				case 1:
-					m_preparedStatement[index].setBoolean(m_paramIndex[index]++, paramToBind.getBool());
+					m_preparedStatement[index].setBoolean(paramIndex, paramToBind.getBool());
 					break;
 				case 2:
-					m_preparedStatement[index].setShort(m_paramIndex[index]++, paramToBind.getShort());
+					m_preparedStatement[index].setShort(paramIndex, paramToBind.getShort());
 					break;
 				case 3:
-					m_preparedStatement[index].setInt(m_paramIndex[index]++, paramToBind.getInt());
+					m_preparedStatement[index].setInt(paramIndex, paramToBind.getInt());
 					break;
 				case 4:
-					m_preparedStatement[index].setLong(m_paramIndex[index]++, paramToBind.getLong());
+					m_preparedStatement[index].setLong(paramIndex, paramToBind.getLong());
 					break;
 				case 5:
-					m_preparedStatement[index].setDouble(m_paramIndex[index]++, paramToBind.getDoub());
+					m_preparedStatement[index].setDouble(paramIndex, paramToBind.getDoub());
 					break;
 				case 6:
-					m_preparedStatement[index].setFloat(m_paramIndex[index]++, paramToBind.getFloat());
+					m_preparedStatement[index].setFloat(paramIndex, paramToBind.getFloat());
 					break;
 				case 7:
-					m_preparedStatement[index].setString(m_paramIndex[index]++, paramToBind.getString());
+					m_preparedStatement[index].setString(paramIndex, paramToBind.getString());
 					break;
 				case 8:
-					m_preparedStatement[index].setDate(m_paramIndex[index]++, paramToBind.getDate());
+					m_preparedStatement[index].setDate(1, paramToBind.getDate());
 					break;
-				/*
 				case 9:
-					m_preparedStatement[index].setTime(m_paramIndex[index]++, paramToBind.getTime());
+					m_preparedStatement[index].setTime(paramIndex, paramToBind.getTime());
 					break;
-				*/
 				case 10:
-					m_preparedStatement[index].setTimestamp(m_paramIndex[index]++, paramToBind.getStamp());
+					m_preparedStatement[index].setTimestamp(paramIndex, paramToBind.getStamp());
 					break;
 			}
 		}
@@ -975,4 +966,3 @@ public class HiveJdbcClient
 		return (val.length());
 	}
 }
-

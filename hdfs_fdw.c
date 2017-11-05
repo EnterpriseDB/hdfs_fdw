@@ -758,10 +758,10 @@ process_query_params(int con_index,
 					List *param_exprs,
 					Oid *param_types)
 {
-	int			i;
+	int			param_index;
 	ListCell	*lc;
 
-	i = 0;
+	param_index = 0;
 	foreach(lc, param_exprs)
 	{
 		ExprState               *expr_state = (ExprState *) lfirst(lc);
@@ -774,8 +774,8 @@ process_query_params(int con_index,
 #else
 		expr_value = ExecEvalExpr(expr_state, econtext, &isNull, NULL);
 #endif
-		hdfs_bind_var(con_index, param_types[i], expr_value, &isNull);
-		i++;
+		hdfs_bind_var(con_index, param_index + 1, param_types[param_index],
+									expr_value, &isNull);
+		param_index++;
 	}
 }
-

@@ -13,6 +13,7 @@
 
 import java.lang.String;
 import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 
 public class JDBCType
@@ -44,7 +45,7 @@ public class JDBCType
 
 	private String		m_stringVal;
 	private Date		m_dateVal;
-//	private Time		m_timeVal;
+	private Time		m_timeVal;
 	private Timestamp	m_stampVal;
 
 	public JDBCType(int typ)
@@ -101,20 +102,23 @@ public class JDBCType
 		m_jdbcType = m_stringType;
 	}
 
-	public void setDate(Date x)
+	public void setDate(String s)
 	{
+		Date x = Date.valueOf(s);
 		m_dateVal = x;
 		m_jdbcType = m_dateType;
 	}
 
-//	public void setTime(Time x)
-//	{
-//		m_timeVal = x;
-//		m_jdbcType = m_timeType;
-//	}
-
-	public void setStamp(Timestamp x)
+	public void setTime(String s)
 	{
+		Time x = Time.valueOf(s);
+		m_timeVal = x;
+		m_jdbcType = m_timeType;
+	}
+
+	public void setStamp(String s)
+	{
+		Timestamp x = Timestamp.valueOf(s);
 		m_stampVal = x;
 		m_jdbcType = m_stampType;
 	}
@@ -160,10 +164,10 @@ public class JDBCType
 		return m_dateVal;
 	}
 
-//	public Time getTime()
-//	{
-//		return m_timeVal;
-//	}
+	public Time getTime()
+	{
+		return m_timeVal;
+	}
 
 	public Timestamp getStamp()
 	{
