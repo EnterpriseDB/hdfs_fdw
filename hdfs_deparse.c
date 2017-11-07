@@ -1034,23 +1034,9 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 		/* Treat like a Param */
 		if (context->params_list)
 		{
-			int			pindex = 0;
-			ListCell   *lc;
+			int pindex = list_length(*context->params_list) + 1;
 
-			/* find its index in params_list */
-			foreach(lc, *context->params_list)
-			{
-				pindex++;
-				if (equal(node, (Node *) lfirst(lc)))
-					break;
-			}
-			if (lc == NULL)
-			{
-				/* not in list, so add it */
-				pindex++;
-				*context->params_list = lappend(*context->params_list, node);
-			}
-
+			*context->params_list = lappend(*context->params_list, node);
 			printRemoteParam(pindex, node->vartype, node->vartypmod, context);
 		}
 		else
@@ -1133,7 +1119,7 @@ deparseConst(Const *node, deparse_expr_cxt *context)
  * Deparse given Param node.
  *
  * If we're generating the query "for real", add the Param to
- * context->params_list if it's not already present, and then use its index
+ * context->params_list, and then use its index
  * in that list as the remote parameter number.  During EXPLAIN, there's
  * no need to identify a parameter number.
  */
@@ -1142,23 +1128,8 @@ deparseParam(Param *node, deparse_expr_cxt *context)
 {
 	if (context->params_list)
 	{
-		int			pindex = 0;
-		ListCell   *lc;
-
-		/* find its index in params_list */
-		foreach(lc, *context->params_list)
-		{
-			pindex++;
-			if (equal(node, (Node *) lfirst(lc)))
-				break;
-		}
-		if (lc == NULL)
-		{
-			/* not in list, so add it */
-			pindex++;
-			*context->params_list = lappend(*context->params_list, node);
-		}
-
+		int pindex = list_length(*context->params_list) + 1;
+		*context->params_list = lappend(*context->params_list, node);
 		printRemoteParam(pindex, node->paramtype, node->paramtypmod, context);
 	}
 	else
