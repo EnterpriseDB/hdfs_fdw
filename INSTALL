@@ -92,6 +92,7 @@
       HIVE_USER  (LDAP User when HiveServer running with LDAP Mode, empty when HiveServer running with NOSASL Mode)
       HIVE_PASSWORD
       AUTH_TYPE (ldap when HiveServer running with LDAP Mode, nosasl when HiveServer running with NOSASL Mode)
+      HIVE_CLIENT_TYPE (hiveserver2 or spark)
 
       e.g
 
@@ -100,6 +101,7 @@
       export HIVE_USER='kzeeshan'
       export HIVE_PASSWORD='edb'
       export AUTH_TYPE='ldap'
+      export HIVE_CLIENT_TYPE='hiveserver2'
 
   5.  Execute the Regression using the following command.
   
