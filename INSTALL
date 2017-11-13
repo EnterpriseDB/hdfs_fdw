@@ -85,7 +85,7 @@
   
       `hdfs_fdw/test/insert_hive.sh`
 
-  4.  In the terminal where Regression will be executed, set following envirement variables using export command.
+  4.  In the terminal where Regression will be executed, set following environment variables using export command.
       
       HIVE_SERVER
       HIVE_PORT
