@@ -182,9 +182,7 @@ public class HiveJdbcClient
 				case m_authTypeUnspecified:
 					if (userName == null || userName.equals(""))
 					{
-						if (clientType == m_clientTypeHive)
-							conURL += ";auth=noSasl";
-
+						conURL += ";auth=noSasl";
 						m_hdfsConnection[index] = DriverManager.getConnection(conURL, "userName", "password");
 					}
 					else
@@ -194,9 +192,7 @@ public class HiveJdbcClient
 					break;
 
 				case m_authTypeNoSasl:
-					if (clientType == m_clientTypeHive)
-						conURL += ";auth=noSasl";
-
+					conURL += ";auth=noSasl";
 					if (userName == null || userName.equals(""))
 					{
 						errBuf.catVal("ERROR : A valid user name is required");
@@ -225,9 +221,7 @@ public class HiveJdbcClient
 				default:
 					if (userName == null || userName.equals(""))
 					{
-						if (clientType == m_clientTypeHive)
-							conURL += ";auth=noSasl";
-
+						conURL += ";auth=noSasl";
 						m_hdfsConnection[index] = DriverManager.getConnection(conURL, "userName", "password");
 					}
 					else
