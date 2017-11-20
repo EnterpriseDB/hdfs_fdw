@@ -1,0 +1,114 @@
+/*---------------------------------------------------------------------------------------------------------------------
+ *
+ * mapping.sql
+ * 		Foreign-data wrapper for remote Hadoop servers
+ *              To verify that Date comparisions are used to retrive data correctly from Hadoop Foreign Tables.
+ *
+ * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ *
+ * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ *
+ * IDENTIFICATION
+ * 		date_comparison.sql
+ *
+ *---------------------------------------------------------------------------------------------------------------------
+ */
+-- Connection Settings.
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+-- Create the database.
+CREATE DATABASE fdw_regression;
+\c fdw_regression postgres
+-- Set the Date Style
+SET datestyle TO ISO,DMY;
+-- Set the Search Path to PUBLIC Schema
+SET search_path TO public;
+-- Create Hadoop FDW Extension.
+CREATE EXTENSION hdfs_fdw;
+-- Create Hadoop FDW Server.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE);
+-- Create Hadoop USER MAPPING.
+CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+-- Create Foreign Tables.
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             INTEGER,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+SELECT * FROM emp;
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 1981-11-17 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
+(14 rows)
+
+-- Retive data based on date comparisons.
+SELECT * FROM emp
+WHERE hiredate = '1980-12-17';
+ empno | ename |  job  | mgr  |  hiredate  | sal | comm | deptno 
+-------+-------+-------+------+------------+-----+------+--------
+  7369 | SMITH | CLERK | 7902 | 1980-12-17 | 800 |      |     20
+(1 row)
+
+SELECT * FROM emp
+WHERE hiredate < '23/01/1982';
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |      | 1981-11-17 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+(11 rows)
+
+SELECT * FROM emp
+WHERE hiredate BETWEEN '20/02/1981' AND '23/01/1982';
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |      | 1981-11-17 | 5000 |      |     10
+  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
+(10 rows)
+
+--Cleanup
+DROP EXTENSION hdfs_fdw CASCADE;
+NOTICE:  drop cascades to 3 other objects
+DETAIL:  drop cascades to server hdfs_server
+drop cascades to user mapping for postgres on server hdfs_server
+drop cascades to foreign table emp
+\c postgres postgres
+DROP DATABASE fdw_regression;
