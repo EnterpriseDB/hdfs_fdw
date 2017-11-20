@@ -1525,16 +1525,14 @@ ORDER BY d.deptno;
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
 ORDER BY d.deptno;
-                QUERY PLAN                
-------------------------------------------
- Sort
-   Sort Key: d.deptno
-   ->  Hash Right Join
-         Hash Cond: (e.deptno = d.deptno)
+                  QUERY PLAN                  
+----------------------------------------------
+ Nested Loop Left Join
+   Join Filter: (d.deptno = e.deptno)
+   ->  Index Scan using dept_pk on dept_lcl d
+   ->  Materialize
          ->  Foreign Scan on emp e
-         ->  Hash
-               ->  Seq Scan on dept_lcl d
-(7 rows)
+(5 rows)
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
 ORDER BY d.deptno;
