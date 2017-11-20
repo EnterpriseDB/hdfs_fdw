@@ -1,0 +1,202 @@
+/*---------------------------------------------------------------------------------------------------------------------
+ *
+ * mapping.sql
+ * 		Foreign-data wrapper for remote Hadoop servers
+ *              To verify the testing of auth_type and client_type parameters in CREATE SERVER Command.
+ *
+ * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ *
+ * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ *
+ * IDENTIFICATION
+ * 		auth_client_type_parameters.sql
+ *
+ *---------------------------------------------------------------------------------------------------------------------
+ */
+
+-- Connection Settings.
+
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+--possible values spark/hiveserver2
+\set HIVE_CLIENT_TYPE           `echo \'"$HIVE_CLIENT_TYPE"\'`
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+--possible values ldap/nosasl
+\set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'` 
+
+CREATE DATABASE fdw_regression;
+\c fdw_regression postgres
+
+CREATE EXTENSION hdfs_fdw;
+
+--=========================================
+--         RM # 41527
+-- Negitive Cases
+--=========================================
+
+-- Create Server with client_type 'spark';
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'spark', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'NOSASL');
+
+DROP SERVER hdfs_server;
+
+-- Create Server with client_type 'hiveserver2';
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'hiveserver2', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'NOSASL');
+
+DROP SERVER hdfs_server;
+
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'hiveserver2', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'LDAP');
+
+DROP SERVER hdfs_server;
+
+-- Verify that the default vaule of client_type 'hiveserver2'
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, use_remote_estimate 'false', log_remote_sql 'true',auth_type 'LDAP');
+
+DROP SERVER hdfs_server;
+
+-- Verify that error message is displayed when invalid vaule is used with client_type Parameter.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'asasasasaas', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'LDAP');
+
+DROP SERVER hdfs_server;
+
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'hiveserver2', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'saaaaasa');
+
+DROP SERVER hdfs_server;
+
+--=========================================
+--         RM # 42047
+--=========================================
+
+-- Verify that when auth_type is used then user name must be defined while creating user mapping.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'spark', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'NOSASL');
+
+CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS ( password 'edb'); 
+
+CREATE FOREIGN TABLE dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+
+SELECT * FROM dept;
+
+DROP EXTENSION hdfs_fdw CASCADE;
+
+CREATE EXTENSION hdfs_fdw;
+
+CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'hiveserver2', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'LDAP');
+
+CREATE USER MAPPING FOR postgres SERVER hdfs_svr OPTIONS ( password 'edb'); 
+
+CREATE FOREIGN TABLE dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_svr OPTIONS (dbname 'fdw_db', table_name 'dept');
+
+SELECT * FROM dept;
+
+DROP EXTENSION hdfs_fdw CASCADE;
+
+--=========================================================================================
+--         RM # 41527
+-- client_type is specified as spark then analyze command will pass when Spark is used
+--=========================================================================================
+
+-- Create function to execute analyze command with Spark and HiveServer.
+
+CREATE OR REPLACE FUNCTION execute_based_client(client_type VARCHAR(70),user_name VARCHAR(30),pass VARCHAR(30),auth VARCHAR(30)) 
+    RETURNS void AS $$
+DECLARE
+	d_sql text;
+BEGIN
+     
+	IF client_type = 'spark' AND auth = 'nosasl' THEN
+
+		-- Create postgres USER MAPPING with incorrect LDAP User.
+
+		d_sql := 'CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username '' || user_name || '' , password '' || pass || '')';
+
+		EXECUTE d_sql;
+
+		-- Create Foreign Tables.
+
+		d_sql := 'CREATE FOREIGN TABLE dept_dt_mp1 
+				(
+					deptno INTEGER, 
+					dname VARCHAR(14), 
+					loc VARCHAR(13) ) 
+			SERVER hdfs_server OPTIONS (dbname ''fdw_db'', table_name ''dept_dt_mp'')';
+
+		EXECUTE d_sql;
+
+		-- Execute ANALYZE Statement.
+	
+		d_sql := 'ANALYZE dept_dt_mp1';
+
+		EXECUTE d_sql;
+
+
+		--Cleanup
+
+		DROP FOREIGN TABLE dept_dt_mp1;
+
+	ELSIF client_type = 'hiveserver2' AND auth = 'ldap' THEN
+		-- Create postgres USER MAPPING with incorrect LDAP User.
+
+		d_sql := 'CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username '' || user_name || '' , password '' || pass || '')';
+
+		EXECUTE d_sql;
+
+		-- Create Foreign Tables.
+
+		d_sql := 'CREATE FOREIGN TABLE dept_dt_mp1 
+				(
+					deptno INTEGER, 
+					dname VARCHAR(14), 
+					loc VARCHAR(13) ) 
+			SERVER hdfs_server OPTIONS (dbname ''fdw_db'', table_name ''dept_dt_mp'')';
+
+		EXECUTE d_sql;
+
+		-- Execute ANALYZE Statement.
+	
+		d_sql := 'ANALYZE dept_dt_mp1';
+
+		EXECUTE d_sql;
+
+
+		--Cleanup
+
+		DROP FOREIGN TABLE dept_dt_mp1;
+	
+	ELSE 
+		
+		RAISE EXCEPTION '******WRONG HIVE_CLIENT TYPE OR AUTH_TYPE************';
+
+	END IF;
+
+END;
+    $$ LANGUAGE plpgsql;
+
+
+-- Verify that if the client_type is specified as spark then analyze command will pass when Spark is used.
+-- Only limited scenarios can be scripted as discussed with Dev.
+
+CREATE EXTENSION hdfs_fdw;
+
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'false', log_remote_sql 'true',auth_type :AUTH_TYPE);
+
+SELECT  execute_based_client(:HIVE_CLIENT_TYPE,'kzeeshan','edb',:AUTH_TYPE);
+
+
+
+
+
+
+-- DROP EXTENSION
+DROP EXTENSION hdfs_fdw CASCADE;
+DROP DATABASE fdw_regression;
+
