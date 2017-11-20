@@ -328,9 +328,6 @@ CREATE FOREIGN TABLE binary_data
   col1         BLOB
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'binary_data');
-SELECT * FROM binary_data;
-ERROR:  unsupported Hive data type
-HINT:  Supported data types are TINYINT, SMALLINT, INT, BIGINT, BOOLEAN, DOUBLE, STRING, CHAR, TIMESTAMP, DECIMAL, DATE and VARCHAR: binary
 DROP FOREIGN TABLE binary_data;
 -- Create Hadoop Table with datatype DOUBLE, error message will be displayed.
 CREATE FOREIGN TABLE dbl_data
