@@ -185,9 +185,22 @@ CREATE TABLE double_data (
 )
 row format delimited fields terminated by ',';
 
+CREATE TABLE emp2 (
+    empno           INT,
+    ename           VARCHAR(10),
+    job                 VARCHAR(9),
+    mgr               INT,
+    hiredate        DATE,
+    sal                INT,
+    comm           INT,
+    deptno          INT
+)
+row format delimited fields terminated by ',';
+
 --Load data in the Tables.
 
 LOAD DATA INPATH 'emp_table.txt' OVERWRITE INTO TABLE emp;
+LOAD DATA INPATH 'emp_table_2.txt' OVERWRITE INTO TABLE emp2;
 LOAD DATA INPATH 'dept_table.txt' OVERWRITE INTO TABLE dept;
 LOAD DATA INPATH 'jobhist_table.txt' OVERWRITE INTO TABLE jobhist;
 LOAD DATA INPATH 'weblogs_parse_table.txt' OVERWRITE INTO TABLE weblogs;
