@@ -20,7 +20,6 @@
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 CREATE DATABASE fdw_regression;
-ERROR:  database "fdw_regression" already exists
 \c fdw_regression postgres
 CREATE EXTENSION hdfs_fdw;
 --==========================================================================================
@@ -294,4 +293,3 @@ DETAIL:  drop cascades to server hdfs_server
 drop cascades to user mapping for postgres on server hdfs_server
 drop cascades to foreign table weblogs
 DROP DATABASE fdw_regression;
-ERROR:  cannot drop the currently open database
