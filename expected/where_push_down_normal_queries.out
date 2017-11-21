@@ -336,9 +336,8 @@ WHERE  bol1 = upper('t') ORDER BY bol1;
    Sort Key: b.bol1
    ->  Foreign Scan on public.bool_test b
          Output: bol1, bol2
-         Filter: ((b.bol1)::text = 'T'::text)
-         Remote SQL: SELECT * FROM fdw_db.bool_test
-(7 rows)
+         Remote SQL: SELECT * FROM fdw_db.bool_test WHERE ((bol1 = 'T'))
+(6 rows)
 
 --******* TIMEOID  -->  TIME ************
 CREATE FOREIGN TABLE time_test (
