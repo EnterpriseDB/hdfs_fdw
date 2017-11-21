@@ -321,12 +321,7 @@ SELECT COUNT(empno) FROM jobhist;
 (1 row)
 
 SELECT empno,startdate,job,sal,deptno FROM jobhist LIMIT 2;
- empno | startdate  |   job    | sal  | deptno 
--------+------------+----------+------+--------
-  7369 | 17/12/1980 | CLERK    |  800 |     20
-  7499 | 20/02/1980 | SALESMAN | 1600 |     30
-(2 rows)
-
+ERROR:  invalid input syntax for integer: "800.00"
 SELECT * FROM emp ORDER BY empno LIMIT ALL;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
@@ -798,22 +793,22 @@ ORDER BY d.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d FULL OUTER JOIN emp e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
@@ -1467,32 +1462,32 @@ ORDER BY dept_lcl.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
 WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
 WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
                 QUERY PLAN                
 ------------------------------------------
  Sort
-   Sort Key: d.deptno
+   Sort Key: d.deptno, e.empno, e.sal
    ->  Hash Join
          Hash Cond: (e.deptno = d.deptno)
          ->  Foreign Scan on emp e
@@ -1502,37 +1497,39 @@ ORDER BY d.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
      20 | RESEARCH   |  7566 | JONES  | 2975 |     20
      20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7900 | JAMES  |  950 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
+     30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
-                  QUERY PLAN                  
-----------------------------------------------
- Nested Loop Left Join
-   Join Filter: (d.deptno = e.deptno)
-   ->  Index Scan using dept_pk on dept_lcl d
-   ->  Materialize
+ORDER BY d.deptno,e.empno,e.sal;
+                QUERY PLAN                
+------------------------------------------
+ Sort
+   Sort Key: d.deptno, e.empno, e.sal
+   ->  Hash Right Join
+         Hash Cond: (e.deptno = d.deptno)
          ->  Foreign Scan on emp e
-(5 rows)
+         ->  Hash
+               ->  Seq Scan on dept_lcl d
+(7 rows)
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
 ORDER BY d.deptno;
@@ -1679,13 +1676,15 @@ ORDER BY dept.deptno;
 
 --Synonym
 CREATE SYNONYM syn_dept FOR dept;
-ERROR:  syntax error at or near "SYNONYM"
-LINE 1: CREATE SYNONYM syn_dept FOR dept;
-               ^
 SELECT * FROM syn_dept;
-ERROR:  relation "syn_dept" does not exist
-LINE 1: SELECT * FROM syn_dept;
-                      ^
+ deptno |   dname    |   loc    
+--------+------------+----------
+     10 | ACCOUNTING | NEW YORK
+     20 | RESEARCH   | DALLAS
+     30 | SALES      | CHICAGO
+     40 | OPERATIONS | BOSTON
+(4 rows)
+
 SELECT * FROM dept;
  deptno |   dname    |   loc    
 --------+------------+----------

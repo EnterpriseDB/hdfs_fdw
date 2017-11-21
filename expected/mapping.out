@@ -43,7 +43,7 @@ CREATE EXTENSION hdfs_fdw;
                         List of installed extensions
    Name   | Version | Schema |                 Description                  
 ----------+---------+--------+----------------------------------------------
- hdfs_fdw | 1.0     | public | foreign-data wrapper for remote hdfs servers
+ hdfs_fdw | 2.0.3   | public | foreign-data wrapper for remote hdfs servers
 (1 row)
 
 --ReCreate the extension (while it already exists) and it should error out.
@@ -80,12 +80,11 @@ CREATE EXTENSION IF NOT EXISTS hdfs_fdw WITH SCHEMA test_ext_schema VERSION '1.0
 -----------------------------------
 -- UPDATE .. Since there is no update path available, it will display NOTICE
 ALTER EXTENSION hdfs_fdw UPDATE;
-NOTICE:  version "1.0" of extension "hdfs_fdw" is already installed
 \dx hdfs_fdw
                             List of installed extensions
    Name   | Version |     Schema      |                 Description                  
 ----------+---------+-----------------+----------------------------------------------
- hdfs_fdw | 1.0     | test_ext_schema | foreign-data wrapper for remote hdfs servers
+ hdfs_fdw | 2.0.3   | test_ext_schema | foreign-data wrapper for remote hdfs servers
 (1 row)
 
 -- Change schema
@@ -94,7 +93,7 @@ ALTER EXTENSION hdfs_fdw SET SCHEMA public;
                         List of installed extensions
    Name   | Version | Schema |                 Description                  
 ----------+---------+--------+----------------------------------------------
- hdfs_fdw | 1.0     | public | foreign-data wrapper for remote hdfs servers
+ hdfs_fdw | 2.0.3   | public | foreign-data wrapper for remote hdfs servers
 (1 row)
 
 -- Create a view to add as member to extension
@@ -231,24 +230,24 @@ SELECT * FROM dept;
 --empty string, should fail
 ALTER SERVER hdfs_srv3a OPTIONS (SET host '');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db within 4000000 seconds)
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db;auth=noSasl within 4000000 seconds)
 --test cient_type
 --set to hiveserver1, should error when querying 
 --since the target is hiveserver2
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'hiverserver1');
 SELECT * FROM dept;
 ERROR:  invalid option "hiverserver1"
-HINT:  Valid client_type is hiveserver2, this option will be deprecated soon
+HINT:  Valid client_type values are hiveserver2 and spark
 --set to invalid value, should error when querying 
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
-HINT:  Valid client_type is hiveserver2, this option will be deprecated soon
+HINT:  Valid client_type values are hiveserver2 and spark
 --set to invalid value, should error when querying 
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
-HINT:  Valid client_type is hiveserver2, this option will be deprecated soon
+HINT:  Valid client_type values are hiveserver2 and spark
 --test DROP SERVER
 --should fail, RESTRICT enforced
 DROP SERVER hdfs_srv3a;

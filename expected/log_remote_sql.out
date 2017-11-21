@@ -20,7 +20,6 @@
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 CREATE DATABASE fdw_regression;
-ERROR:  database "fdw_regression" already exists
 \c fdw_regression postgres
 CREATE EXTENSION hdfs_fdw;
 --==========================================================================================
@@ -151,12 +150,9 @@ SELECT dname, loc FROM dept d
 WHERE  deptno NOT IN (SELECT deptno FROM dept
               WHERE  dept.deptno = d.deptno)
 ORDER BY deptno;
-   dname    |   loc   
-------------+---------
- RESEARCH   | DALLAS
- SALES      | CHICAGO
- OPERATIONS | BOSTON
-(3 rows)
+ dname | loc 
+-------+-----
+(0 rows)
 
 --Cleanup
 DROP EXTENSION hdfs_fdw CASCADE;
@@ -212,12 +208,9 @@ SELECT dname, loc FROM dept d
 WHERE  deptno NOT IN (SELECT deptno FROM dept
               WHERE  dept.deptno = d.deptno)
 ORDER BY deptno;
-   dname    |   loc   
-------------+---------
- RESEARCH   | DALLAS
- SALES      | CHICAGO
- OPERATIONS | BOSTON
-(3 rows)
+ dname | loc 
+-------+-----
+(0 rows)
 
 --Cleanup
 DROP EXTENSION hdfs_fdw CASCADE;
@@ -301,12 +294,9 @@ SELECT dname, loc FROM dept d
 WHERE  deptno NOT IN (SELECT deptno FROM dept
               WHERE  dept.deptno = d.deptno)
 ORDER BY deptno;
-   dname    |   loc   
-------------+---------
- RESEARCH   | DALLAS
- SALES      | CHICAGO
- OPERATIONS | BOSTON
-(3 rows)
+ dname | loc 
+-------+-----
+(0 rows)
 
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
@@ -315,4 +305,3 @@ DETAIL:  drop cascades to server hdfs_server
 drop cascades to user mapping for postgres on server hdfs_server
 drop cascades to foreign table dept
 DROP DATABASE fdw_regression;
-ERROR:  cannot drop the currently open database

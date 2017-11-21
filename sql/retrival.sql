@@ -275,7 +275,7 @@ ORDER BY d.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d FULL OUTER JOIN emp e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 -- Retrive Data from Foreign Table using CTE (With Clause).
 
@@ -479,19 +479,19 @@ ORDER BY dept_lcl.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
 WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
 WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
 ORDER BY d.deptno;

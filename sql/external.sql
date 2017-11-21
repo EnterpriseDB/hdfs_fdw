@@ -151,7 +151,7 @@ ORDER BY d.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d FULL OUTER JOIN emp_ext e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 -- Data retrival using CTE (With Clause).
 
@@ -231,11 +231,11 @@ ORDER BY dept_lcl.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp_ext e
 WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp_ext e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
 
 EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp_ext.ename FROM dept_lcl CROSS JOIN emp_ext
 ORDER BY dept_lcl.deptno
