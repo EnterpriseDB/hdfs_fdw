@@ -17,10 +17,11 @@
 -- Connection Settings.
 
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
-\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 CREATE DATABASE fdw_regression;
 \c fdw_regression postgres
@@ -108,7 +109,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
 -- Using false value in use_remote_estimate, 1000 rows will be returned in Query Plan
 --************************************************************************************
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'false', log_remote_sql 'true');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'false', log_remote_sql 'true',auth_type :AUTH_TYPE);
 
 \des+ hdfs_server
 
@@ -152,7 +153,7 @@ CREATE EXTENSION hdfs_fdw;
 -- Using true value in use_remote_estimate, 1000 rows will be returned in Query Plan
 --************************************************************************************
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100',auth_type :AUTH_TYPE);
 
 \des+ hdfs_server
 
@@ -196,7 +197,7 @@ CREATE EXTENSION hdfs_fdw;
 -- Using true value in use_remote_estimate, 1000 rows will be returned in Query Plan
 --************************************************************************************
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100',auth_type :AUTH_TYPE);
 
 \des+ hdfs_server
 
