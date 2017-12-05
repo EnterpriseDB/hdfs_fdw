@@ -17,10 +17,11 @@
 -- Connection Settings.
 
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
-\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 -- Create the database.
 
@@ -42,7 +43,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE);
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
 
 -- Create Hadoop USER MAPPING.
 
