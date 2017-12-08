@@ -215,5 +215,6 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
 
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
+\c postgres postgres
 DROP DATABASE fdw_regression;
 

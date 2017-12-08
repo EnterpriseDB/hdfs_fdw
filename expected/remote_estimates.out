@@ -100,7 +100,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
                                                                                                      List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                          FDW Options                                                          | Description 
 -------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'spark', use_remote_estimate 'false', log_remote_sql 'true', auth_type 'NOSASL') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'spark', use_remote_estimate 'false', log_remote_sql 'true', auth_type 'NOSASL') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -135,7 +135,7 @@ ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'true');
                                                                                                      List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                          FDW Options                                                          | Description 
 -------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'spark', use_remote_estimate 'true', log_remote_sql 'false', auth_type 'NOSASL') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'spark', use_remote_estimate 'true', log_remote_sql 'false', auth_type 'NOSASL') | 
 (1 row)
 
 -- Rows returned by the Plan will be 1000 as the table only have 4 rows and so the "The minimum row count that a remote estimate can return is 1000.".
@@ -169,7 +169,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
                                                                                                               List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                                  FDW Options                                                                   | Description 
 -------------+----------+----------------------+-------------------+------+---------+------------------------------------------------------------------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'spark', use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100', auth_type 'NOSASL') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'spark', use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100', auth_type 'NOSASL') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -204,7 +204,7 @@ ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'false');
                                                                                                                List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                                   FDW Options                                                                    | Description 
 -------------+----------+----------------------+-------------------+------+---------+--------------------------------------------------------------------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'spark', use_remote_estimate 'false', log_remote_sql 'false', fetch_size '100', auth_type 'NOSASL') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'spark', use_remote_estimate 'false', log_remote_sql 'false', fetch_size '100', auth_type 'NOSASL') | 
 (1 row)
 
 -- Rows returned by the Plan will be 1000.
@@ -238,7 +238,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
                                                                                                               List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                                  FDW Options                                                                   | Description 
 -------------+----------+----------------------+-------------------+------+---------+------------------------------------------------------------------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'spark', use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100', auth_type 'NOSASL') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'spark', use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100', auth_type 'NOSASL') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -277,7 +277,7 @@ ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'false');
                                                                                                               List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                                                   FDW Options                                                                   | Description 
 -------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'spark', use_remote_estimate 'false', log_remote_sql 'true', fetch_size '100', auth_type 'NOSASL') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'spark', use_remote_estimate 'false', log_remote_sql 'true', fetch_size '100', auth_type 'NOSASL') | 
 (1 row)
 
 -- 1000 rows will be displayed.
@@ -293,4 +293,5 @@ NOTICE:  drop cascades to 3 other objects
 DETAIL:  drop cascades to server hdfs_server
 drop cascades to user mapping for postgres on server hdfs_server
 drop cascades to foreign table weblogs
+\c postgres postgres
 DROP DATABASE fdw_regression;

@@ -321,5 +321,6 @@ WHERE  col1 IS NULL ORDER BY col1;
 
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
+\c postgres postgres
 DROP DATABASE fdw_regression;
 

@@ -109,7 +109,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
                                                                                 List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                     FDW Options                                     | Description 
 -------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'hiveserver2', log_remote_sql 'false') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', log_remote_sql 'false') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -167,7 +167,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
                                                                     List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                         FDW Options                         | Description 
 -------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'hiveserver2') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -228,7 +228,7 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVE
                                                                                 List of foreign servers
     Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                    FDW Options                                     | Description 
 -------------+----------+----------------------+-------------------+------+---------+------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host '127.0.0.1', port '10000', client_type 'hiveserver2', log_remote_sql 'true') | 
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', log_remote_sql 'true') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -304,4 +304,5 @@ NOTICE:  drop cascades to 3 other objects
 DETAIL:  drop cascades to server hdfs_server
 drop cascades to user mapping for postgres on server hdfs_server
 drop cascades to foreign table dept
+\c postgres postgres
 DROP DATABASE fdw_regression;

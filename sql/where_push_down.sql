@@ -657,5 +657,6 @@ SELECT empno, ename, sal, deptno FROM emp e WHERE hiredate IN (SELECT hiredate F
 
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
+\c postgres postgres
 DROP DATABASE fdw_regression;
 

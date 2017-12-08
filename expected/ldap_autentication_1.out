@@ -78,7 +78,7 @@ END;
 -- To verify that error message displayed when invalid LDAP User is used
 --**************************************************************************************************
 SELECT  verify_auth(:AUTH_TYPE,'wronguser','edb');
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://localhost:10000/fdw_db within 300000 seconds)
 CONTEXT:  SQL statement "SELECT * FROM dept_dt_mp1"
 PL/pgSQL function verify_auth(character varying,character varying,character varying) line 29 at EXECUTE
 --SELECT  verify_auth('ldap','wronguser','edb');
@@ -86,14 +86,14 @@ PL/pgSQL function verify_auth(character varying,character varying,character vary
 -- To verify that error message displayed when invalid LDAP User password is used
 --**************************************************************************************************
 SELECT  verify_auth(:AUTH_TYPE,'kzeeshan','wrong');
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://localhost:10000/fdw_db within 300000 seconds)
 CONTEXT:  SQL statement "SELECT * FROM dept_dt_mp1"
 PL/pgSQL function verify_auth(character varying,character varying,character varying) line 29 at EXECUTE
 --**************************************************************************************************
 -- To verify that error message displayed when invalid LDAP User and invalid password is used
 --**************************************************************************************************
 SELECT  verify_auth(:AUTH_TYPE,'wrong','wrong');
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://localhost:10000/fdw_db within 300000 seconds)
 CONTEXT:  SQL statement "SELECT * FROM dept_dt_mp1"
 PL/pgSQL function verify_auth(character varying,character varying,character varying) line 29 at EXECUTE
 DROP EXTENSION hdfs_fdw CASCADE;

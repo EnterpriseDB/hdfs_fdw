@@ -1097,4 +1097,5 @@ drop cascades to foreign table time_test
 drop cascades to foreign table name_test
 drop cascades to foreign table bit_test
 drop cascades to foreign table emp
+\c postgres postgres
 DROP DATABASE fdw_regression;

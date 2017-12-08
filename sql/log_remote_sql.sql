@@ -285,5 +285,6 @@ ORDER BY deptno;
 
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
+\c postgres postgres
 DROP DATABASE fdw_regression;
 
