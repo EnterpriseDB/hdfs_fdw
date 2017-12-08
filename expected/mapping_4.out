@@ -230,7 +230,7 @@ SELECT * FROM dept;
 --empty string, should fail
 ALTER SERVER hdfs_srv3a OPTIONS (SET host '');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db;auth=noSasl within 4000000 seconds)
+ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db within 4000000 seconds)
 --test cient_type
 --set to hiveserver1, should error when querying 
 --since the target is hiveserver2
@@ -282,6 +282,5 @@ DROP SCHEMA test_ext_schema;
 DROP ROLE low_priv_user;
 DROP VIEW ext_v1;
 DROP TABLE DUAL;
-ERROR:  cannot drop table dual because it is required by the database system
 \c postgres postgres
 DROP DATABASE fdw_regression;
