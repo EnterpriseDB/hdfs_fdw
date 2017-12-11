@@ -329,8 +329,8 @@ WHERE  bol1 = 'f' ORDER BY bol1;
 --As per discussed with Dev, build in functions will not be pushed.
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT bol1,bol2 FROM bool_test b
 WHERE  bol1 = upper('t') ORDER BY bol1;
-                     QUERY PLAN                     
-----------------------------------------------------
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
  Sort
    Output: bol1, bol2
    Sort Key: b.bol1
@@ -338,6 +338,7 @@ WHERE  bol1 = upper('t') ORDER BY bol1;
          Output: bol1, bol2
          Remote SQL: SELECT * FROM fdw_db.bool_test WHERE ((bol1 = 'T'))
 (6 rows)
+
 
 --******* TIMEOID  -->  TIME ************
 CREATE FOREIGN TABLE time_test (

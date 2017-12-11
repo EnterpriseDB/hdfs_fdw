@@ -104,7 +104,7 @@ EXPLAIN SELECT deptno FROM DEPT WHERE DEPTNO BETWEEN 20 AND 30;
 
 --Verify that defualt fetch size is 10,000. This vaule will be sent to server log.
 --This cant be manaully verified so following log is attached as example where the default vaule 10000 is sent to server.
--- CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host '127.0.0.1', port '10000', client_type 'spark', log_remote_sql 'true');
+-- CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host 'localhost', port '10000', client_type 'spark', log_remote_sql 'true');
 
 -- 2017-10-13 03:51:17 EDT LOG:  hdfs_fdw: prepare remote SQL: [SELECT * FROM fdw_db.dept] [10000]      here [10000 is default size]
 SELECT * FROM DEPT;
