@@ -116,7 +116,7 @@ hdfs_get_value(int con_index, hdfs_opt *opt, Oid pgtyp, int pgtypmod,
 
 			ereport(ERROR, (errcode(ERRCODE_FDW_INVALID_DATA_TYPE),
 								errmsg("unsupported PostgreSQL data type"),
-								errhint("Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : %u", pgtyp)));
+								errhint("Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR",)));
                         break;
 		}
 	}
