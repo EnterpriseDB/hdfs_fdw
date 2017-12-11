@@ -210,7 +210,7 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT deptno "Department", COUNT(emp) "Total
                        QUERY PLAN                        
 ---------------------------------------------------------
  Sort
-   Output: deptno, (count(emp.*))
+   Output: deptno, count(emp.*)
    Sort Key: emp.deptno
    ->  HashAggregate
          Output: deptno, count(emp.*)

@@ -32,7 +32,7 @@ CREATE TABLE emp (
     mgr               INT,
     hiredate        DATE,
     sal                INT,
-    comm           DECIMAL(7,2),
+    comm           INT,
     deptno          INT
 )
 row format delimited fields terminated by ',';
