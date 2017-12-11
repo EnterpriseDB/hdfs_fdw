@@ -339,7 +339,6 @@ WHERE  bol1 = upper('t') ORDER BY bol1;
          Remote SQL: SELECT * FROM fdw_db.bool_test WHERE ((bol1 = 'T'))
 (6 rows)
 
-
 --******* TIMEOID  -->  TIME ************
 CREATE FOREIGN TABLE time_test (
     col1              	TIME
