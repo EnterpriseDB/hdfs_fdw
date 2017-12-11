@@ -347,10 +347,6 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'binary_data');
 ERROR:  type "blob" does not exist
 LINE 3:   col1         BLOB
                        ^
-SELECT * FROM binary_data;
-ERROR:  relation "binary_data" does not exist
-LINE 1: SELECT * FROM binary_data;
-                      ^
 DROP FOREIGN TABLE binary_data;
 ERROR:  foreign table "binary_data" does not exist
 -- Create Hadoop Table with datatype DOUBLE, error message will be displayed.

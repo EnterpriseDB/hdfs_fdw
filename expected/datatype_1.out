@@ -329,25 +329,6 @@ CREATE FOREIGN TABLE binary_data
   col1         BLOB
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'binary_data');
-SELECT * FROM binary_data;
-         col1         
-----------------------
- \xefbfbd7eefbfbd
- \xefbfbd7d
- \xef9db5
- \xef9eba
- \xefbfbd78
- \xefbfbd7c
- \xefbfbd36
- \xefbfbd3c
- \xefbfbdefbfbdefbfbd
- \xefbfbdefbfbd38
- \xefbfbdefbfbdefbfbd
- \xefbfbdefbfbd34
- \xefbfbdefbfbd36
- \xefbfbdefbfbdefbfbd
-(14 rows)
-
 DROP FOREIGN TABLE binary_data;
 -- Create Hadoop Table with datatype DOUBLE, error message will be displayed.
 CREATE FOREIGN TABLE dbl_data

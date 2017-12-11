@@ -406,8 +406,6 @@ CREATE FOREIGN TABLE binary_data
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'binary_data');
 
-SELECT * FROM binary_data;
-
 DROP FOREIGN TABLE binary_data;
 
 -- Create Hadoop Table with datatype DOUBLE, error message will be displayed.
