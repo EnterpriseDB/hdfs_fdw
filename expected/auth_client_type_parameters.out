@@ -23,7 +23,6 @@
 --possible values ldap/nosasl
 \set AUTH_TYPE       `echo \'"$AUTH_TYPE"\'` 
 CREATE DATABASE fdw_regression;
-ERROR:  database "fdw_regression" already exists
 \c fdw_regression postgres
 CREATE EXTENSION hdfs_fdw;
 --=========================================
@@ -174,5 +173,5 @@ DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 2 other objects
 DETAIL:  drop cascades to server hdfs_server
 drop cascades to user mapping for postgres on server hdfs_server
+\c postgres postgres
 DROP DATABASE fdw_regression;
-ERROR:  cannot drop the currently open database

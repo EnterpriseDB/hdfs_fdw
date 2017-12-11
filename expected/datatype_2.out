@@ -801,7 +801,7 @@ CREATE FOREIGN TABLE dept_dt_dt (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_dt ORDER BY deptno;
-ERROR:  invalid input syntax for type date: "10"
+ERROR:  invalid input syntax for type timestamp: "10"
 DROP FOREIGN TABLE dept_dt_dt;
 -- Mapp TIMESTAMP with INT, error will be displayed.
 CREATE FOREIGN TABLE dept_dt_tm (
@@ -841,7 +841,7 @@ CREATE FOREIGN TABLE dept_dt_con_date (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_con_date ORDER BY deptno;
-ERROR:  invalid input syntax for type date: "ACCOUNTING"
+ERROR:  invalid input syntax for type timestamp: "ACCOUNTING"
 DROP FOREIGN TABLE dept_dt_con_date;
 -- Mapp TIMESTAMP with VARCHAR2, error will be displayed.
 CREATE FOREIGN TABLE dept_dt_con_tmpstmp (
@@ -1680,7 +1680,7 @@ CREATE FOREIGN TABLE emp_bol8 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 SELECT * FROM emp_bol8 ORDER BY bol1;
-ERROR:  invalid input syntax for type date: "false"
+ERROR:  invalid input syntax for type timestamp: "false"
 DROP FOREIGN TABLE emp_bol8;
 -- Mapp DATE with STRING, data will be displayed.
 CREATE FOREIGN TABLE str_date (
@@ -2093,7 +2093,7 @@ CREATE FOREIGN TABLE emp_fr15 (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 SELECT * FROM emp_fr15 ORDER BY empno;
-ERROR:  invalid input syntax for type date: "7369"
+ERROR:  invalid input syntax for type timestamp: "7369"
 DROP FOREIGN TABLE emp_fr15;
 -- Create Foreign Table, data will be displayed.
 CREATE FOREIGN TABLE emp_fr16 (

@@ -169,5 +169,5 @@ PL/pgSQL function execute_based_client(character varying,character varying,chara
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to server hdfs_server
+\c postgres postgres
 DROP DATABASE fdw_regression;
-ERROR:  cannot drop the currently open database

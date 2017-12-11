@@ -198,5 +198,6 @@ SELECT  execute_based_client(:HIVE_CLIENT_TYPE,'kzeeshan','edb',:AUTH_TYPE);
 
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
+\c postgres postgres
 DROP DATABASE fdw_regression;
 
