@@ -13,6 +13,7 @@
  *
  *---------------------------------------------------------------------------------------------------------------------
  */
+\set VERBOSITY terse
 -- Connection Settings.
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 --possible values spark/hiveserver2
