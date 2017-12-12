@@ -13,6 +13,7 @@
  *
  *---------------------------------------------------------------------------------------------------------------------
  */
+\set enable_hashagg on
 -- Connection Settings.
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE           '\'hiveserver2\''
