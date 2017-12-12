@@ -62,9 +62,6 @@ SELECT * FROM dept;
 ERROR:  failed to initialize the HDFS connection object (ERROR : A valid user name is required)
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 3 other objects
-DETAIL:  drop cascades to server hdfs_server
-drop cascades to user mapping for postgres on server hdfs_server
-drop cascades to foreign table dept
 CREATE EXTENSION hdfs_fdw;
 CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type 'hiveserver2', use_remote_estimate 'false', log_remote_sql 'true',auth_type 'LDAP');
 CREATE USER MAPPING FOR postgres SERVER hdfs_svr OPTIONS ( password 'edb'); 
@@ -78,9 +75,6 @@ SELECT * FROM dept;
 ERROR:  failed to initialize the HDFS connection object (ERROR : A valid user name is required)
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 3 other objects
-DETAIL:  drop cascades to server hdfs_svr
-drop cascades to user mapping for postgres on server hdfs_svr
-drop cascades to foreign table dept
 --=========================================================================================
 --         RM # 41527
 -- client_type is specified as spark then analyze command will pass when Spark is used
@@ -172,7 +166,5 @@ SELECT  execute_based_client(:HIVE_CLIENT_TYPE,'kzeeshan','edb',:AUTH_TYPE);
 -- DROP EXTENSION
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to server hdfs_server
-drop cascades to user mapping for postgres on server hdfs_server
 \c postgres postgres
 DROP DATABASE fdw_regression;
