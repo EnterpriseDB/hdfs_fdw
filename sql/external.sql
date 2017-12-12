@@ -78,8 +78,6 @@ SELECT empno, ename, job, mgr, hiredate, sal, comm, deptno FROM emp_ext;
 
 SELECT * FROM emp_ext ORDER BY deptno;
 
-SELECT DISTINCT mgr, deptno FROM emp_ext;
-
 SELECT deptno, sal, comm FROM emp_ext ORDER BY deptno;
 
 SELECT ename as "Employee Name" FROM emp_ext;

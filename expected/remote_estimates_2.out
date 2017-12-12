@@ -266,8 +266,8 @@ user_agent               TEXT
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'weblogs');
 -- Total rows will be displayed.
 EXPLAIN SELECT * FROM weblogs;
-                                QUERY PLAN                                 
----------------------------------------------------------------------------
+                                 QUERY PLAN                                  
+-----------------------------------------------------------------------------
  Foreign Scan on weblogs  (cost=100000.00..54267000.00 rows=54167 width=484)
 (1 row)
 
