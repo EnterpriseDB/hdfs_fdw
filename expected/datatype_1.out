@@ -48,7 +48,7 @@ CREATE FOREIGN TABLE emp_fr_21 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 SELECT * FROM emp_fr_21;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 13320
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE emp_fr_21;
 -- Create Table with datatype CLOB, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_clob (
@@ -59,7 +59,7 @@ CREATE FOREIGN TABLE dept_dt_clob (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_clob;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 13320
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_clob;
 -- Create Table with datatype MONEY, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_mony (
@@ -70,7 +70,7 @@ CREATE FOREIGN TABLE dept_dt_mony (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_mony;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 790
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_mony;
 -- Create Table with datatype NUMERIC, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_num (
@@ -81,7 +81,7 @@ CREATE FOREIGN TABLE dept_dt_num (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_num;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1700
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_num;
 -- Create Table with datatype decimal, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_dec (
@@ -92,7 +92,7 @@ CREATE FOREIGN TABLE dept_dt_dec (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_dec;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1700
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_dec;
 -- Create Table with datatype interval, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_terv (
@@ -103,7 +103,7 @@ CREATE FOREIGN TABLE dept_dt_terv (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_terv;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1186
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_terv;
 -- Create Table with datatype cidr, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_cidr (
@@ -114,7 +114,7 @@ CREATE FOREIGN TABLE dept_dt_cidr (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_cidr;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 650
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_cidr;
 -- Create Table with datatype cidr, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_inet (
@@ -125,7 +125,7 @@ CREATE FOREIGN TABLE dept_dt_inet (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_inet;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 869
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_inet;
 -- Create Table with datatype macaddr, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_macaddr (
@@ -136,7 +136,7 @@ CREATE FOREIGN TABLE dept_dt_macaddr (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_macaddr;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 829
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_macaddr;
 -- Create Table with datatype point, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_point (
@@ -147,7 +147,7 @@ CREATE FOREIGN TABLE dept_dt_point (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_point;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 600
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_point;
 -- Create Table with datatype line, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_line (
@@ -158,7 +158,7 @@ CREATE FOREIGN TABLE dept_dt_line (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_line;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 628
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_line;
 -- Create Table with datatype lseg, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_lseg (
@@ -169,7 +169,7 @@ CREATE FOREIGN TABLE dept_dt_lseg (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_lseg;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 601
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_lseg;
 -- Create Table with box macaddr, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_box (
@@ -180,7 +180,7 @@ CREATE FOREIGN TABLE dept_dt_box (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_box;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 603
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_box;
 -- Create Table with datatype path, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_path (
@@ -191,7 +191,7 @@ CREATE FOREIGN TABLE dept_dt_path (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_path;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 602
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_path;
 -- Create Table with datatype polygon, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_polygon (
@@ -202,7 +202,7 @@ CREATE FOREIGN TABLE dept_dt_polygon (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_polygon;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 604
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_polygon;
 -- Create Table with datatype circle, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_circle (
@@ -213,7 +213,7 @@ CREATE FOREIGN TABLE dept_dt_circle (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_circle;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 718
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_circle;
 -- Create Table with array, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_arr (
@@ -224,7 +224,7 @@ CREATE FOREIGN TABLE dept_dt_arr (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_arr;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1009
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_arr;
 CREATE FOREIGN TABLE dept_dt_arr1 (
     deptno          INT,
@@ -234,7 +234,7 @@ CREATE FOREIGN TABLE dept_dt_arr1 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_arr1;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1009
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_arr1;
 CREATE FOREIGN TABLE dept_dt_arr2 (
     deptno          INT,
@@ -244,7 +244,7 @@ CREATE FOREIGN TABLE dept_dt_arr2 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_arr2;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1009
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_arr2;
 CREATE FOREIGN TABLE dept_dt_arr3 (
     deptno          INT,
@@ -254,7 +254,7 @@ CREATE FOREIGN TABLE dept_dt_arr3 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_arr3;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1009
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_arr3;
 -- Create Table with ENUM, error message will be displayed.
 CREATE TYPE deptnotype AS ENUM ('10', '20', '30', '40');
@@ -299,7 +299,7 @@ CREATE FOREIGN TABLE dept_dt_nmric (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept_dt_nmric;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1700
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_nmric;
 -- Create Table with datatype NUMBER, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_mp13 (
@@ -310,7 +310,7 @@ CREATE FOREIGN TABLE dept_dt_mp13 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
 SELECT * FROM dept_dt_mp13;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1700
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_mp13;
 --*************************************************************************
 --===================================================================================
@@ -1848,7 +1848,7 @@ CREATE FOREIGN TABLE emp_fr4 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 SELECT * FROM emp_fr4 ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1186
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE emp_fr4;
 -- Create Foreign Table, data will be displayed.
 CREATE FOREIGN TABLE emp_fr5 (
@@ -1864,7 +1864,7 @@ CREATE FOREIGN TABLE emp_fr5 (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
 SELECT * FROM emp_fr5 ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 1700
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE emp_fr5;
 /*
 
