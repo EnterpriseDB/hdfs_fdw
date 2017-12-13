@@ -22,7 +22,7 @@
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 
-CREATE DATABASE fdw_regression;
+CREATE DATABASE fdw_regression ENCODING=UTF8 LC_CTYPE='en_US.UTF-8' TEMPLATE=template0;
 \c fdw_regression postgres
 
 CREATE EXTENSION hdfs_fdw;
