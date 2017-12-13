@@ -1,0 +1,1102 @@
+/*---------------------------------------------------------------------------------------------------------------------
+ *
+ * mapping.sql
+ * 		Foreign-data wrapper for remote Hadoop servers
+ *              To verify the WHERE Clause with parameters is pushed down.
+ *
+ * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ *
+ * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ *
+ * IDENTIFICATION
+ * 		where_push_down.sql
+ *
+ *---------------------------------------------------------------------------------------------------------------------
+ */
+\set enable_hashagg off
+-- Connection Settings.
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+CREATE DATABASE fdw_regression;
+\c fdw_regression postgres
+CREATE EXTENSION hdfs_fdw;
+--==========================================================================================
+--                    Pushing down parametrized WHERE clauses
+-- 
+-- Adds support for pushing down parametrized WHERE clauses.
+--The query execution is broken down into three steps to make
+--this possible: PREPARE, BIND and EXECUTE.
+--While rescanning the new parameters are bound and the same
+--prepared query is executed again.
+--==========================================================================================
+-- Create Hadoop FDW Server. log_remote_sql 'true' is required to setup logging for Remote SQL Sent to Hive Server.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true');
+-- Create Hadoop USER MAPPING.
+CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+-- Create Foreign Tables.
+CREATE FOREIGN TABLE dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             INTEGER,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+-- Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, ea.deptno FROM emp ea
+WHERE sal = (SELECT MAX(sal) FROM emp eb 
+	     WHERE eb.deptno = ea.deptno)
+ORDER BY deptno;
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ Sort
+   Output: ea.empno, ea.ename, ea.deptno
+   Sort Key: ea.deptno
+   ->  Foreign Scan on public.emp ea
+         Output: ea.empno, ea.ename, ea.deptno
+         Filter: (ea.sal = (SubPlan 1))
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Aggregate
+                 Output: max(eb.sal)
+                 ->  Foreign Scan on public.emp eb
+                       Output: eb.empno, eb.ename, eb.job, eb.mgr, eb.hiredate, eb.sal, eb.comm, eb.deptno
+                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))
+(13 rows)
+
+-- The Server log will contain following info when this query will be executed, this rescan feature is tested manually as this cant be scripted.
+--2017-10-17 04:46:11 EDT LOG:  hdfs_fdw: prepare remote SQL: [SELECT empno, ename, sal, deptno FROM fdw_db.emp] [10000]
+--2017-10-17 04:46:11 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:11 EDT LOG:  hdfs_fdw: prepare remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [10000]
+--2017-10-17 04:46:11 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:11 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [0]
+--2017-10-17 04:46:11 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:11 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [1]
+--2017-10-17 04:46:11 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [2]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [3]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [4]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [5]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [6]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [7]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [8]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:12 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [9]
+--2017-10-17 04:46:12 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:13 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [10]
+--2017-10-17 04:46:13 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:13 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [11]
+--2017-10-17 04:46:13 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+--2017-10-17 04:46:13 EDT LOG:  hdfs_fdw: rescan remote SQL: [SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))] [12]
+--2017-10-17 04:46:13 EDT STATEMENT:  SELECT empno, ename, sal, deptno FROM emp e
+--	WHERE  sal > (SELECT AVG(sal) FROM emp
+--	              WHERE  emp.deptno = e.deptno)
+--	ORDER BY deptno;
+-- Expected output from Postgres is
+--test=# SELECT empno, ename, sal, deptno FROM emp e
+--test-# WHERE  sal > (SELECT AVG(sal) FROM emp
+--test(#               WHERE  emp.deptno = e.deptno)
+--test-# ORDER BY deptno;
+-- empno | ename | sal  | deptno 
+-------+-------+------+--------
+--  7839 | KING  | 5000 |     10
+--  7566 | JONES | 2975 |     20
+--  7788 | SCOTT | 3000 |     20
+--  7902 | FORD  | 3000 |     20
+--  7499 | ALLEN | 1600 |     30
+--  7698 | BLAKE | 2850 |     30
+--(6 rows)
+--
+--test=# 
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal > (SELECT AVG(sal) FROM emp
+              WHERE  emp.deptno = e.deptno)
+ORDER BY deptno;
+ empno | ename | sal  | deptno 
+-------+-------+------+--------
+  7839 | KING  | 5000 |     10
+  7566 | JONES | 2975 |     20
+  7788 | SCOTT | 3000 |     20
+  7902 | FORD  | 3000 |     20
+  7499 | ALLEN | 1600 |     30
+  7698 | BLAKE | 2850 |     30
+(6 rows)
+
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+-- Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal > (SELECT AVG(sal) FROM emp
+              WHERE  emp.deptno = e.deptno)
+ORDER BY deptno;
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: ((e.sal)::numeric > (SubPlan 1))
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Aggregate
+                 Output: avg(emp.sal)
+                 ->  Foreign Scan on public.emp
+                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))
+(13 rows)
+
+--Normal WHERE will not be parameterized.
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptno ORDER BY deptno;
+                       QUERY PLAN                        
+---------------------------------------------------------
+ GroupAggregate
+   Output: deptno, count(emp.*)
+   Group Key: emp.deptno
+   ->  Sort
+         Output: deptno, emp.*
+         Sort Key: emp.deptno
+         ->  Foreign Scan on public.emp
+               Output: deptno, emp.*
+               Remote SQL: SELECT deptno FROM fdw_db.emp
+(9 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT deptno, SUM(sal) FROM emp GROUP BY deptno HAVING deptno IN (10, 30) ORDER BY deptno;
+                                       QUERY PLAN                                        
+-----------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: deptno, sum(sal)
+   Group Key: emp.deptno
+   ->  Sort
+         Output: deptno, sal
+         Sort Key: emp.deptno
+         ->  Foreign Scan on public.emp
+               Output: deptno, sal
+               Remote SQL: SELECT sal, deptno FROM fdw_db.emp WHERE (deptno  IN (10,30))
+(9 rows)
+
+--********************************************************************
+--Datatype Verification with parameterized WHERE Clause.
+--********************************************************************
+DROP FOREIGN TABLE emp;
+--*******  INT2OID --> smallint  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             smallint,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT empno, ename, sal as "salary", deptno FROM emp e
+WHERE  sal IN (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename  | salary | deptno 
+-------+--------+--------+--------
+  7934 | MILLER |   1300 |     10
+  7782 | CLARK  |   2450 |     10
+  7839 | KING   |   5000 |     10
+  7788 | SCOTT  |   3000 |     20
+  7566 | JONES  |   2975 |     20
+  7369 | SMITH  |    800 |     20
+  7876 | ADAMS  |   1100 |     20
+  7902 | FORD   |   3000 |     20
+  7521 | WARD   |   1250 |     30
+  7844 | TURNER |   1500 |     30
+  7499 | ALLEN  |   1600 |     30
+  7698 | BLAKE  |   2850 |     30
+  7654 | MARTIN |   1250 |     30
+  7900 | JAMES  |    950 |     30
+(14 rows)
+
+SELECT empno, ename, sal as "salary", deptno FROM emp e
+WHERE  sal NOT IN (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename | salary | deptno 
+-------+-------+--------+--------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal > (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: ((e.sal)::numeric > (SubPlan 1))
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Aggregate
+                 Output: avg(emp.sal)
+                 ->  Foreign Scan on public.emp
+                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+(13 rows)
+
+DROP FOREIGN TABLE emp;
+--*******  INT8OID --> bigint  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             bigint,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename  | sal  | deptno 
+-------+--------+------+--------
+  7934 | MILLER | 1300 |     10
+  7782 | CLARK  | 2450 |     10
+  7839 | KING   | 5000 |     10
+  7788 | SCOTT  | 3000 |     20
+  7566 | JONES  | 2975 |     20
+  7369 | SMITH  |  800 |     20
+  7876 | ADAMS  | 1100 |     20
+  7902 | FORD   | 3000 |     20
+  7521 | WARD   | 1250 |     30
+  7844 | TURNER | 1500 |     30
+  7499 | ALLEN  | 1600 |     30
+  7698 | BLAKE  | 2850 |     30
+  7654 | MARTIN | 1250 |     30
+  7900 | JAMES  |  950 |     30
+(14 rows)
+
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal NOT IN (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename | sal | deptno 
+-------+-------+-----+--------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Aggregate
+                 Output: avg(emp.sal)
+                 ->  Foreign Scan on public.emp
+                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+(13 rows)
+
+DROP FOREIGN TABLE emp;
+--*******  FLOAT4OID --> real  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             real,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename  | sal  | deptno 
+-------+--------+------+--------
+  7934 | MILLER | 1300 |     10
+  7782 | CLARK  | 2450 |     10
+  7839 | KING   | 5000 |     10
+  7788 | SCOTT  | 3000 |     20
+  7566 | JONES  | 2975 |     20
+  7369 | SMITH  |  800 |     20
+  7876 | ADAMS  | 1100 |     20
+  7902 | FORD   | 3000 |     20
+  7521 | WARD   | 1250 |     30
+  7844 | TURNER | 1500 |     30
+  7499 | ALLEN  | 1600 |     30
+  7698 | BLAKE  | 2850 |     30
+  7654 | MARTIN | 1250 |     30
+  7900 | JAMES  |  950 |     30
+(14 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal > (SELECT AVG(sal) FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (e.sal > (SubPlan 1))
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Aggregate
+                 Output: avg(emp.sal)
+                 ->  Foreign Scan on public.emp
+                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+(13 rows)
+
+DROP FOREIGN TABLE emp;
+--*******  FLOAT8OID --> double precision  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             double precision,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT sal FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename  | sal  | deptno 
+-------+--------+------+--------
+  7934 | MILLER | 1300 |     10
+  7782 | CLARK  | 2450 |     10
+  7839 | KING   | 5000 |     10
+  7788 | SCOTT  | 3000 |     20
+  7566 | JONES  | 2975 |     20
+  7369 | SMITH  |  800 |     20
+  7876 | ADAMS  | 1100 |     20
+  7902 | FORD   | 3000 |     20
+  7521 | WARD   | 1250 |     30
+  7844 | TURNER | 1500 |     30
+  7499 | ALLEN  | 1600 |     30
+  7698 | BLAKE  | 2850 |     30
+  7654 | MARTIN | 1250 |     30
+  7900 | JAMES  |  950 |     30
+(14 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT sal FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.sal
+                 Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+(11 rows)
+
+DROP FOREIGN TABLE emp;
+--*******  VARCHAROID --> VARCHAR  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             VARCHAR(10),
+    comm            INTEGER,
+    deptno          VARCHAR(10)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  ename IN (SELECT ename FROM emp
+              WHERE  emp.ename = e.ename)
+ORDER BY deptno;
+ empno | ename  | sal  | deptno 
+-------+--------+------+--------
+  7934 | MILLER | 1300 | 10
+  7782 | CLARK  | 2450 | 10
+  7839 | KING   | 5000 | 10
+  7788 | SCOTT  | 3000 | 20
+  7566 | JONES  | 2975 | 20
+  7369 | SMITH  | 800  | 20
+  7876 | ADAMS  | 1100 | 20
+  7902 | FORD   | 3000 | 20
+  7521 | WARD   | 1250 | 30
+  7844 | TURNER | 1500 | 30
+  7499 | ALLEN  | 1600 | 30
+  7698 | BLAKE  | 2850 | 30
+  7654 | MARTIN | 1250 | 30
+  7900 | JAMES  | 950  | 30
+(14 rows)
+
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  ename NOT IN (SELECT ename FROM emp
+              WHERE  emp.ename = e.ename)
+ORDER BY deptno;
+ empno | ename | sal | deptno 
+-------+-------+-----+--------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  ename NOT IN (SELECT ename FROM emp
+              WHERE  emp.ename = e.ename)
+ORDER BY deptno;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.ename
+                 Remote SQL: SELECT ename FROM fdw_db.emp WHERE ((ename = ?))
+(11 rows)
+
+DROP FOREIGN TABLE emp;
+--*******  INT4OID --> INTEGER  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             VARCHAR(10),
+    comm            INTEGER,
+    deptno          VARCHAR(10)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT ename FROM emp e
+WHERE  empno IN (SELECT empno FROM emp
+              WHERE  emp.empno = e.empno)
+ORDER BY ename;
+ ename  
+--------
+ ADAMS
+ ALLEN
+ BLAKE
+ CLARK
+ FORD
+ JAMES
+ JONES
+ KING
+ MARTIN
+ MILLER
+ SCOTT
+ SMITH
+ TURNER
+ WARD
+(14 rows)
+
+SELECT ename FROM emp e
+WHERE  empno NOT IN (SELECT empno FROM emp
+              WHERE  emp.empno = e.empno)
+ORDER BY ename;
+ ename 
+-------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT ename FROM emp e
+WHERE  empno NOT IN (SELECT empno FROM emp
+              WHERE  emp.empno = e.empno)
+ORDER BY ename;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: e.ename
+   Sort Key: e.ename
+   ->  Foreign Scan on public.emp e
+         Output: e.ename
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT empno, ename FROM fdw_db.emp
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.empno
+                 Remote SQL: SELECT empno FROM fdw_db.emp WHERE ((empno = ?))
+(11 rows)
+
+DROP FOREIGN TABLE emp;
+--******* DATEOID  --> DATE  ************
+-- EXECPECT OUTPUT FROM POSTGRES
+--test=# SELECT empno, ename, sal, deptno FROM emp e
+--test-# WHERE  hiredate NOT IN (SELECT hiredate FROM emp
+--test(#               WHERE  emp.deptno = e.deptno)
+--test-# ORDER BY deptno;
+-- empno | ename | sal | deptno 
+-------+-------+-----+--------
+--(0 rows)
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             VARCHAR(10),
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed.
+SELECT comm FROM emp e
+WHERE  hiredate IN (SELECT hiredate FROM emp
+              WHERE  emp.hiredate = e.hiredate)
+ORDER BY comm;
+ comm 
+------
+    0
+  300
+  500
+ 1400
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+(14 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  hiredate NOT IN (SELECT hiredate FROM emp
+              WHERE  emp.hiredate = e.hiredate)
+ORDER BY deptno;
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT empno, ename, hiredate, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.hiredate
+                 Remote SQL: SELECT hiredate FROM fdw_db.emp WHERE ((hiredate = ?))
+(11 rows)
+
+DROP FOREIGN TABLE emp;
+--******* TIMESTAMPOID  --> TIMESTAMP  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        TIMESTAMP,
+    sal             VARCHAR(10),
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp2');
+-- Execute the Query and the parametrized WHERE clause will be pushed.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  hiredate IN (SELECT hiredate FROM emp
+              WHERE  emp.hiredate = e.hiredate)
+ORDER BY deptno;
+ empno | ename  | sal  | deptno 
+-------+--------+------+--------
+  7934 | MILLER | 1300 |     10
+  7782 | CLARK  | 2450 |     10
+  7839 | KING   | 5000 |     10
+  7788 | SCOTT  | 3000 |     20
+  7566 | JONES  | 2975 |     20
+  7369 | SMITH  | 800  |     20
+  7876 | ADAMS  | 1100 |     20
+  7902 | FORD   | 3000 |     20
+  7521 | WARD   | 1250 |     30
+  7844 | TURNER | 1500 |     30
+  7499 | ALLEN  | 1600 |     30
+  7698 | BLAKE  | 2850 |     30
+  7654 | MARTIN | 1250 |     30
+  7900 | JAMES  | 950  |     30
+(14 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  hiredate IN (SELECT hiredate FROM emp
+              WHERE  emp.hiredate = e.hiredate)
+ORDER BY deptno;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT empno, ename, hiredate, sal, deptno FROM fdw_db.emp2
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.hiredate
+                 Remote SQL: SELECT hiredate FROM fdw_db.emp2 WHERE ((hiredate = ?))
+(11 rows)
+
+DROP FOREIGN TABLE emp;
+--******* TIMESTAMPTZOID  --> TIMESTAMP WITH TIME ZONE  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        TIMESTAMP WITH TIME ZONE,
+    sal             VARCHAR(10),
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp2');
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  hiredate IN (SELECT hiredate FROM emp
+              WHERE  emp.hiredate = e.hiredate)
+ORDER BY deptno;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT empno, ename, hiredate, sal, deptno FROM fdw_db.emp2
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.hiredate
+                 Remote SQL: SELECT hiredate FROM fdw_db.emp2 WHERE ((hiredate = ?))
+(11 rows)
+
+DROP FOREIGN TABLE emp;
+--******* TEXTOID  --> TEXT  ************
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        TIMESTAMP WITH TIME ZONE,
+    sal             TEXT,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT sal FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename  | sal  | deptno 
+-------+--------+------+--------
+  7934 | MILLER | 1300 |     10
+  7782 | CLARK  | 2450 |     10
+  7839 | KING   | 5000 |     10
+  7788 | SCOTT  | 3000 |     20
+  7566 | JONES  | 2975 |     20
+  7369 | SMITH  | 800  |     20
+  7876 | ADAMS  | 1100 |     20
+  7902 | FORD   | 3000 |     20
+  7521 | WARD   | 1250 |     30
+  7844 | TURNER | 1500 |     30
+  7499 | ALLEN  | 1600 |     30
+  7698 | BLAKE  | 2850 |     30
+  7654 | MARTIN | 1250 |     30
+  7900 | JAMES  | 950  |     30
+(14 rows)
+
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal NOT IN (SELECT sal FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+ empno | ename | sal | deptno 
+-------+-------+-----+--------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE)SELECT empno, ename, sal, deptno FROM emp e
+WHERE  sal IN (SELECT sal FROM emp
+              WHERE  emp.sal = e.sal)
+ORDER BY deptno;
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.sal
+                 Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+(11 rows)
+
+--******* BPCHAROID  --> CHAR  ************
+CREATE FOREIGN TABLE chr_date (
+   col1              	char(30)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'chr_date');
+-- Execute the Query and the parametrized WHERE clause will be pushed.
+SELECT * FROM chr_date c
+WHERE  col1 NOT IN (SELECT col1 FROM chr_date
+              WHERE  chr_date.col1 = c.col1)
+ORDER BY col1;
+ col1 
+------
+(0 rows)
+
+SELECT * FROM chr_date c
+WHERE  col1 IN (SELECT col1 FROM chr_date
+              WHERE  chr_date.col1 = c.col1)
+ORDER BY col1;
+              col1              
+--------------------------------
+ 1980-12-17 01:23:23           
+ 1981-02-20 05:01:20           
+ 1981-02-22 06:21:48           
+ 1981-04-02 08:24:35           
+(4 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT * FROM chr_date c
+WHERE  col1 NOT IN (SELECT col1 FROM chr_date
+              WHERE  chr_date.col1 = c.col1)
+ORDER BY col1;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: c.col1
+   Sort Key: c.col1
+   ->  Foreign Scan on public.chr_date c
+         Output: c.col1
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT * FROM fdw_db.chr_date
+         SubPlan 1
+           ->  Foreign Scan on public.chr_date
+                 Output: chr_date.col1
+                 Remote SQL: SELECT * FROM fdw_db.chr_date WHERE ((col1 = ?))
+(11 rows)
+
+--******* BOOLOID  -->  BOOLEAN ************
+CREATE FOREIGN TABLE bool_test (
+    bol1              	BOOLEAN,
+    bol2                INT
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
+-- Execute the Query and the parametrized WHERE clause will be pushed.
+SELECT bol1,bol2 FROM bool_test b
+WHERE  bol1 IN (SELECT bol1 FROM bool_test
+              WHERE  bool_test.bol1 = b.bol1)
+ORDER BY bol1;
+ bol1 | bol2 
+------+------
+ f    |    1
+ f    |    1
+ t    |    0
+ t    |    2
+(4 rows)
+
+SELECT bol1,bol2 FROM bool_test b
+WHERE  bol1 NOT IN (SELECT bol1 FROM bool_test
+              WHERE  bool_test.bol1 = b.bol1)
+ORDER BY bol1;
+ bol1 | bol2 
+------+------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT bol1,bol2 FROM bool_test b
+WHERE  bol1 IN (SELECT bol1 FROM bool_test
+              WHERE  bool_test.bol1 = b.bol1)
+ORDER BY bol1;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Sort
+   Output: b.bol1, b.bol2
+   Sort Key: b.bol1
+   ->  Foreign Scan on public.bool_test b
+         Output: b.bol1, b.bol2
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT * FROM fdw_db.bool_test
+         SubPlan 1
+           ->  Foreign Scan on public.bool_test
+                 Output: bool_test.bol1
+                 Remote SQL: SELECT bol1 FROM fdw_db.bool_test WHERE ((bol1 = ?))
+(11 rows)
+
+--******* JSONOID  -->  json ************
+-- Error will be displayed as JSON Not supported.
+CREATE FOREIGN TABLE json_test (
+    bol1              	json,
+    bol2                INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
+SELECT bol1 FROM json_test;
+ERROR:  unsupported PostgreSQL data type
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR : 114
+--******* TIMEOID  -->  TIME ************
+CREATE FOREIGN TABLE time_test (
+    col1              	TIME
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'var_date');
+-- Error will be displayed as TIME is not handled by JDBC Driver.
+SELECT col1 FROM time_test b
+WHERE  col1 NOT IN (SELECT col1 FROM time_test
+              WHERE  time_test.col1 = b.col1)
+ORDER BY col1;
+ERROR:  failed to bind variable: 1083
+-- Plan will show column being pushed down
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1 FROM time_test b
+WHERE  col1 NOT IN (SELECT col1 FROM time_test
+              WHERE  time_test.col1 = b.col1)
+ORDER BY col1;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: b.col1
+   Sort Key: b.col1
+   ->  Foreign Scan on public.time_test b
+         Output: b.col1
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT * FROM fdw_db.var_date
+         SubPlan 1
+           ->  Foreign Scan on public.time_test
+                 Output: time_test.col1
+                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+(11 rows)
+
+--******* NAMEOID  -->  NAME ************
+CREATE FOREIGN TABLE name_test (
+    col1              	NAME
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'var_date');
+-- Data will be returned and column wil be pushed.
+SELECT col1 FROM name_test b
+WHERE  col1 NOT IN (SELECT col1 FROM name_test
+              WHERE  name_test.col1 = b.col1)
+ORDER BY col1;
+ col1 
+------
+(0 rows)
+
+SELECT col1 FROM name_test b
+WHERE  col1 IN (SELECT col1 FROM name_test
+              WHERE  name_test.col1 = b.col1)
+ORDER BY col1;
+        col1         
+---------------------
+ 1980-12-17 01:23:23
+ 1981-02-20 05:01:20
+ 1981-02-22 06:21:48
+ 1981-04-02 08:24:35
+(4 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1 FROM name_test b
+WHERE  col1 NOT IN (SELECT col1 FROM name_test
+              WHERE  name_test.col1 = b.col1)
+ORDER BY col1;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: b.col1
+   Sort Key: b.col1
+   ->  Foreign Scan on public.name_test b
+         Output: b.col1
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT * FROM fdw_db.var_date
+         SubPlan 1
+           ->  Foreign Scan on public.name_test
+                 Output: name_test.col1
+                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+(11 rows)
+
+--******* BITOID  -->  BIT ************
+CREATE FOREIGN TABLE bit_test (
+    col1              	bit
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'var_date');
+-- Data will be returned and column wil be pushed.
+SELECT col1 FROM bit_test b
+WHERE  col1 NOT IN (SELECT col1 FROM bit_test
+              WHERE  bit_test.col1 = b.col1)
+ORDER BY col1;
+ERROR:  "9" is not a valid binary digit
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1 FROM bit_test b
+WHERE  col1 NOT IN (SELECT col1 FROM bit_test
+              WHERE  bit_test.col1 = b.col1)
+ORDER BY col1;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: b.col1
+   Sort Key: b.col1
+   ->  Foreign Scan on public.bit_test b
+         Output: b.col1
+         Filter: (NOT (SubPlan 1))
+         Remote SQL: SELECT * FROM fdw_db.var_date
+         SubPlan 1
+           ->  Foreign Scan on public.bit_test
+                 Output: bit_test.col1
+                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+(11 rows)
+
+--====================================================================
+--                        RM # 42773
+--====================================================================
+DROP FOREIGN TABLE emp;
+-- Verify that correct data is displayed.
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        DATE,
+    sal             VARCHAR(10),
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+-- Execute the Query and the parametrized WHERE clause will be pushed as shown here.
+SELECT empno, ename, sal, deptno FROM emp e
+WHERE  hiredate IN (SELECT hiredate FROM emp
+               WHERE  emp.deptno = e.deptno AND emp.deptno > e.deptno)
+ORDER BY deptno;
+ empno | ename | sal | deptno 
+-------+-------+-----+--------
+(0 rows)
+
+EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
+WHERE  hiredate IN (SELECT hiredate FROM emp
+               WHERE  emp.deptno = e.deptno AND emp.deptno > e.deptno)
+ORDER BY deptno;
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, e.sal, e.deptno
+   Sort Key: e.deptno
+   ->  Foreign Scan on public.emp e
+         Output: e.empno, e.ename, e.sal, e.deptno
+         Filter: (SubPlan 1)
+         Remote SQL: SELECT empno, ename, hiredate, sal, deptno FROM fdw_db.emp
+         SubPlan 1
+           ->  Foreign Scan on public.emp
+                 Output: emp.hiredate
+                 Remote SQL: SELECT hiredate FROM fdw_db.emp WHERE ((deptno > ?)) AND ((deptno = ?))
+(11 rows)
+
+-- 2 Rows with empno 7900 and 7902 will be displayed.
+SELECT empno, ename, sal, deptno FROM emp e WHERE hiredate IN (SELECT hiredate FROM emp WHERE emp.deptno < e.deptno OR emp.deptno > e.deptno);
+ empno | ename | sal  | deptno 
+-------+-------+------+--------
+  7900 | JAMES | 950  |     30
+  7902 | FORD  | 3000 |     20
+(2 rows)
+
+-- 1 Row with empno 7902 will be displayed.
+SELECT empno, ename, sal, deptno FROM emp e WHERE hiredate IN (SELECT hiredate FROM emp WHERE emp.empno < e.empno OR emp.deptno > e.deptno);
+ empno | ename | sal  | deptno 
+-------+-------+------+--------
+  7902 | FORD  | 3000 |     20
+(1 row)
+
+-- DROP EXTENSION
+DROP EXTENSION hdfs_fdw CASCADE;
+NOTICE:  drop cascades to 10 other objects
+DETAIL:  drop cascades to server hdfs_server
+drop cascades to user mapping for postgres on server hdfs_server
+drop cascades to foreign table dept
+drop cascades to foreign table chr_date
+drop cascades to foreign table bool_test
+drop cascades to foreign table json_test
+drop cascades to foreign table time_test
+drop cascades to foreign table name_test
+drop cascades to foreign table bit_test
+drop cascades to foreign table emp
+\c postgres postgres
+DROP DATABASE fdw_regression;
