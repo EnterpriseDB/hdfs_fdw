@@ -21,6 +21,7 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 CREATE DATABASE fdw_regression ENCODING=UTF8 LC_CTYPE='en_US.UTF-8' TEMPLATE=template0;
 \c fdw_regression postgres
@@ -41,7 +42,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server. log_remote_sql 'true' is required to setup logging for Remote SQL Sent to Hive Server.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', auth_type :AUTH_TYPE);
 
 -- Create Hadoop USER MAPPING.
 
@@ -123,7 +124,7 @@ ALTER SERVER hdfs_server OPTIONS (SET fetch_size '200');
 DROP SERVER hdfs_server CASCADE;
 
 -- Create foreign server with option fetch_size
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', fetch_size '200');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', fetch_size '200', auth_type :AUTH_TYPE);
 
 -- Create Hadoop USER MAPPING.
 CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
@@ -163,7 +164,7 @@ SELECT * FROM DEPT;
 DROP SERVER hdfs_server CASCADE;
 
 -- Create foreign server with option fetch_size
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', fetch_size '1');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', fetch_size '1', auth_type :AUTH_TYPE);
 
 -- Create Hadoop USER MAPPING.
 
@@ -185,7 +186,7 @@ SELECT deptno FROM DEPT;
 DROP SERVER hdfs_server CASCADE;
 
 -- Create foreign server with option fetch_size
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', fetch_size '700000');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', fetch_size '700000', auth_type :AUTH_TYPE);
 
 -- Create Hadoop USER MAPPING.
 CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);

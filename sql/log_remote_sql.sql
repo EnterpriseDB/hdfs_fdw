@@ -21,6 +21,7 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 CREATE DATABASE fdw_regression;
 \c fdw_regression postgres
@@ -65,7 +66,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server with value in log_remote_sql ''.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql '');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql '', auth_type :AUTH_TYPE);
 
 CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 
@@ -121,7 +122,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server with false value in log_remote_sql . Log will not be generated.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'false');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'false', auth_type :AUTH_TYPE);
 
 \des+ hdfs_server
 
@@ -166,7 +167,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server without log_remote_sql, default will be false. Log will not be generated.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE);
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
 
 \des+ hdfs_server
 
@@ -216,7 +217,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server without log_remote_sql, default will be false. Log will not be generated.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE,log_remote_sql 'true');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE,log_remote_sql 'true', auth_type :AUTH_TYPE);
 
 \des+ hdfs_server
 

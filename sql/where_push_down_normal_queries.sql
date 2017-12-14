@@ -21,6 +21,7 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 CREATE DATABASE fdw_regression;
 \c fdw_regression postgres
@@ -29,7 +30,7 @@ CREATE EXTENSION hdfs_fdw;
 
 -- Create Hadoop FDW Server. log_remote_sql 'true' is required to setup logging for Remote SQL Sent to Hive Server.
 
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true');
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', auth_type :AUTH_TYPE);
 
 -- Create Hadoop USER MAPPING.
 
