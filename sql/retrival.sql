@@ -123,11 +123,11 @@ SELECT * FROM EMP ORDER BY deptno DESC, empno DESC;
 
 SELECT * FROM DEPT ORDER BY dname DESC;
 
-SELECT DISTINCT deptno FROM EMP;
+SELECT DISTINCT deptno FROM EMP ORDER BY deptno;
 
-SELECT DISTINCT mgr, deptno FROM EMP;
+SELECT DISTINCT mgr, deptno FROM EMP ORDER BY mgr,deptno;
 
-SELECT DISTINCT empno, deptno FROM EMP;
+SELECT DISTINCT empno, deptno FROM EMP ORDER BY empno, deptno;
 
 SELECT deptno, dname, loc FROM dept;
 

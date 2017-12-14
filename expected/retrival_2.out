@@ -206,16 +206,16 @@ SELECT * FROM DEPT ORDER BY dname DESC;
      10 | ACCOUNTING | NEW YORK
 (4 rows)
 
-SELECT DISTINCT deptno FROM EMP;
- deptno 
+SELECT DISTINCT deptno FROM EMP ORDER BY deptno;
+ deptno
 --------
      10
      20
      30
 (3 rows)
 
-SELECT DISTINCT mgr, deptno FROM EMP;
- mgr  | deptno 
+SELECT DISTINCT mgr, deptno FROM EMP ORDER BY mgr,deptno;
+ mgr  | deptno
 ------+--------
  7566 |     20
  7698 |     30
@@ -228,8 +228,8 @@ SELECT DISTINCT mgr, deptno FROM EMP;
       |     10
 (9 rows)
 
-SELECT DISTINCT empno, deptno FROM EMP;
- empno | deptno 
+SELECT DISTINCT empno, deptno FROM EMP ORDER BY empno, deptno;
+ empno | deptno
 -------+--------
   7369 |     20
   7499 |     30
