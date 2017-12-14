@@ -204,14 +204,14 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- Execute the Query and the normal WHERE clause will be pushed as shown here.
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
 WHERE  hiredate <= '1980-12-17' ORDER BY deptno;
-                                                      QUERY PLAN                                                       
------------------------------------------------------------------------------------------------------------------------
+                                               QUERY PLAN                                                       
+---------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((hiredate <= 'Wed Dec 17 00:00:00 1980'))
+         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((hiredate <= '12-17-1980'))
 (6 rows)
 
 DROP FOREIGN TABLE emp;

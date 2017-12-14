@@ -72,21 +72,19 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
 -- Data retrival using SELECT Statement.
 
-SELECT * FROM emp_ext;
+SELECT * FROM emp_ext ORDER BY empno;
 
-SELECT empno, ename, job, mgr, hiredate, sal, comm, deptno FROM emp_ext;
+SELECT empno, ename, job, mgr, hiredate, sal, comm, deptno FROM emp_ext ORDER BY empno,sal;
 
-SELECT * FROM emp_ext ORDER BY deptno;
+SELECT * FROM emp_ext ORDER BY empno,deptno;
 
-SELECT deptno, sal, comm FROM emp_ext ORDER BY deptno;
-
-SELECT ename as "Employee Name" FROM emp_ext;
+SELECT deptno, sal, comm FROM emp_ext ORDER BY empno,deptno;
 
 SELECT COUNT(*) FROM emp_ext;
 
-SELECT * FROM emp_ext ORDER BY empno LIMIT 2;
+SELECT * FROM emp_ext ORDER BY empno,deptno LIMIT 2;
 
-SELECT * FROM emp_ext ORDER BY empno LIMIT 5 OFFSET 1;
+SELECT * FROM emp_ext ORDER BY empno,deptno LIMIT 5 OFFSET 1;
 
 -- Data retrival using Group By.
 
@@ -101,7 +99,7 @@ ORDER BY deptno;
 
 SELECT * FROM emp_ext
 WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
-ORDER BY empno;
+ORDER BY empno,deptno;
 
 SELECT * FROM emp_ext
 WHERE deptno NOT IN (SELECT deptno FROM dept)
