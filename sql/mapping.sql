@@ -215,6 +215,5 @@ DROP EXTENSION hdfs_fdw;
 DROP SCHEMA test_ext_schema;
 DROP ROLE low_priv_user;
 DROP VIEW ext_v1;
-DROP TABLE DUAL;
 \c postgres postgres
 DROP DATABASE fdw_regression;
