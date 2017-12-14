@@ -107,10 +107,10 @@ CREATE EXTENSION hdfs_fdw;
 -- Create Hadoop FDW Server with false value in log_remote_sql . Log will not be generated.
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'false', auth_type :AUTH_TYPE);
 \des+ hdfs_server
-                                                                                List of foreign servers
-    Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                     FDW Options                                     | Description 
--------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', log_remote_sql 'false') | 
+                                                                                         List of foreign servers
+    Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                              FDW Options                                              | Description 
+-------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------------------------------+-------------
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', log_remote_sql 'false', auth_type 'LDAP') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -165,10 +165,10 @@ CREATE EXTENSION hdfs_fdw;
 -- Create Hadoop FDW Server without log_remote_sql, default will be false. Log will not be generated.
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
 \des+ hdfs_server
-                                                                    List of foreign servers
-    Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                         FDW Options                         | Description 
--------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2') | 
+                                                                             List of foreign servers
+    Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                  FDW Options                                  | Description 
+-------------+----------+----------------------+-------------------+------+---------+-------------------------------------------------------------------------------+-------------
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', auth_type 'LDAP') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.
@@ -226,10 +226,10 @@ CREATE EXTENSION hdfs_fdw;
 -- Create Hadoop FDW Server without log_remote_sql, default will be false. Log will not be generated.
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE,log_remote_sql 'true', auth_type :AUTH_TYPE);
 \des+ hdfs_server
-                                                                                List of foreign servers
-    Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                    FDW Options                                     | Description 
--------------+----------+----------------------+-------------------+------+---------+------------------------------------------------------------------------------------+-------------
- hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', log_remote_sql 'true') | 
+                                                                                         List of foreign servers
+    Name     |  Owner   | Foreign-data wrapper | Access privileges | Type | Version |                                             FDW Options                                              | Description 
+-------------+----------+----------------------+-------------------+------+---------+------------------------------------------------------------------------------------------------------+-------------
+ hdfs_server | postgres | hdfs_fdw             |                   |      |         | (host 'localhost', port '10000', client_type 'hiveserver2', log_remote_sql 'true', auth_type 'LDAP') | 
 (1 row)
 
 -- Create Hadoop USER MAPPING.

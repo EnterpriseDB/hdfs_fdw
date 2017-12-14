@@ -205,7 +205,7 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- Execute the Query and the normal WHERE clause will be pushed as shown here.
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
 WHERE  hiredate <= '1980-12-17' ORDER BY deptno;
-                                               QUERY PLAN                                                       
+                                               QUERY PLAN                                                
 ---------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
