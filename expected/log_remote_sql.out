@@ -19,6 +19,7 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 CREATE DATABASE fdw_regression;
 \c fdw_regression postgres
 CREATE EXTENSION hdfs_fdw;

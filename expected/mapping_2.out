@@ -19,6 +19,7 @@
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 CREATE DATABASE fdw_regression;
 \c fdw_regression postgres
 --create a non superuser
@@ -175,7 +176,7 @@ OPTIONS (host '127.0.0.1', PORT:HIVE_PORT,Client_Type :HIVE_CLIENT_TYPE);
 
 --Create a server providing valid OPTIONS (HOST,PORT,CLIENT_TYPE,connect_timeout,query_timeout)
 CREATE SERVER hdfs_srv3a FOREIGN DATA WRAPPER hdfs_fdw 
- OPTIONS (host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, connect_timeout '4000',query_timeout '4000');
+ OPTIONS (host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, connect_timeout '4000',query_timeout '4000',auth_type :AUTH_TYPE);
 --\des+ hdfs_srv3a  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
 --test server
 CREATE USER MAPPING FOR postgres SERVER hdfs_srv3a OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
