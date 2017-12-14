@@ -190,7 +190,7 @@ CREATE TABLE emp2 (
     ename           VARCHAR(10),
     job                 VARCHAR(9),
     mgr               INT,
-    hiredate        DATE,
+    hiredate        TIMESTAMP,
     sal                INT,
     comm           INT,
     deptno          INT
