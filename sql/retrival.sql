@@ -554,15 +554,6 @@ SELECT * FROM (
 WHERE dept.deptno = emp.deptno
 ORDER BY dept.deptno;
 
---Synonym
-
-CREATE SYNONYM syn_dept FOR dept;
-
-SELECT * FROM syn_dept;
-
-SELECT * FROM dept;
-
-
 --Cleanup
 
 --DROP SYNONYM syn_dept;

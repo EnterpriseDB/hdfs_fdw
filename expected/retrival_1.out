@@ -1678,26 +1678,6 @@ ORDER BY dept.deptno;
      30 |         6 |     30 | SALES      | CHICAGO
 (3 rows)
 
---Synonym
-CREATE SYNONYM syn_dept FOR dept;
-SELECT * FROM syn_dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
-SELECT * FROM dept;
- deptno |   dname    |   loc    
---------+------------+----------
-     10 | ACCOUNTING | NEW YORK
-     20 | RESEARCH   | DALLAS
-     30 | SALES      | CHICAGO
-     40 | OPERATIONS | BOSTON
-(4 rows)
-
 --Cleanup
 --DROP SYNONYM syn_dept;
 DROP VIEW smpl_vw;
