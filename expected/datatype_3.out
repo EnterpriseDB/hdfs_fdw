@@ -46,15 +46,10 @@ CREATE FOREIGN TABLE emp_fr_21 (
  bol2           TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-ERROR:  type "clob" does not exist
-LINE 2:  bol1           CLOB,
-                        ^
 SELECT * FROM emp_fr_21;
-ERROR:  relation "emp_fr_21" does not exist
-LINE 1: SELECT * FROM emp_fr_21;
-                      ^
+ERROR:  unsupported PostgreSQL data type
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE emp_fr_21;
-ERROR:  foreign table "emp_fr_21" does not exist
 -- Create Table with datatype CLOB, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_clob (
     deptno          CLOB,
@@ -62,15 +57,10 @@ CREATE FOREIGN TABLE dept_dt_clob (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-ERROR:  type "clob" does not exist
-LINE 2:     deptno          CLOB,
-                            ^
 SELECT * FROM dept_dt_clob;
-ERROR:  relation "dept_dt_clob" does not exist
-LINE 1: SELECT * FROM dept_dt_clob;
-                      ^
+ERROR:  unsupported PostgreSQL data type
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_clob;
-ERROR:  foreign table "dept_dt_clob" does not exist
 -- Create Table with datatype MONEY, error message will be displayed.
 CREATE FOREIGN TABLE dept_dt_mony (
     deptno          MONEY,
@@ -318,15 +308,10 @@ CREATE FOREIGN TABLE dept_dt_mp13 (
     loc             CHAR(20)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept_dt_mp1');
-ERROR:  type "number" does not exist
-LINE 2:     deptno            NUMBER(2),
-                              ^
 SELECT * FROM dept_dt_mp13;
-ERROR:  relation "dept_dt_mp13" does not exist
-LINE 1: SELECT * FROM dept_dt_mp13;
-                      ^
+ERROR:  unsupported PostgreSQL data type
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
 DROP FOREIGN TABLE dept_dt_mp13;
-ERROR:  foreign table "dept_dt_mp13" does not exist
 --*************************************************************************
 --===================================================================================
 -- PG Not Supported Datatypes
@@ -344,11 +329,7 @@ CREATE FOREIGN TABLE binary_data
   col1         BLOB
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'binary_data');
-ERROR:  type "blob" does not exist
-LINE 3:   col1         BLOB
-                       ^
 DROP FOREIGN TABLE binary_data;
-ERROR:  foreign table "binary_data" does not exist
 -- Create Hadoop Table with datatype DOUBLE, error message will be displayed.
 CREATE FOREIGN TABLE dbl_data
 (
@@ -494,15 +475,16 @@ CREATE FOREIGN TABLE dept_dt_blob (
     loc             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-ERROR:  type "blob" does not exist
-LINE 2:     deptno          BLOB,
-                            ^
 SELECT * FROM dept_dt_blob ORDER BY deptno;
-ERROR:  relation "dept_dt_blob" does not exist
-LINE 1: SELECT * FROM dept_dt_blob ORDER BY deptno;
-                      ^
+ deptno |   dname    |   loc    
+--------+------------+----------
+ \x3130 | ACCOUNTING | NEW YORK
+ \x3230 | RESEARCH   | DALLAS
+ \x3330 | SALES      | CHICAGO
+ \x3430 | OPERATIONS | BOSTON
+(4 rows)
+
 DROP FOREIGN TABLE dept_dt_blob;
-ERROR:  foreign table "dept_dt_blob" does not exist
 -- Create Table with datatype BYTEA, data will be displayed.
 CREATE FOREIGN TABLE dept_dt_byt (
     deptno          BYTEA,
@@ -527,15 +509,16 @@ CREATE FOREIGN TABLE dept_dt_str (
     loc             VARCHAR2(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-ERROR:  type "string" does not exist
-LINE 2:     deptno          STRING,
-                            ^
 SELECT * FROM dept_dt_str ORDER BY deptno;
-ERROR:  relation "dept_dt_str" does not exist
-LINE 1: SELECT * FROM dept_dt_str ORDER BY deptno;
-                      ^
+ deptno |   dname    |   loc    
+--------+------------+----------
+ 10     | ACCOUNTING | NEW YORK
+ 20     | RESEARCH   | DALLAS
+ 30     | SALES      | CHICAGO
+ 40     | OPERATIONS | BOSTON
+(4 rows)
+
 DROP FOREIGN TABLE dept_dt_str;
-ERROR:  foreign table "dept_dt_str" does not exist
 -- Create Table with datatypes INTEGER and TEXTS, data will be displayed.
 CREATE FOREIGN TABLE dept_dt_int (
     deptno          INTEGER,
@@ -1680,15 +1663,16 @@ CREATE FOREIGN TABLE emp_bol5 (
     bol2             TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
-ERROR:  type "blob" does not exist
-LINE 2:     bol1             BLOB,
-                             ^
 SELECT * FROM emp_bol5 ORDER BY bol1;
-ERROR:  relation "emp_bol5" does not exist
-LINE 1: SELECT * FROM emp_bol5 ORDER BY bol1;
-                      ^
+     bol1     | bol2 
+--------------+------
+ \x66616c7365 | 1
+ \x66616c7365 | 1
+ \x74727565   | 0
+ \x74727565   | 2
+(4 rows)
+
 DROP FOREIGN TABLE emp_bol5;
-ERROR:  foreign table "emp_bol5" does not exist
 -- Mapp DATE with BOOLEAN, data will be displayed.
 CREATE FOREIGN TABLE emp_bol8 (
     bol1            DATE,
@@ -2219,15 +2203,26 @@ CREATE FOREIGN TABLE emp_fr19 (
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp_dt_mp1');
-ERROR:  type "blob" does not exist
-LINE 7:     sal             BLOB,
-                            ^
 SELECT * FROM emp_fr19 ORDER BY empno;
-ERROR:  relation "emp_fr19" does not exist
-LINE 1: SELECT * FROM emp_fr19 ORDER BY empno;
-                      ^
+ empno | ename  |    job    | mgr  |  hiredate  |      sal       |       comm       | deptno 
+-------+--------+-----------+------+------------+----------------+------------------+--------
+ 7369  | SMITH  | CLERK     | 7902 | 17/12/1980 | \x3830302e30   | \x302e3030       |     20
+ 7499  | ALLEN  | SALESMAN  | 7698 | 20/02/1981 | \x313630302e30 | \x3330302e3130   |     30
+ 7521  | WARD   | SALESMAN  | 7698 | 22/02/1981 | \x313235302e30 | \x3530302e3030   |     30
+ 7566  | JONES  | MANAGER   | 7839 | 02/04/1981 | \x323937352e30 | \x302e3030       |     20
+ 7654  | MARTIN | SALESMAN  | 7698 | 28/09/1981 | \x313235302e30 | \x313430302e3334 |     30
+ 7698  | BLAKE  | MANAGER   | 7839 | 01/05/1981 | \x323835302e30 | \x302e3030       |     30
+ 7782  | CLARK  | MANAGER   | 7839 | 09/06/1981 | \x323435302e30 | \x302e3030       |     10
+ 7788  | SCOTT  | ANALYST   | 7566 | 19/04/1987 | \x333030302e30 | \x302e3030       |     20
+ 7839  | KING   | PRESIDENT |      | 17/11/1981 | \x353030302e30 | \x302e3030       |     10
+ 7844  | TURNER | SALESMAN  | 7698 | 08/09/1980 | \x313530302e30 | \x302e3030       |     30
+ 7876  | ADAMS  | CLERK     | 7788 | 23/05/1987 | \x313130302e30 | \x302e3030       |     20
+ 7900  | JAMES  | CLERK     | 7698 | 03/12/1981 | \x3935302e30   | \x302e3030       |     30
+ 7902  | FORD   | ANALYST   | 7566 | 03/12/1981 | \x333030302e30 | \x302e3030       |     20
+ 7934  | MILLER | CLERK     | 7782 | 23/01/1982 | \x313330302e30 | \x302e3030       |     10
+(14 rows)
+
 DROP FOREIGN TABLE emp_fr19;
-ERROR:  foreign table "emp_fr19" does not exist
 /*
 
 RM # 38240 Logged

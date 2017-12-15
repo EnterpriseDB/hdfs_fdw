@@ -53,79 +53,79 @@ CREATE FOREIGN TABLE dept (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 -- Data retrival using SELECT Statement.
 SELECT * FROM emp_ext ORDER BY empno;
- empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 1981-11-17 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 17/11/1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 | 1300 |      |     10
 (14 rows)
 
 SELECT empno, ename, job, mgr, hiredate, sal, comm, deptno FROM emp_ext ORDER BY empno,sal;
- empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 1981-11-17 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 17/11/1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 | 1300 |      |     10
 (14 rows)
 
 SELECT * FROM emp_ext ORDER BY empno,deptno;
- empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 1980-12-17 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 1981-02-20 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 1981-04-02 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 1981-05-01 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 1981-06-09 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 1987-04-19 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 1981-11-17 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 1980-09-08 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 1987-05-23 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 1981-12-03 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 1981-12-03 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 1982-01-23 | 1300 |      |     10
+  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 17/11/1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 23/01/1982 | 1300 |      |     10
 (14 rows)
 
-SELECT deptno, sal, comm FROM emp_ext ORDER BY deptno;
+SELECT deptno, sal, comm FROM emp_ext ORDER BY empno,deptno;
  deptno | sal  | comm 
 --------+------+------
-     10 | 1300 |     
-     10 | 2450 |     
-     10 | 5000 |     
-     20 | 3000 |     
-     20 | 2975 |     
      20 |  800 |     
-     20 | 1100 |     
-     20 | 3000 |     
-     30 | 1250 |  500
-     30 | 1500 |    0
      30 | 1600 |  300
-     30 | 2850 |     
+     30 | 1250 |  500
+     20 | 2975 |     
      30 | 1250 | 1400
+     30 | 2850 |     
+     10 | 2450 |     
+     20 | 3000 |     
+     10 | 5000 |     
+     30 | 1500 |    0
+     20 | 1100 |     
      30 |  950 |     
+     20 | 3000 |     
+     10 | 1300 |     
 (14 rows)
 
 SELECT COUNT(*) FROM emp_ext;
@@ -135,20 +135,20 @@ SELECT COUNT(*) FROM emp_ext;
 (1 row)
 
 SELECT * FROM emp_ext ORDER BY empno,deptno LIMIT 2;
- empno | ename |   job    | mgr  |  hiredate  | sal  | comm | deptno
+ empno | ename |   job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+-------+----------+------+------------+------+------+--------
-  7369 | SMITH | CLERK    | 7902 | 1980-12-17 |  800 |      |     20
-  7499 | ALLEN | SALESMAN | 7698 | 1981-02-20 | 1600 |  300 |     30
+  7369 | SMITH | CLERK    | 7902 | 17/12/1980 |  800 |      |     20
+  7499 | ALLEN | SALESMAN | 7698 | 20/02/1981 | 1600 |  300 |     30
 (2 rows)
 
 SELECT * FROM emp_ext ORDER BY empno,deptno LIMIT 5 OFFSET 1;
- empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+----------+------+------------+------+------+--------
-  7499 | ALLEN  | SALESMAN | 7698 | 1981-02-20 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN | 7698 | 1981-02-22 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER  | 7839 | 1981-04-02 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN | 7698 | 1981-09-28 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER  | 7839 | 1981-05-01 | 2850 |      |     30
+  7499 | ALLEN  | SALESMAN | 7698 | 20/02/1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN | 7698 | 22/02/1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 02/04/1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 28/09/1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 01/05/1981 | 2850 |      |     30
 (5 rows)
 
 -- Data retrival using Group By.
@@ -175,13 +175,13 @@ ORDER BY deptno;
 SELECT * FROM emp_ext
 WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
 ORDER BY empno,deptno;
- empno | ename |   job   | mgr  |  hiredate  | sal  | comm | deptno
+ empno | ename |   job   | mgr  |  hiredate  | sal  | comm | deptno 
 -------+-------+---------+------+------------+------+------+--------
-  7369 | SMITH | CLERK   | 7902 | 1980-12-17 |  800 |      |     20
-  7566 | JONES | MANAGER | 7839 | 1981-04-02 | 2975 |      |     20
-  7788 | SCOTT | ANALYST | 7566 | 1987-04-19 | 3000 |      |     20
-  7876 | ADAMS | CLERK   | 7788 | 1987-05-23 | 1100 |      |     20
-  7902 | FORD  | ANALYST | 7566 | 1981-12-03 | 3000 |      |     20
+  7369 | SMITH | CLERK   | 7902 | 17/12/1980 |  800 |      |     20
+  7566 | JONES | MANAGER | 7839 | 02/04/1981 | 2975 |      |     20
+  7788 | SCOTT | ANALYST | 7566 | 19/04/1987 | 3000 |      |     20
+  7876 | ADAMS | CLERK   | 7788 | 23/05/1987 | 1100 |      |     20
+  7902 | FORD  | ANALYST | 7566 | 03/12/1981 | 3000 |      |     20
 (5 rows)
 
 SELECT * FROM emp_ext
@@ -382,22 +382,22 @@ ORDER BY d.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d FULL OUTER JOIN emp_ext e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
@@ -648,44 +648,44 @@ ORDER BY dept_lcl.deptno;
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp_ext e
 WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
 SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp_ext e
 ON d.deptno=e.deptno
-ORDER BY d.deptno;
+ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
      20 | RESEARCH   |  7566 | JONES  | 2975 |     20
      20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7900 | JAMES  |  950 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
+     30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
