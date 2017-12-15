@@ -52,7 +52,14 @@ PG_MODULE_MAGIC;
 /* Default CPU cost to process 1 row  */
 #define DEFAULT_FDW_TUPLE_COST      1000.0
 
+/*
+ * In PG 9.5.1 the number will be 90501,
+ * our version is 2.0.3 so number will be 20003
+ */
+#define CODE_VERSION   20003
+
 PG_FUNCTION_INFO_V1(hdfs_fdw_handler);
+PG_FUNCTION_INFO_V1(hdfs_fdw_version);
 
 #define IS_DEBUG					0
 
@@ -99,6 +106,12 @@ static void process_query_params(int index,
 #endif
 
 static void hdfs_fdw_xact_callback(XACT_CB_SIGNATURE);
+
+Datum
+hdfs_fdw_version(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_INT32(CODE_VERSION);
+}
 
 void
 _PG_init(void)
@@ -295,6 +308,8 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	}
 
 	baserel->rows = 1000;
+	fpinfo->width = 1000;
+	baserel->reltarget->width = fpinfo->width;
 
 	/* Get the actual number of rows from server
 	 * if use_remote_estimate is specified in options.
@@ -310,6 +325,9 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 		hdfs_rel_connection(con_index);
 	}
 	fpinfo->rows = baserel->tuples = baserel->rows;
+
+	fpinfo->width = 1000;
+	baserel->reltarget->width = fpinfo->width;
 
 	if (IS_DEBUG)
 		ereport(LOG, (errmsg("hdfs_fdw: hdfsGetForeignRelSize ends [%f]", baserel->rows)));

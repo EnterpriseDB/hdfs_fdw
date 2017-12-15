@@ -31,3 +31,7 @@ LANGUAGE C STRICT;
 CREATE FOREIGN DATA WRAPPER hdfs_fdw
   HANDLER hdfs_fdw_handler
   VALIDATOR hdfs_fdw_validator;
+
+CREATE OR REPLACE FUNCTION hdfs_fdw_version()
+  RETURNS pg_catalog.int4 STRICT
+  AS 'MODULE_PATHNAME' LANGUAGE C;
