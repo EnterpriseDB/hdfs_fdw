@@ -308,8 +308,6 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	}
 
 	baserel->rows = 1000;
-	fpinfo->width = 1000;
-	baserel->reltarget->width = fpinfo->width;
 
 	/* Get the actual number of rows from server
 	 * if use_remote_estimate is specified in options.
@@ -325,9 +323,6 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 		hdfs_rel_connection(con_index);
 	}
 	fpinfo->rows = baserel->tuples = baserel->rows;
-
-	fpinfo->width = 1000;
-	baserel->reltarget->width = fpinfo->width;
 
 	if (IS_DEBUG)
 		ereport(LOG, (errmsg("hdfs_fdw: hdfsGetForeignRelSize ends [%f]", baserel->rows)));
