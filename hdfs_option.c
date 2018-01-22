@@ -67,6 +67,7 @@ static struct HDFSFdwOption valid_options[] =
 	{ "port",                ForeignServerRelationId },
 	{ "username",            UserMappingRelationId },
 	{ "password",            UserMappingRelationId },
+	{ "principal",           ForeignServerRelationId },
 	{ "dbname",              ForeignTableRelationId },
 	{ "table_name",          ForeignTableRelationId },
 	{ "client_type",         ForeignServerRelationId },
@@ -211,6 +212,9 @@ hdfs_get_options(Oid foreigntableid)
 		if (strcmp(def->defname, "password") == 0)
 			opt->password = defGetString(def);
 
+		if (strcmp(def->defname, "principal") == 0)
+			opt->principal = defGetString(def);
+
 		if (strcmp(def->defname, "dbname") == 0)
 			opt->dbname = defGetString(def);
 
@@ -243,11 +247,15 @@ hdfs_get_options(Oid foreigntableid)
 			{
 				if (strcasecmp(defGetString(def), "LDAP") == 0)
 					opt->auth_type = AUTH_TYPE_LDAP;
-				else
-					ereport(ERROR,
-						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
-							errmsg("invalid option \"%s\"", defGetString(def)),
-								errhint("Valid auth_type are NOSASL & LDAP")));
+				else {
+					if (strcasecmp(defGetString(def), "KERBEROS") == 0)
+						opt->auth_type = AUTH_TYPE_KERBEROS;
+					else
+						ereport(ERROR,
+							(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+								errmsg("invalid option \"%s\"", defGetString(def)),
+									errhint("Valid auth_type are NOSASL & LDAP & KERBEROS")));
+				}
 			}
 		}
 

@@ -35,6 +35,7 @@ hdfs_get_connection(ForeignServer *server, UserMapping *user, hdfs_opt *opt)
 							opt->dbname,
 							opt->username,
 							opt->password,
+							opt->principal,
 							opt->connect_timeout,
 							opt->receive_timeout,
 							opt->auth_type,

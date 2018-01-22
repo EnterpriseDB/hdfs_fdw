@@ -43,7 +43,8 @@ typedef enum AUTH_TYPE
 {
 	AUTH_TYPE_UNSPECIFIED = 0,
 	AUTH_TYPE_NOSASL,
-	AUTH_TYPE_LDAP
+	AUTH_TYPE_LDAP,
+	AUTH_TYPE_KERBEROS
 } AUTH_TYPE;
 
 /******************************************************************************
@@ -79,6 +80,7 @@ int Destroy(void);
  * @param databaseName   Name of the database on the Hive server to which to connect.
  * @param username       The name of the user for authentication on the Hive server.
  * @param password       The password of the user for authentication on the Hive server.
+ * @param principal      The principal of the user for kerberos authentication on the Hive server.
  * @param connectTimeout Time in seconds to wait for the connection to get established
                          and authenticated.
  * @param receiveTimeout Time in seconds to wait for queries to get executed on this connection.
@@ -91,7 +93,7 @@ int Destroy(void);
  *         Error messages will be stored in errBuf.
  */
 int DBOpenConnection(char *host, int port, char *databaseName,
-					char *username, char *password,
+					char *username, char *password, char *principal,
 					int connectTimeout, int receiveTimeout,
 					AUTH_TYPE auth_type, CLIENT_TYPE client_type, char **errBuf);
 
