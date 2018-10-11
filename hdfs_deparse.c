@@ -525,7 +525,7 @@ deparseTargetList(StringInfo buf,
 
 	for (i = 1; i <= tupdesc->natts; i++)
 	{
-		Form_pg_attribute attr = tupdesc->attrs[i - 1];
+		Form_pg_attribute attr = TupleDescAttr(tupdesc, i - 1);
 
 		/* Ignore dropped attributes. */
 		if (attr->attisdropped)
@@ -622,7 +622,7 @@ deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_
 	for (i = 0; i < tupdesc->natts; i++)
 	{
 		/* Ignore dropped columns. */
-		if (tupdesc->attrs[i]->attisdropped)
+		if (TupleDescAttr(tupdesc, i)->attisdropped)
 			continue;
 
 		if (!first)
@@ -630,7 +630,7 @@ deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_
 		first = false;
 
 		/* Use attribute name or column_name option. */
-		colname = NameStr(tupdesc->attrs[i]->attname);
+		colname = NameStr(TupleDescAttr(tupdesc, i)->attname);
 		options = GetForeignColumnOptions(relid, i + 1);
 
 		foreach(lc, options)
@@ -699,7 +699,11 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
 	 * option, use attribute name.
 	 */
 	if (colname == NULL)
+#if PG_VERSION_NUM >= 110000
+		colname = get_attname(rte->relid, varattno,false);
+#else
 		colname = get_relid_attribute_name(rte->relid, varattno);
+#endif
 
 	appendStringInfoString(buf, quote_identifier(colname));
 }

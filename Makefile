@@ -22,11 +22,3 @@ DATA = hdfs_fdw--2.0.2.sql hdfs_fdw--2.0.3.sql hdfs_fdw--2.0.1--2.0.2.sql hdfs_f
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
-
-ifndef MAJORVERSION
-    MAJORVERSION := $(basename $(VERSION))
-endif
-
-ifeq (,$(findstring $(MAJORVERSION), 9.3 9.4 9.5 9.6 10.0))
-    $(error PostgreSQL 9.3+ is required to compile this extension)
-endif

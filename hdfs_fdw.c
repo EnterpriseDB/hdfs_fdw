@@ -96,7 +96,7 @@ static void process_query_params(int index,
 
 
 #ifdef EDB_NATIVE_LANG
-	#if PG_VERSION_NUM >= 90300
+	#if PG_VERSION_NUM >= 90300 && PG_VERSION_NUM < 110000
 		#define XACT_CB_SIGNATURE XactEvent event, void *arg, bool spl_commit
 	#else
 		#define XACT_CB_SIGNATURE XactEvent event, void *arg
@@ -513,9 +513,13 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	node->fdw_state = (void *) festate;
 	festate->batch_cxt = AllocSetContextCreate(estate->es_query_cxt,
 						   "hdfs_fdw tuple data",
+#if PG_VERSION_NUM >= 110000
+						   ALLOCSET_DEFAULT_SIZES);
+#else
 						   ALLOCSET_DEFAULT_MINSIZE,
 						   ALLOCSET_DEFAULT_INITSIZE,
 						   ALLOCSET_DEFAULT_MAXSIZE);
+#endif
 
 	festate->query_executed = false;
 	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
@@ -608,8 +612,8 @@ hdfsIterateForeignScan(ForeignScanState *node)
 		{
 			bool        isnull = true;
 			int         attnum = lfirst_int(lc) - 1;
-			Oid         pgtype = tupdesc->attrs[attnum]->atttypid;
-			int32       pgtypmod = tupdesc->attrs[attnum]->atttypmod;
+			Oid         pgtype = TupleDescAttr(tupdesc, attnum)->atttypid;
+			int32       pgtypmod = TupleDescAttr(tupdesc, attnum)->atttypmod;
 			Datum       v;
 
 			v = hdfs_get_value(festate->con_index, options, pgtype,
@@ -761,7 +765,11 @@ prepare_query_params(PlanState *node,
 	 * benefit, and it'd require fdw to know more than is desirable
 	 * about Param evaluation.)
 	 */
+#if PG_VERSION_NUM >= 100000
+	*param_exprs = ExecInitExprList(fdw_exprs, node);
+#else
 	*param_exprs = (List *) ExecInitExpr((Expr *) fdw_exprs, node);
+#endif
 
 }
 

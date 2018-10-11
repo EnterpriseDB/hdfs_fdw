@@ -19,6 +19,7 @@
 #include "libhive/jdbc/hiveclient.h"
 
 
+#include "access/tupdesc.h"
 #include "foreign/foreign.h"
 #include "lib/stringinfo.h"
 #include "nodes/relation.h"
@@ -174,6 +175,10 @@ double hdfs_describe(int con_index, hdfs_opt *opt);
 void hdfs_analyze(int con_index, hdfs_opt *opt);
 bool hdfs_bind_var(int con_index, int param_index, Oid type,
 								Datum value, bool *isnull);
+
+#ifndef TupleDescAttr
+#define TupleDescAttr(tupdesc, i) ((tupdesc)->attrs[(i)])
+#endif
 
 extern void _PG_init(void);
 extern void _PG_fini(void);
