@@ -44,20 +44,20 @@ Usage
   
 While creating the foreign server object for HDFS FDW the following can be specified in options:
   
-    * `host`: IP Address or hostname of the Hive Thrift Server OR Spark Thrift Server. Defaults to `127.0.0.1`
-    * `port`: Port number of the Hive Thrift Server OR Spark Thrift Server. Defaults to `10000`
-    * `client_type`:  hiveserver2 or spark. Hive and Spark both support HiveQL and are compatible but there are few differences like the behaviour of ANALYZE command and connection string for the NOSASL case.
-    * `auth_type`:  NOSASL or LDAP. Specify which authentication type is required while connecting to the Hive or Spark server. Default is unspecified and the FDW uses the username option in the user mapping to infer the auth_type. If the username is empty or not specified it uses NOSASL otherwise it uses LDAP.
-    * `connect_timeout`:  Connection timeout, default value is 300 seconds.
-    * `query_timeout`:  Query timeout is not supported by the Hive JDBC driver.
-    * `fetch_size`:  A user-specified value that is provided as a parameter to the JDBC API setFetchSize . The default value is 10,000..
-    * `log_remote_sql`:  If true , logging will include SQL commands executed on the remote hive server and the number of times that a scan is repeated. The default is false.
-    * `use_remote_estimate`:  Include the use_remote_estimate to instruct the server to use EXPLAIN commands on the remote server when estimating processing costs. By default, use_remote_estimate is false, and remote tables are assumed to have 1000 rows.
-  
+* `host`: IP Address or hostname of the Hive Thrift Server OR Spark Thrift Server. Defaults to `127.0.0.1`
+* `port`: Port number of the Hive Thrift Server OR Spark Thrift Server. Defaults to `10000`
+* `client_type`:  hiveserver2 or spark. Hive and Spark both support HiveQL and are compatible but there are few differences like the behaviour of ANALYZE command and connection string for the NOSASL case.
+* `auth_type`:  NOSASL or LDAP. Specify which authentication type is required while connecting to the Hive or Spark server. Default is unspecified and the FDW uses the username option in the user mapping to infer the auth_type. If the username is empty or not specified it uses NOSASL otherwise it uses LDAP.
+* `connect_timeout`:  Connection timeout, default value is 300 seconds.
+* `query_timeout`:  Query timeout is not supported by the Hive JDBC driver.
+* `fetch_size`:  A user-specified value that is provided as a parameter to the JDBC API setFetchSize . The default value is 10,000..
+* `log_remote_sql`:  If true , logging will include SQL commands executed on the remote hive server and the number of times that a scan is repeated. The default is false.
+* `use_remote_estimate`:  Include the use_remote_estimate to instruct the server to use EXPLAIN commands on the remote server when estimating processing costs. By default, use_remote_estimate is false, and remote tables are assumed to have 1000 rows.
+
 HDFS can be used through either Hive or Spark. In this case both Hive and Spark store metadata in the configured metastore. In the metastore databases and tables can be created using HiveQL. While creating foreign table object for the foreign server the following can be specified in options:
-  
-    * `dbname`: Name of the metastore database to query. This is a mandatory option.
-    * `table_name`: Name of the metastore table, default is the same as foreign table name.
+
+* `dbname`: Name of the metastore database to query. This is a mandatory option.
+* `table_name`: Name of the metastore table, default is the same as foreign table name.
 
   
 Using HDFS FDW with Apache Hive on top of Hadoop
@@ -67,20 +67,20 @@ Step 1: Download [weblogs_parse][8] and follow instructions from this [site][9].
   
 Step 2: Upload weblog_parse.txt file using these commands.
   
-  ```sh
+```sh
   hadoop fs -mkdir /weblogs
   hadoop fs -mkdir /weblogs/parse
   hadoop fs -put weblogs_parse.txt /weblogs/parse/part-00000
   hadoop fs -cp /weblogs/parse/part-00000 /user/hive/warehouse/weblogs/
-  ```
+```
   
 Step 3: Start HiveServer
   
-  ```sh
+```sh
   bin/hive --service hiveserver -v
-  ```
+```
 Step 4: Start beeline client to connect to HiveServer
-  ```sh
+```sh
   ./beeline
   Beeline version 1.0.1 by Apache Hive
   beeline> !connect jdbc:hive2://localhost:10000 'ldapadm' 'abcdef'  org.apache.hive.jdbc.HiveDriver
@@ -89,10 +89,10 @@ Step 4: Start beeline client to connect to HiveServer
   Driver: Hive JDBC (version 1.0.1)
   Transaction isolation: TRANSACTION_REPEATABLE_READ
   0: jdbc:hive2://localhost:10000>
-  ```
+```
   
 Step 5: Create Table in Hive
-  ```sql
+```sql
   CREATE TABLE weblogs (
       client_ip           STRING,
       full_request_date   STRING,
@@ -112,18 +112,18 @@ Step 5: Create Table in Hive
       user_agent          STRING)
   row format delimited
   fields terminated by '\t';
-  ```
+```
   
   Now we are ready to use the the weblog table in PostgreSQL, we need to follow 
   these steps.
   
-  ```sql
+```sql
   
   -- set the GUC variables
   hdfs_fdw.jvmpath='/home/edb/Projects/hadoop_fdw/jdk1.8.0_111/jre/lib/amd64/server/'
   hdfs_fdw.classpath='/usr/local/edb95/lib/postgresql/HiveJdbcClient-1.0.jar:
-                      /home/edb/Projects/hadoop_fdw/hadoop/share/hadoop/common/hadoop-common-2.6.4.jar:
-                      /home/edb/Projects/hadoop_fdw/apache-hive-1.0.1-bin/lib/hive-jdbc-1.0.1-standalone.jar'
+      /home/edb/Projects/hadoop_fdw/hadoop/share/hadoop/common/hadoop-common-2.6.4.jar:
+      /home/edb/Projects/hadoop_fdw/apache-hive-1.0.1-bin/lib/hive-jdbc-1.0.1-standalone.jar'
   
   -- load extension first time after install
   CREATE EXTENSION hdfs_fdw;
@@ -159,9 +159,9 @@ Step 5: Create Table in Hive
   )
   SERVER hdfs_server
            OPTIONS (dbname 'db', table_name 'weblogs');
-  
-  
-  -- select from table
+```
+select from table:
+```
   postgres=# SELECT DISTINCT client_ip IP, count(*)
              FROM weblogs GROUP BY IP HAVING count(*) > 5000;
          ip        | count
@@ -176,7 +176,7 @@ Step 5: Create Table in Hive
    325.87.75.336   |  6500
   (8 rows)
   
-  
+```sql
   CREATE TABLE premium_ip
   (
         client_ip TEXT, category TEXT
@@ -188,13 +188,15 @@ Step 5: Create Table in Hive
   INSERT INTO premium_ip VALUES ('361.631.17.30','Category A');
   INSERT INTO premium_ip VALUES ('361.631.17.30','Category A');
   INSERT INTO premium_ip VALUES ('325.87.75.336','Category B');
-  
-  postgres=# SELECT hd.client_ip IP, pr.category, count(hd.client_ip)
-                             FROM weblogs hd, premium_ip pr
-                             WHERE hd.client_ip = pr.client_ip
-                             AND hd.year = '2011'                                 
-                 
-                             GROUP BY hd.client_ip,pr.category;
+```
+
+```
+postgres=# SELECT hd.client_ip IP, pr.category, count(hd.client_ip)
+             FROM weblogs hd, premium_ip pr
+             WHERE hd.client_ip = pr.client_ip
+             AND hd.year = '2011'                                 
+ 
+             GROUP BY hd.client_ip,pr.category;
                              
          ip        |  category  | count
   -----------------+------------+-------
@@ -205,16 +207,15 @@ Step 5: Create Table in Hive
    325.87.75.336   | Category B |  3816
   (5 rows)
   
-  
-  postgres=# EXPLAIN VERBOSE SELECT hd.client_ip IP, pr.category, 
-  count(hd.client_ip)
-                             FROM weblogs hd, premium_ip pr
-                             WHERE hd.client_ip = pr.client_ip
-                             AND hd.year = '2011'                                 
-                 
-                             GROUP BY hd.client_ip,pr.category;
+
+postgres=# EXPLAIN VERBOSE 
+             SELECT hd.client_ip IP, pr.category, count(hd.client_ip)
+             FROM weblogs hd, premium_ip pr
+             WHERE hd.client_ip = pr.client_ip
+             AND hd.year = '2011'
+             GROUP BY hd.client_ip,pr.category;
+
                                             QUERY PLAN                            
-                
   --------------------------------------------------------------------------------
   --------------
    HashAggregate  (cost=221.40..264.40 rows=4300 width=64)
@@ -237,11 +238,10 @@ Step 5: Create Table in Hive
                        Output: hd.client_ip
                        Remote SQL: SELECT client_ip FROM weblogs WHERE ((year = 
   '2011'))
-  ```
+```
 
 Using HDFS FDW with Apache Spark on top of Hadoop
 -----
-
 
 1. Install PPAS 9.5 and hdfs_fdw using installer.
 
@@ -253,14 +253,14 @@ Using HDFS FDW with Apache Spark on top of Hadoop
                       /home/edb/Projects/hadoop_fdw/apache-hive-1.0.1-bin/lib/hive-jdbc-1.0.1-standalone.jar'
   
 4. At the edb-psql prompt issue the following commands.
-    ```sql
+```sql
         CREATE EXTENSION hdfs_fdw;
         CREATE SERVER hdfs_svr FOREIGN DATA WRAPPER hdfs_fdw
         OPTIONS (host '127.0.0.1',port '10000',client_type 'spark');
         CREATE USER MAPPING FOR postgres server hdfs_svr OPTIONS (username 'ldapadm', password 'ldapadm');
         CREATE FOREIGN TABLE f_names_tab( a int, name varchar(255)) SERVER hdfs_svr
         OPTIONS (dbname 'testdb', table_name 'my_names_tab');
-    ```
+```
   
 Please note that we are using the same port while creating foreign server because Spark Thrift Server is compatible with Hive Thrift Server. Applications using Hiveserver2 would work with Spark except for the behaviour of ANALYZE command and the connection string in case of NOSASL. It is better to use ALTER SERVER and change the client_type option if Hive is to be replaced with Spark.
 
@@ -304,7 +304,7 @@ Please note that we are using the same port while creating foreign server becaus
 
 10. Run the following commands in beeline command line tool
 
-  ```sql
+```
   ./beeline
   Beeline version 1.0.1 by Apache Hive
   beeline> !connect jdbc:hive2://localhost:10000 'ldapadm' 'abcdef'  org.apache.hive.jdbc.HiveDriver
@@ -351,10 +351,10 @@ Please note that we are using the same port while creating foreign server becaus
   | 5     | p_q_r   |
   | NULL  | NULL    |
   +-------+---------+--+
-  ```
+```
 
 11. Run the following command in edb-psql
-    ```sql
+```
     select * from f_names_tab;
      a |  name 
     ---+--------
@@ -365,11 +365,11 @@ Please note that we are using the same port while creating foreign server becaus
      5 | p_q_r
      0 |
     (6 rows)
-    ```
+```
 Here are the corresponding files in hadoop
 
 
-    ```sql
+```
     $ hadoop fs -ls /user/hive/warehouse/
     Found 1 items
     drwxrwxr-x - user supergroup 0 2017-01-19 10:47 /user/hive/warehouse/my_test_db.db
@@ -377,7 +377,7 @@ Here are the corresponding files in hadoop
     $ hadoop fs -ls /user/hive/warehouse/my_test_db.db/
     Found 1 items
     drwxrwxr-x - user supergroup 0 2017-01-19 10:50 /user/hive/warehouse/my_test_db.db/my_names_tab
-    ```
+```
     
 How to build
 -----
@@ -422,17 +422,12 @@ In order to run the TPC-H queries the following steps were performed
                            log_remote_sql 'true');
  14. Create user mapping
  15. Create foreign tables.
- 16. Run the queries using command similar to:
-    ./edb-psql -U enterprisedb tpch --file=/tmp/q/q01.sql
-                                    --output=/tmp/qr/q01.out
-
-    Results of running the test are as follows:
+ 16. Run the queries using command similar to: <br/>`./edb-psql -U enterprisedb tpch --file=/tmp/q/q01.sql --output=/tmp/qr/q01.out`<br/>Results of running the test are as follows:
     
     First column contains TPC-H query number.
     Second column contains time taken by the query when run by creating all tables on EDBAS.
-    Third column contains the time taken by the query when run by shifting orders and lineitem table to hive and queried through the FDW foreign tables.
-
-
+    Third column contains the time taken by the query when run by shifting orders and 
+    lineitem table to hive and queried through the FDW foreign tables.
     
     +---------+--------------+-----------------+
     | Query   | EDBAS        | HDFS_FDW & Hive |
@@ -461,13 +456,11 @@ In order to run the TPC-H queries the following steps were performed
     | q22.sql |    85.349 ms |    12200.344 ms |
     +---------+--------------+---------------- +
   
+## TODO
 
-  
-TODO
-----
- 1. Hadoop Installation Instructions
- 2. Write-able support
- 3. Flum support
+1. Hadoop Installation Instructions
+2. Write-able support
+3. Flum support
   
 Contributing
 ------------
