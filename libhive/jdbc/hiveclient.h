@@ -4,7 +4,7 @@
  * 		Wrapper functions to call functions in the Java class HiveJdbcClient
  * 		from C/C++
  *
- * Copyright (c) 2017, EnterpriseDB Corporation.
+ * Copyright (c) 2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hiveclient.h

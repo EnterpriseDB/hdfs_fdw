@@ -3,7 +3,7 @@
  * MsgBuf.java
  * 		Wrapper class to return error messages or data from java to C
  *
- * Copyright (c) 2017, EnterpriseDB Corporation.
+ * Copyright (c) 2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		MsgBuf.java

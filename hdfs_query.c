@@ -3,9 +3,9 @@
  * hdfs_query.c
  * 		Foreign-data wrapper for remote HDFS servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_query.c

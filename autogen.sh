@@ -5,7 +5,7 @@
 # autogen.sh
 #             Foreign-data wrapper for remote Hadoop/Hive servers
 #
-# Portions Copyright (c) 2004-2015, EnterpriseDB Corporation.
+# Portions Copyright (c) 2004-2019, EnterpriseDB Corporation.
 #
 # IDENTIFICATION
 #             autogen.sh

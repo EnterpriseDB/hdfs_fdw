@@ -3,9 +3,9 @@
  * hdfs_fdw.c
  * 		Foreign-data wrapper for remote Hadoop servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_fdw.c
@@ -34,7 +34,11 @@
 #include "optimizer/planmain.h"
 #include "optimizer/prep.h"
 #include "optimizer/restrictinfo.h"
+#if PG_VERSION_NUM < 120000
 #include "optimizer/var.h"
+#else
+#include "optimizer/optimizer.h"
+#endif
 #include "parser/parsetree.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
@@ -54,9 +58,9 @@ PG_MODULE_MAGIC;
 
 /*
  * In PG 9.5.1 the number will be 90501,
- * our version is 2.0.4 so number will be 20004
+ * our version is 2.0.5 so number will be 20005
  */
-#define CODE_VERSION   20004
+#define CODE_VERSION   20005
 
 PG_FUNCTION_INFO_V1(hdfs_fdw_handler);
 PG_FUNCTION_INFO_V1(hdfs_fdw_version);
@@ -626,7 +630,11 @@ hdfsIterateForeignScan(ForeignScanState *node)
 			attid++;
 		}
 		tuple = heap_form_tuple(tupdesc, values, nulls);
+#if PG_VERSION_NUM < 120000
 		ExecStoreTuple(tuple, slot, InvalidBuffer, true);
+#else
+		ExecStoreHeapTuple(tuple, slot, true);
+#endif
 	}
 	MemoryContextSwitchTo(oldcontext);
 	if (IS_DEBUG)

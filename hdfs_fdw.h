@@ -3,9 +3,9 @@
  * hdfs_fdw.h
  * 		Foreign-data wrapper for remote Hadoop servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_fdw.h
@@ -22,7 +22,11 @@
 #include "access/tupdesc.h"
 #include "foreign/foreign.h"
 #include "lib/stringinfo.h"
+#if PG_VERSION_NUM < 120000
 #include "nodes/relation.h"
+#else
+#include "nodes/pathnodes.h"
+#endif
 #include "utils/rel.h"
 #include "access/htup.h"
 

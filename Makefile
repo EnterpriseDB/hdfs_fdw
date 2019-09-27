@@ -1,7 +1,7 @@
 ##############################################################
 # Makefile
 #
-# Portions Copyright © 2004-2014, EnterpriseDB Corporation.
+# Portions Copyright © 2004-2019, EnterpriseDB Corporation.
 #
 
 MODULE_big = hdfs_fdw

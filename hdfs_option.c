@@ -3,9 +3,9 @@
  * hdfs_option.c
  * 		Foreign-data wrapper for remote Hadoop servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_option.c

@@ -3,9 +3,9 @@
  * hdfs_deparse.c
  * 		Foreign-data wrapper for remote Hadoop servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2019, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_deparse.c
@@ -29,7 +29,11 @@
 #include "commands/defrem.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/clauses.h"
+#if PG_VERSION_NUM < 120000
 #include "optimizer/var.h"
+#else
+#include "optimizer/optimizer.h"
+#endif
 #include "parser/parsetree.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
@@ -100,7 +104,11 @@ static void deparseExpr(Expr *expr, deparse_expr_cxt *context);
 static void deparseVar(Var *node, deparse_expr_cxt *context);
 static void deparseConst(Const *node, deparse_expr_cxt *context);
 static void deparseParam(Param *node, deparse_expr_cxt *context);
+#if PG_VERSION_NUM < 120000
 static void deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context);
+#else
+static void deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context);
+#endif
 static void deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context);
 static void deparseOpExpr(OpExpr *node, deparse_expr_cxt *context);
 static void deparseOperatorName(StringInfo buf, Form_pg_operator opform);
@@ -239,6 +247,7 @@ foreign_expr_walker(Node *node,
 			{
 			}
 			break;
+#if PG_VERSION_NUM < 120000
 		case T_ArrayRef:
 			{
 				ArrayRef   *ar = (ArrayRef *) node;;
@@ -263,6 +272,32 @@ foreign_expr_walker(Node *node,
 					return false;
 			}
 			break;
+#else
+		case T_SubscriptingRef:
+			{
+				SubscriptingRef   *sbref = (SubscriptingRef *) node;;
+
+				/* Assignment should not be in restrictions. */
+				if (sbref->refassgnexpr != NULL)
+					return false;
+
+				/*
+				 * Recurse to remaining subexpressions.  Since the array
+				 * subscripts must yield (noncollatable) integers, they won't
+				 * affect the inner_cxt state.
+				 */
+				if (!foreign_expr_walker((Node *) sbref->refupperindexpr,
+										 glob_cxt, &inner_cxt))
+					return false;
+				if (!foreign_expr_walker((Node *) sbref->reflowerindexpr,
+										 glob_cxt, &inner_cxt))
+					return false;
+				if (!foreign_expr_walker((Node *) sbref->refexpr,
+										 glob_cxt, &inner_cxt))
+					return false;
+			}
+			break;
+#endif
 		case T_FuncExpr:
 			{
 				FuncExpr   *fe = (FuncExpr *) node;
@@ -769,9 +804,14 @@ deparseExpr(Expr *node, deparse_expr_cxt *context)
 		case T_Param:
 			deparseParam((Param *) node, context);
 			break;
+#if PG_VERSION_NUM < 120000
 		case T_ArrayRef:
 			deparseArrayRef((ArrayRef *) node, context);
+#else
+		case T_SubscriptingRef:
+			deparseSubscriptingRef((SubscriptingRef *) node, context);
 			break;
+#endif
 		case T_FuncExpr:
 			deparseFuncExpr((FuncExpr *) node, context);
 			break;
@@ -935,7 +975,11 @@ deparseParam(Param *node, deparse_expr_cxt *context)
  * Deparse an array subscript expression.
  */
 static void
+#if PG_VERSION_NUM < 120000
 deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context)
+#else
+deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
+#endif
 {
 	StringInfo	buf = context->buf;
 	ListCell   *lowlist_item;

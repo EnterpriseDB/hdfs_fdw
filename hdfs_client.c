@@ -3,7 +3,7 @@
  * hdfs_client.c
  * 		Foreign-data wrapper for remote Hadoop servers
  *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  * 
  * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
  *
