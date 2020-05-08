@@ -515,7 +515,11 @@ hdfs_deparse_select(hdfs_opt *opt,
 	 * Core code already has some lock on each rel being planned, so we can
 	 * use NoLock here.
 	 */
+#if PG_VERSION_NUM < 130000
 	rel = heap_open(rte->relid, NoLock);
+#else
+	rel = table_open(rte->relid, NoLock);
+#endif
 
 	/*
 	 * Construct SELECT list
@@ -530,7 +534,11 @@ hdfs_deparse_select(hdfs_opt *opt,
 	appendStringInfoString(buf, " FROM ");
 	deparseRelation(opt, buf);
 
+#if PG_VERSION_NUM < 130000
 	heap_close(rel, NoLock);
+#else
+	table_close(rel, NoLock);
+#endif
 }
 
 static void
@@ -1012,7 +1020,11 @@ deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
 		{
 			deparseExpr(lfirst(lowlist_item), context);
 			appendStringInfoChar(buf, ':');
+#if PG_VERSION_NUM < 130000
 			lowlist_item = lnext(lowlist_item);
+#else
+			lowlist_item = lnext(node->reflowerindexpr, lowlist_item);
+#endif
 		}
 		deparseExpr(lfirst(uplist_item), context);
 		appendStringInfoChar(buf, ']');
@@ -1089,7 +1101,11 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 	{
 		if (!first)
 			appendStringInfoString(buf, ", ");
+#if PG_VERSION_NUM < 130000
 		if (use_variadic && lnext(arg) == NULL)
+#else
+		if (use_variadic && lnext(node->args, arg) == NULL)
+#endif
 			appendStringInfoString(buf, "VARIADIC ");
 		deparseExpr((Expr *) lfirst(arg), context);
 		first = false;
