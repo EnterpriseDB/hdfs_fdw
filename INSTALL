@@ -1,111 +1,103 @@
-               Installation
+Installation
+------------
 
-  - There are two options for installation. If you have an EDB Postgres 
-  Subscription, you can use the Interactive Installers provided via StackBuilder
-  Plus or the RPMs from the yum.enterprisedb.com site. Otherwise, you can compile 
-  the source code
+HDFS FDW Installation from the source code:
 
-  HDFS FDW Installation from Source Code
+To compile the Hadoop foreign data wrapper, we need Java Compiler,
+JDK Include files and the JVM Library.
+We have used jdk-8u111-linux-x64.tar.gz.
 
-  To compile the [Hadoop][1] foreign data wrapper, we need Java Compiler,
-  JDK Include files and the JVM Library.
-  We have used jdk-8u111-linux-x64.tar.gz.
+- Steps to compile hiveclient
 
-  * HiveClient library
-  - Steps to compile hiveclient
+For C/C++ part:
 
-  For C/C++ part:
-  
+    export JDK_INCLUDE:=$JAVA_HOME/include
+    export INSTALL_DIR:=/path/to/ppas/install/dir/lib
+    export PATH:=/path/to/ppas/install/dir/bin:$PATH
 
-    export JDK_INCLUDE:=/home/user/Projects/hadoop_fdw/jdk1.8.0_111/include
-    export INSTALL_DIR:=/opt/PPAS_PG/version/lib
+    Make sure that pg_config is now in path.
 
-    cd libhive
+    cd /path/to/hdfs_fdw/libhive
     make
     make install
 
+For Java part:
 
-  
-  For Java part:
-
-
+    cd /path/to/hdfs_fdw/libhive/jdbc
     javac MsgBuf.java
     javac HiveJdbcClient.java
     jar cf HiveJdbcClient-1.0.jar *.class
     cp HiveJdbcClient-1.0.jar /path/to/install/folder/lib/postgresql/
   
+Now that all the required dependencies are built we can build and
+install the fdw.
 
-  Now that all the required dependencies are built we can build and install the fdw.
 
-  - Steps to compile the HDFS FDW source code
-  
-  To build on POSIX-compliant systems you need to ensure the `pg_config` 
-  executable is in your path when you run `make`. This executable is typically in 
-  your PostgreSQL installation's `bin` directory. For example:
+- Steps to compile the HDFS FDW source code:
+
+To build on POSIX-compliant systems you need to ensure the `pg_config`
+executable is in your path when you run `make`. This executable is
+typically in your PostgreSQL installation's `bin` directory. For
+example:
 
     export PATH=/usr/local/pgsql/bin/:$PATH
 
     make USE_PGXS=1
     make USE_PGXS=1 install
 
-  Please note that the HDFS_FDW extension has only been tested on ubuntu and CentOS
-  systems but it should work on other *UNIX's systems without any problems.
-  
-  
-  * How To Start Hadoop.
-  The detail installation instruction of Hadoop can be found on this [site][5]. 
-  Here are the steps to start and stop the Hadoop.
-   
-  * Stop and start Hdfs on Single Node
-  # sbin/stop-dfs.sh
-  # sbin/start-dfs.sh
-  
-  * YARN on Single Node
-  # sbin/stop-yarn.sh
-  # sbin/start-yarn.sh
-  
-  * Starting HiveServer2
-  cd /usr/local/hive/
-  bin/hive --service hiveserver2
-  
-  ##Regression
-  
-  To execute the Regression, follow the below steps.
-  
-  1.  Open /etc/hosts and add the following line (the IP Address is of the Hive 
-      Server Machine).
-  
-      `127.0.0.1 hive.server`
-  
-  2.  Run Hive Server using the following command.
-  
-      `./hive --service hiveserver2`
-  
-  3.  Load sample data for the test cases by using the following command.
-  
-      `hdfs_fdw/test/insert_hive.sh`
+Please note that the HDFS_FDW extension has only been tested on Ubuntu
+and CentOS systems but it should work on other *UNIX's systems without
+any problems.
 
-  4.  In the terminal where Regression will be executed, set following environment variables using export command.
-      
-      HIVE_SERVER
-      HIVE_PORT
-      HIVE_USER  (LDAP User when HiveServer running with LDAP Mode, empty when HiveServer running with NOSASL Mode)
-      HIVE_PASSWORD
-      AUTH_TYPE (ldap when HiveServer running with LDAP Mode, nosasl when HiveServer running with NOSASL Mode)
-      CLIENT_TYPE (hiveserver2 or spark)
 
-      e.g
+* How To Start Hadoop.
+The detail installation instruction of Hadoop can be found on this
+[site][1]. Here are the steps to start and stop the Hadoop:
 
-      export HIVE_SERVER='127.0.0.1'
-      export HIVE_PORT='10000'
-      export HIVE_USER='kzeeshan'
-      export HIVE_PASSWORD='edb'
-      export AUTH_TYPE='ldap'
-      export CLIENT_TYPE='hiveserver2'
+* Stop and start Hdfs on Single Node
+    # $HADOOP_HOME/sbin/stop-dfs.sh
+    # $HADOOP_HOME/sbin/start-dfs.sh
 
-  5.  Execute the Regression using the following command.
+* YARN on Single Node
+    # $HADOOP_HOME/sbin/stop-yarn.sh
+    # $HADOOP_HOME/sbin/start-yarn.sh
+
+* Starting HiveServer2
+  $HIVE_HOME/bin/hiveserver2
+  or
+  $HIVE_HOME/bin/hive --service hiveserver2
+
+
+- Steps to execute the regression:
+
+1. Start the Hive server if not already running.
+
+2. Load sample data for the test cases by using the following command.
+
+    `hdfs_fdw/test/insert_hive.sh`
+
+3. In the terminal where regression will be executed, set following
+   environment variables using export command.
+
+    HIVE_SERVER
+    HIVE_PORT
+    HIVE_USER  (LDAP User when HiveServer running with LDAP Mode, empty when HiveServer running with NOSASL Mode)
+    HIVE_PASSWORD
+    AUTH_TYPE (LDAP when HiveServer running with LDAP Mode, NOSASL when HiveServer running with NOSASL Mode)
+    CLIENT_TYPE (hiveserver2 or spark)
+
+    e.g
+
+    export HIVE_SERVER='127.0.0.1'
+    export HIVE_PORT='10000'
+    export HIVE_USER='hive_user'
+    export HIVE_PASSWORD='hive_password'
+    export AUTH_TYPE='LDAP'
+    export CLIENT_TYPE='hiveserver2'
+
+4. Execute the regression using the following command.
   
-      `hdfs_fdw/make installcheck`
+    `hdfs_fdw/make installcheck`
 
-[5]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
 
+[1]: http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html
