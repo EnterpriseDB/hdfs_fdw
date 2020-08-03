@@ -12,6 +12,9 @@ CREATE DATABASE fdw_regression ENCODING=UTF8 LC_CTYPE='en_US.UTF-8' TEMPLATE=tem
 
 CREATE EXTENSION hdfs_fdw;
 
+-- Check version
+SELECT hdfs_fdw_version();
+
 --==========================================================================================
 --                    DESC Table Issue
 -- In each query execution FDW used to issue a DESC table_name

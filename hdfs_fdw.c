@@ -57,9 +57,9 @@ PG_MODULE_MAGIC;
 
 /*
  * In PG 9.5.1 the number will be 90501,
- * our version is 2.0.5 so number will be 20005
+ * our version is 2.0.6 so number will be 20006
  */
-#define CODE_VERSION   20005
+#define CODE_VERSION   20006
 
 PG_FUNCTION_INFO_V1(hdfs_fdw_handler);
 PG_FUNCTION_INFO_V1(hdfs_fdw_version);
