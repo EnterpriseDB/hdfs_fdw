@@ -1,19 +1,3 @@
-/*---------------------------------------------------------------------------------------------------------------------
- *
- * mapping.sql
- * 		Foreign-data wrapper for remote Hadoop servers
- *              To verify the SQL are logged in the Server Log.
- *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
- *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
- *
- * IDENTIFICATION
- * 		log_remote_sql.sql
- *
- *---------------------------------------------------------------------------------------------------------------------
- */
-
 -- Connection Settings.
 
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`

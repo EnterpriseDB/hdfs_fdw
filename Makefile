@@ -1,8 +1,9 @@
 ##############################################################
 # Makefile
 #
-# Portions Copyright © 2004-2019, EnterpriseDB Corporation.
+# Portions Copyright (c) 2004-2020, EnterpriseDB Corporation.
 #
+##############################################################
 
 MODULE_big = hdfs_fdw
 CCC=g++

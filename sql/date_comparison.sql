@@ -1,20 +1,3 @@
-/*---------------------------------------------------------------------------------------------------------------------
- *
- * mapping.sql
- * 		Foreign-data wrapper for remote Hadoop servers
- *              To verify that Date comparisions are used to retrive data correctly from Hadoop Foreign Tables.
- *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
- *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
- *
- * IDENTIFICATION
- * 		date_comparison.sql
- *
- *---------------------------------------------------------------------------------------------------------------------
- */
-
-
 -- Connection Settings.
 
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`

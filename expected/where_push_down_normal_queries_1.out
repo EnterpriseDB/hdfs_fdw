@@ -1,18 +1,3 @@
-/*---------------------------------------------------------------------------------------------------------------------
- *
- * mapping.sql
- * 		Foreign-data wrapper for remote Hadoop servers
- *              To verify the normal WHERE Clause pushed down.
- *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
- *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
- *
- * IDENTIFICATION
- * 		where_push_down_normal_queries.sql
- *
- *---------------------------------------------------------------------------------------------------------------------
- */
 -- Connection Settings.
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE           '\'hiveserver2\''

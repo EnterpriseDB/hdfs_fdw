@@ -3,7 +3,7 @@
  * HiveJdbcClient.java
  * 		The java class containing all the functions to query hive db
  *
- * Copyright (c) 2019, EnterpriseDB Corporation.
+ * Copyright (c) 2019-2020, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		HiveJdbcClient.java

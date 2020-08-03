@@ -1,18 +1,3 @@
-/*---------------------------------------------------------------------------------------------------------------------
- *
- * mapping.sql
- * 		Foreign-data wrapper for remote Hadoop servers
- *              To verify the testing of auth_type and client_type parameters in CREATE SERVER Command.
- *
- * Portions Copyright (c) 2012-2014, PostgreSQL Global Development Group
- *
- * Portions Copyright (c) 2004-2014, EnterpriseDB Corporation.
- *
- * IDENTIFICATION
- * 		auth_client_type_parameters.sql
- *
- *---------------------------------------------------------------------------------------------------------------------
- */
 \set VERBOSITY terse
 -- Connection Settings.
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
