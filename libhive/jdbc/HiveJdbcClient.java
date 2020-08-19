@@ -39,6 +39,7 @@ public class HiveJdbcClient
 	private static final int	m_authTypeUnspecified = 0;
 	private static final int	m_authTypeNoSasl = 1;
 	private static final int	m_authTypeLDAP = 2;
+	private static final int	m_authTypeKerberos = 3;
 
 	private static final int	m_clientTypeHive = 0;
 	private static final int	m_clientTypeSpark = 1;
@@ -75,11 +76,12 @@ public class HiveJdbcClient
 		return (-1);
 	}
 
-	/* singature will be (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILMsgBuf;)I */
+	/* singature will be (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILMsgBuf;)I */
 	public int DBOpenConnection(String host, int port, String databaseName,
 								String userName, String password,
-								int connectTimeout, int receiveTimeout,
-								int authType, int clientType, MsgBuf errBuf)
+								String principal, int connectTimeout,
+								int receiveTimeout, int authType,
+								int clientType, MsgBuf errBuf)
 	{
 		int index;
 		String hst;
@@ -215,6 +217,21 @@ public class HiveJdbcClient
 					else
 					{
 						m_hdfsConnection[index] = DriverManager.getConnection(conURL, userName, password);
+					}
+					break;
+
+				case m_authTypeKerberos:
+					conURL += ";principal=" + principal;
+					if (userName == null || userName.equals(""))
+					{
+						errBuf.catVal("ERROR : A valid user name is required");
+						m_isFree[index] = true;
+						return (-3);
+					}
+					else
+					{
+						System.setProperty("javax.security.auth.useSubjectCredsOnly", "false");
+						m_hdfsConnection[index] = DriverManager.getConnection(conURL);
 					}
 					break;
 

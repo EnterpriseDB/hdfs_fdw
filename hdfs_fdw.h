@@ -47,6 +47,7 @@ typedef struct hdfs_opt
 	char           *host;             /* HDFS server IP address */
 	char           *username;         /* HDFS user name */
 	char           *password;         /* HDFS password */
+	char           *principal;        /* HDFS kerberos principal */
 	char           *dbname;           /* HDFS database name */
 	char           *table_name;       /* HDFS table name */
 	CLIENT_TYPE    client_type;
