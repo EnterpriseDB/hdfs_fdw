@@ -44,7 +44,7 @@ CREATE FOREIGN TABLE dept (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : A valid user name is required)
+ERROR:  failed to initialize the connection: (ERROR : A valid user name is required)
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 3 other objects
 CREATE EXTENSION hdfs_fdw;
@@ -57,7 +57,7 @@ CREATE FOREIGN TABLE dept (
 )
 SERVER hdfs_svr OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : A valid user name is required)
+ERROR:  failed to initialize the connection: (ERROR : A valid user name is required)
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 3 other objects
 --=========================================================================================

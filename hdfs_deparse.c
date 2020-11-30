@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * hdfs_deparse.c
- * 		Foreign-data wrapper for remote Hadoop servers
+ * 		Query deparser for hdfs_fdw.
  *
  * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  * Portions Copyright (c) 2004-2020, EnterpriseDB Corporation.
@@ -14,21 +14,19 @@
 
 #include "postgres.h"
 
-#include "hdfs_fdw.h"
-
 #include "access/heapam.h"
 #include "access/htup_details.h"
 #include "access/sysattr.h"
 #include "access/transam.h"
-#include "catalog/pg_collation.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
+#include "hdfs_fdw.h"
 #include "nodes/nodeFuncs.h"
-#include "optimizer/clauses.h"
 #if PG_VERSION_NUM < 120000
+#include "optimizer/clauses.h"
 #include "optimizer/var.h"
 #else
 #include "optimizer/optimizer.h"
@@ -37,12 +35,10 @@
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
-#include "utils/date.h"
-#include "utils/datetime.h"
 
 
 /*
- * Global context for foreign_expr_walker's search of an expression tree.
+ * Global context for hdfs_foreign_expr_walker's search of an expression tree.
  */
 typedef struct foreign_glob_cxt
 {
@@ -51,7 +47,7 @@ typedef struct foreign_glob_cxt
 } foreign_glob_cxt;
 
 /*
- * Local (per-tree-level) context for foreign_expr_walker's search.
+ * Local (per-tree-level) context for hdfs_foreign_expr_walker's search.
  * This is concerned with identifying collations used in the expression.
  */
 typedef enum
@@ -68,7 +64,7 @@ typedef struct foreign_loc_cxt
 } foreign_loc_cxt;
 
 /*
- * Context for deparseExpr
+ * Context for hdfs_deparse_expr
  */
 typedef struct deparse_expr_cxt
 {
@@ -82,47 +78,50 @@ typedef struct deparse_expr_cxt
  * Functions to determine whether an expression can be evaluated safely on
  * remote server.
  */
-static bool foreign_expr_walker(Node *node,
-								foreign_glob_cxt *glob_cxt,
-								foreign_loc_cxt *outer_cxt);
-static bool is_builtin(Oid procid);
+static bool hdfs_foreign_expr_walker(Node *node,
+									 foreign_glob_cxt *glob_cxt,
+									 foreign_loc_cxt *outer_cxt);
+static bool hdfs_is_builtin(Oid procid);
 
 /*
  * Functions to construct string representation of a node tree.
  */
-static void deparseTargetList(StringInfo buf,
-							  PlannerInfo *root,
-							  Index rtindex,
-							  Relation rel,
-							  Bitmapset *attrs_used,
-							  List **retrieved_attrs);
-static void deparseColumnRef(StringInfo buf, int varno, int varattno,
-							 PlannerInfo *root);
-static void deparseRelation(hdfs_opt *opt, StringInfo buf);
-static void deparseExpr(Expr *expr, deparse_expr_cxt *context);
-static void deparseVar(Var *node, deparse_expr_cxt *context);
-static void deparseConst(Const *node, deparse_expr_cxt *context);
-static void deparseParam(Param *node, deparse_expr_cxt *context);
+static void hdfs_deparse_target_list(StringInfo buf,
+									 PlannerInfo *root,
+									 Index rtindex,
+									 Relation rel,
+									 Bitmapset *attrs_used,
+									 List **retrieved_attrs);
+static void hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
+									PlannerInfo *root);
+static void hdfs_deparse_relation(hdfs_opt *opt, StringInfo buf);
+static void hdfs_deparse_expr(Expr *expr, deparse_expr_cxt *context);
+static void hdfs_deparse_var(Var *node, deparse_expr_cxt *context);
+static void hdfs_deparse_const(Const *node, deparse_expr_cxt *context);
+static void hdfs_deparse_param(Param *node, deparse_expr_cxt *context);
 #if PG_VERSION_NUM < 120000
-static void deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context);
+static void hdfs_deparse_array_ref(ArrayRef *node, deparse_expr_cxt *context);
 #else
-static void deparseSubscriptingRef(SubscriptingRef *node,
-								   deparse_expr_cxt *context);
+static void hdfs_deparse_subscripting_ref(SubscriptingRef *node,
+										  deparse_expr_cxt *context);
 #endif
-static void deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context);
-static void deparseOpExpr(OpExpr *node, deparse_expr_cxt *context);
-static void deparseOperatorName(StringInfo buf, Form_pg_operator opform);
-static void deparseDistinctExpr(DistinctExpr *node, deparse_expr_cxt *context);
-static void deparseScalarArrayOpExpr(ScalarArrayOpExpr *node,
-									 deparse_expr_cxt *context);
-static void deparseRelabelType(RelabelType *node, deparse_expr_cxt *context);
-static void deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context);
-static void deparseNullTest(NullTest *node, deparse_expr_cxt *context);
-static void deparseArrayExpr(ArrayExpr *node, deparse_expr_cxt *context);
-static void printRemoteParam(int paramindex, Oid paramtype, int32 paramtypmod,
-							 deparse_expr_cxt *context);
-static void printRemotePlaceholder(Oid paramtype, int32 paramtypmod,
-								   deparse_expr_cxt *context);
+static void hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context);
+static void hdfs_deparse_op_expr(OpExpr *node, deparse_expr_cxt *context);
+static void hdfs_deparse_operator_name(StringInfo buf,
+									   Form_pg_operator opform);
+static void hdfs_deparse_distinct_expr(DistinctExpr *node,
+									   deparse_expr_cxt *context);
+static void hdfs_deparse_scalar_array_op_expr(ScalarArrayOpExpr *node,
+											  deparse_expr_cxt *context);
+static void hdfs_deparse_relabel_type(RelabelType *node,
+									  deparse_expr_cxt *context);
+static void hdfs_deparse_bool_expr(BoolExpr *node, deparse_expr_cxt *context);
+static void hdfs_deparse_null_test(NullTest *node, deparse_expr_cxt *context);
+static void hdfs_deparse_array_expr(ArrayExpr *node,
+									deparse_expr_cxt *context);
+static void hdfs_deparse_string_literal(StringInfo buf, const char *val);
+static void hdfs_print_remote_param(deparse_expr_cxt *context);
+static void hdfs_print_remote_placeholder(deparse_expr_cxt *context);
 
 
 /*
@@ -132,11 +131,11 @@ static void printRemotePlaceholder(Oid paramtype, int32 paramtypmod,
  *	- local_conds contains expressions that can't be evaluated remotely
  */
 void
-classifyConditions(PlannerInfo *root,
-				   RelOptInfo *baserel,
-				   List *input_conds,
-				   List **remote_conds,
-				   List **local_conds)
+hdfs_classify_conditions(PlannerInfo *root,
+						 RelOptInfo *baserel,
+						 List *input_conds,
+						 List **remote_conds,
+						 List **local_conds)
 {
 	ListCell   *lc;
 
@@ -147,7 +146,7 @@ classifyConditions(PlannerInfo *root,
 	{
 		RestrictInfo *ri = (RestrictInfo *) lfirst(lc);
 
-		if (is_foreign_expr(root, baserel, ri->clause))
+		if (hdfs_is_foreign_expr(root, baserel, ri->clause))
 			*remote_conds = lappend(*remote_conds, ri);
 		else
 			*local_conds = lappend(*local_conds, ri);
@@ -158,9 +157,9 @@ classifyConditions(PlannerInfo *root,
  * Returns true if given expr is safe to evaluate on the foreign server.
  */
 bool
-is_foreign_expr(PlannerInfo *root,
-				RelOptInfo *baserel,
-				Expr *expr)
+hdfs_is_foreign_expr(PlannerInfo *root,
+					 RelOptInfo *baserel,
+					 Expr *expr)
 {
 	foreign_glob_cxt glob_cxt;
 	foreign_loc_cxt loc_cxt;
@@ -173,10 +172,10 @@ is_foreign_expr(PlannerInfo *root,
 	glob_cxt.foreignrel = baserel;
 	loc_cxt.collation = InvalidOid;
 	loc_cxt.state = FDW_COLLATE_NONE;
-	if (!foreign_expr_walker((Node *) expr, &glob_cxt, &loc_cxt))
+	if (!hdfs_foreign_expr_walker((Node *) expr, &glob_cxt, &loc_cxt))
 		return false;
 
-	/* Expressions examined here should be boolean, ie noncollatable */
+	/* Expressions examined here should be boolean, i.e. noncollatable */
 	Assert(loc_cxt.collation == InvalidOid);
 	Assert(loc_cxt.state == FDW_COLLATE_NONE);
 
@@ -207,12 +206,11 @@ is_foreign_expr(PlannerInfo *root,
  * can assume here that the given expression is valid.
  */
 static bool
-foreign_expr_walker(Node *node,
-					foreign_glob_cxt *glob_cxt,
-					foreign_loc_cxt *outer_cxt)
+hdfs_foreign_expr_walker(Node *node,
+						 foreign_glob_cxt *glob_cxt,
+						 foreign_loc_cxt *outer_cxt)
 {
 	foreign_loc_cxt inner_cxt;
-	Oid			collation;
 	FDWCollateState state;
 
 	/* Need do nothing for empty subexpressions */
@@ -240,12 +238,7 @@ foreign_expr_walker(Node *node,
 			}
 			break;
 		case T_Const:
-			{
-			}
-			break;
 		case T_Param:
-			{
-			}
 			break;
 #if PG_VERSION_NUM < 120000
 		case T_ArrayRef:
@@ -261,14 +254,14 @@ foreign_expr_walker(Node *node,
 				 * subscripts must yield (noncollatable) integers, they won't
 				 * affect the inner_cxt state.
 				 */
-				if (!foreign_expr_walker((Node *) ar->refupperindexpr,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) ar->refupperindexpr,
+											  glob_cxt, &inner_cxt))
 					return false;
-				if (!foreign_expr_walker((Node *) ar->reflowerindexpr,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) ar->reflowerindexpr,
+											  glob_cxt, &inner_cxt))
 					return false;
-				if (!foreign_expr_walker((Node *) ar->refexpr,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) ar->refexpr,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -286,14 +279,14 @@ foreign_expr_walker(Node *node,
 				 * subscripts must yield (noncollatable) integers, they won't
 				 * affect the inner_cxt state.
 				 */
-				if (!foreign_expr_walker((Node *) sbref->refupperindexpr,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) sbref->refupperindexpr,
+											  glob_cxt, &inner_cxt))
 					return false;
-				if (!foreign_expr_walker((Node *) sbref->reflowerindexpr,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) sbref->reflowerindexpr,
+											  glob_cxt, &inner_cxt))
 					return false;
-				if (!foreign_expr_walker((Node *) sbref->refexpr,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) sbref->refexpr,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -307,14 +300,14 @@ foreign_expr_walker(Node *node,
 				 * can't be sent to remote because it might have incompatible
 				 * semantics on remote side.
 				 */
-				if (!is_builtin(fe->funcid))
+				if (!hdfs_is_builtin(fe->funcid))
 					return false;
 
 				/*
 				 * Recurse to input subexpressions.
 				 */
-				if (!foreign_expr_walker((Node *) fe->args,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) fe->args,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -328,14 +321,14 @@ foreign_expr_walker(Node *node,
 				 * (If the operator is, surely its underlying function is
 				 * too.)
 				 */
-				if (!is_builtin(oe->opno))
+				if (!hdfs_is_builtin(oe->opno))
 					return false;
 
 				/*
 				 * Recurse to input subexpressions.
 				 */
-				if (!foreign_expr_walker((Node *) oe->args,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) oe->args,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -346,14 +339,14 @@ foreign_expr_walker(Node *node,
 				/*
 				 * Again, only built-in operators can be sent to remote.
 				 */
-				if (!is_builtin(oe->opno))
+				if (!hdfs_is_builtin(oe->opno))
 					return false;
 
 				/*
 				 * Recurse to input subexpressions.
 				 */
-				if (!foreign_expr_walker((Node *) oe->args,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) oe->args,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -364,8 +357,8 @@ foreign_expr_walker(Node *node,
 				/*
 				 * Recurse to input subexpression.
 				 */
-				if (!foreign_expr_walker((Node *) r->arg,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) r->arg,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -376,8 +369,8 @@ foreign_expr_walker(Node *node,
 				/*
 				 * Recurse to input subexpressions.
 				 */
-				if (!foreign_expr_walker((Node *) b->args,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) b->args,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -388,8 +381,8 @@ foreign_expr_walker(Node *node,
 				/*
 				 * Recurse to input subexpressions.
 				 */
-				if (!foreign_expr_walker((Node *) nt->arg,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) nt->arg,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -400,8 +393,8 @@ foreign_expr_walker(Node *node,
 				/*
 				 * Recurse to input subexpressions.
 				 */
-				if (!foreign_expr_walker((Node *) a->elements,
-										 glob_cxt, &inner_cxt))
+				if (!hdfs_foreign_expr_walker((Node *) a->elements,
+											  glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
@@ -415,8 +408,8 @@ foreign_expr_walker(Node *node,
 				 */
 				foreach(lc, l)
 				{
-					if (!foreign_expr_walker((Node *) lfirst(lc),
-											 glob_cxt, &inner_cxt))
+					if (!hdfs_foreign_expr_walker((Node *) lfirst(lc),
+												  glob_cxt, &inner_cxt))
 						return false;
 				}
 			}
@@ -453,25 +446,23 @@ foreign_expr_walker(Node *node,
  * track of that would be a huge exercise.
  */
 static bool
-is_builtin(Oid oid)
+hdfs_is_builtin(Oid oid)
 {
 	return (oid < FirstBootstrapObjectId);
 }
 
 void
-hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
-					 RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
+hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf)
 {
-	List	   *params_list = NIL;
-
-	appendStringInfo(buf, "EXPLAIN SELECT * FROM ");
-	appendStringInfo(buf, "%s", opt->table_name);
+	appendStringInfo(buf, "EXPLAIN SELECT * FROM %s", opt->table_name);
 
 	/*
 	 * For accurate row counts we should append where clauses with the
 	 * statement, but if where clause is parameterized we should handle it the
-	 * way pg fdw does TODO if (fpinfo->remote_conds)
-	 * hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds,
+	 * way postgres fdw does.
+	 * TODO:
+	 * if (fpinfo->remote_conds)
+	 * 	hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds,
 	 * true, &params_list);
 	 */
 }
@@ -479,19 +470,15 @@ hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
 void
 hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt)
 {
-	appendStringInfo(buf, "DESCRIBE FORMATTED ");
-	appendStringInfo(buf, "%s", opt->table_name);
+	appendStringInfo(buf, "DESCRIBE FORMATTED %s", opt->table_name);
 }
-
 
 void
 hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt)
 {
-	appendStringInfo(buf, "ANALYZE TABLE ");
-	appendStringInfo(buf, "%s ", opt->table_name);
-	appendStringInfo(buf, "COMPUTE STATISTICS");
+	appendStringInfo(buf, "ANALYZE TABLE %s COMPUTE STATISTICS",
+					 opt->table_name);
 }
-
 
 /*
  * Construct a simple SELECT statement that retrieves desired columns
@@ -522,18 +509,14 @@ hdfs_deparse_select(hdfs_opt *opt,
 	rel = table_open(rte->relid, NoLock);
 #endif
 
-	/*
-	 * Construct SELECT list
-	 */
+	/* Construct SELECT list */
 	appendStringInfoString(buf, "SELECT ");
-	deparseTargetList(buf, root, baserel->relid, rel, attrs_used,
-					  retrieved_attrs);
+	hdfs_deparse_target_list(buf, root, baserel->relid, rel, attrs_used,
+							 retrieved_attrs);
 
-	/*
-	 * Construct FROM clause
-	 */
+	/* Construct FROM clause */
 	appendStringInfoString(buf, " FROM ");
-	deparseRelation(opt, buf);
+	hdfs_deparse_relation(opt, buf);
 
 #if PG_VERSION_NUM < 130000
 	heap_close(rel, NoLock);
@@ -542,13 +525,19 @@ hdfs_deparse_select(hdfs_opt *opt,
 #endif
 }
 
+/*
+ * Emit a target list that retrieves the columns specified in attrs_used.
+ *
+ * The target list text is appended to buf, and we also create an integer
+ * list of the columns being retrieved, which is returned to *retrieved_attrs.
+ */
 static void
-deparseTargetList(StringInfo buf,
-				  PlannerInfo *root,
-				  Index rtindex,
-				  Relation rel,
-				  Bitmapset *attrs_used,
-				  List **retrieved_attrs)
+hdfs_deparse_target_list(StringInfo buf,
+						 PlannerInfo *root,
+						 Index rtindex,
+						 Relation rel,
+						 Bitmapset *attrs_used,
+						 List **retrieved_attrs)
 {
 	TupleDesc	tupdesc = RelationGetDescr(rel);
 	int			i;
@@ -561,11 +550,13 @@ deparseTargetList(StringInfo buf,
 		tupdesc->natts == bms_num_members(attrs_used))
 	{
 		have_wholerow = true;
+
 		/* Send SELECT * query to avoid Map-Reduce job */
-		appendStringInfoString(buf, "*");
+		appendStringInfoChar(buf, '*');
 	}
+
 	if (bms_num_members(attrs_used) == 0)
-		appendStringInfoString(buf, "*");
+		appendStringInfoChar(buf, '*');
 
 	for (i = 1; i <= tupdesc->natts; i++)
 	{
@@ -582,9 +573,11 @@ deparseTargetList(StringInfo buf,
 			{
 				if (!first)
 					appendStringInfoString(buf, ", ");
+
 				first = false;
-				deparseColumnRef(buf, rtindex, i, root);
+				hdfs_deparse_column_ref(buf, rtindex, i, root);
 			}
+
 			*retrieved_attrs = lappend_int(*retrieved_attrs, i);
 		}
 	}
@@ -635,74 +628,11 @@ hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
 			appendStringInfoString(buf, " AND ");
 
 		appendStringInfoChar(buf, '(');
-		deparseExpr(ri->clause, &context);
+		hdfs_deparse_expr(ri->clause, &context);
 		appendStringInfoChar(buf, ')');
 
 		is_first = false;
 	}
-}
-
-
-/*
- * Construct SELECT statement to acquire sample rows of given relation.
- *
- * SELECT command is appended to buf, and list of columns retrieved
- * is returned to *retrieved_attrs.
- */
-void
-deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel,
-				  List **retrieved_attrs)
-{
-	Oid			relid = RelationGetRelid(rel);
-	TupleDesc	tupdesc = RelationGetDescr(rel);
-	int			i;
-	char	   *colname;
-	List	   *options;
-	ListCell   *lc;
-	bool		first = true;
-
-	*retrieved_attrs = NIL;
-
-	appendStringInfoString(buf, "SELECT ");
-	for (i = 0; i < tupdesc->natts; i++)
-	{
-		/* Ignore dropped columns. */
-		if (TupleDescAttr(tupdesc, i)->attisdropped)
-			continue;
-
-		if (!first)
-			appendStringInfoString(buf, ", ");
-		first = false;
-
-		/* Use attribute name or column_name option. */
-		colname = NameStr(TupleDescAttr(tupdesc, i)->attname);
-		options = GetForeignColumnOptions(relid, i + 1);
-
-		foreach(lc, options)
-		{
-			DefElem    *def = (DefElem *) lfirst(lc);
-
-			if (strcmp(def->defname, "column_name") == 0)
-			{
-				colname = defGetString(def);
-				break;
-			}
-		}
-
-		appendStringInfoString(buf, quote_identifier(colname));
-
-		*retrieved_attrs = lappend_int(*retrieved_attrs, i + 1);
-	}
-
-	/* Don't generate bad syntax for zero-column relation. */
-	if (first)
-		appendStringInfoString(buf, "NULL");
-
-	/*
-	 * Construct FROM clause
-	 */
-	appendStringInfoString(buf, " FROM ");
-	deparseRelation(opt, buf);
 }
 
 /*
@@ -710,7 +640,8 @@ deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel,
  * If it has a column_name FDW option, use that instead of attribute name.
  */
 static void
-deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
+hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
+						PlannerInfo *root)
 {
 	RangeTblEntry *rte;
 	char	   *colname = NULL;
@@ -754,7 +685,7 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
 }
 
 static void
-deparseRelation(hdfs_opt *opt, StringInfo buf)
+hdfs_deparse_relation(hdfs_opt *opt, StringInfo buf)
 {
 	appendStringInfo(buf, "%s", opt->table_name);
 }
@@ -762,8 +693,8 @@ deparseRelation(hdfs_opt *opt, StringInfo buf)
 /*
  * Append a SQL string literal representing "val" to buf.
  */
-void
-deparseStringLiteral(StringInfo buf, const char *val)
+static void
+hdfs_deparse_string_literal(StringInfo buf, const char *val)
 {
 	const char *valptr;
 
@@ -775,30 +706,34 @@ deparseStringLiteral(StringInfo buf, const char *val)
 	 */
 	if (strchr(val, '\\') != NULL)
 		appendStringInfoChar(buf, ESCAPE_STRING_SYNTAX);
+
 	appendStringInfoChar(buf, '\'');
+
 	for (valptr = val; *valptr; valptr++)
 	{
 		char		ch = *valptr;
 
 		if (SQL_STR_DOUBLE(ch, true))
 			appendStringInfoChar(buf, ch);
+
 		appendStringInfoChar(buf, ch);
 	}
+
 	appendStringInfoChar(buf, '\'');
 }
 
 /*
  * Deparse given expression into context->buf.
  *
- * This function must support all the same node types that foreign_expr_walker
- * accepts.
+ * This function must support all the same node types that
+ * hdfs_foreign_expr_walker accepts.
  *
  * Note: unlike ruleutils.c, we just use a simple hard-wired parenthesization
  * scheme: anything more complex than a Var, Const, function call or cast
  * should be self-parenthesized.
  */
 static void
-deparseExpr(Expr *node, deparse_expr_cxt *context)
+hdfs_deparse_expr(Expr *node, deparse_expr_cxt *context)
 {
 	if (node == NULL)
 		return;
@@ -806,49 +741,52 @@ deparseExpr(Expr *node, deparse_expr_cxt *context)
 	switch (nodeTag(node))
 	{
 		case T_Var:
-			deparseVar((Var *) node, context);
+			hdfs_deparse_var((Var *) node, context);
 			break;
 		case T_Const:
-			deparseConst((Const *) node, context);
+			hdfs_deparse_const((Const *) node, context);
 			break;
 		case T_Param:
-			deparseParam((Param *) node, context);
+			hdfs_deparse_param((Param *) node, context);
 			break;
 #if PG_VERSION_NUM < 120000
 		case T_ArrayRef:
-			deparseArrayRef((ArrayRef *) node, context);
+			hdfs_deparse_array_ref((ArrayRef *) node, context);
 #else
 		case T_SubscriptingRef:
-			deparseSubscriptingRef((SubscriptingRef *) node, context);
+			hdfs_deparse_subscripting_ref((SubscriptingRef *) node, context);
 			break;
 #endif
 		case T_FuncExpr:
-			deparseFuncExpr((FuncExpr *) node, context);
+			hdfs_deparse_func_expr((FuncExpr *) node, context);
 			break;
 		case T_OpExpr:
-			deparseOpExpr((OpExpr *) node, context);
+			hdfs_deparse_op_expr((OpExpr *) node, context);
 			break;
 		case T_DistinctExpr:
-			deparseDistinctExpr((DistinctExpr *) node, context);
+			hdfs_deparse_distinct_expr((DistinctExpr *) node, context);
 			break;
 		case T_ScalarArrayOpExpr:
-			deparseScalarArrayOpExpr((ScalarArrayOpExpr *) node, context);
+			hdfs_deparse_scalar_array_op_expr((ScalarArrayOpExpr *) node,
+											  context);
 			break;
 		case T_RelabelType:
-			deparseRelabelType((RelabelType *) node, context);
+			hdfs_deparse_relabel_type((RelabelType *) node, context);
 			break;
 		case T_BoolExpr:
-			deparseBoolExpr((BoolExpr *) node, context);
+			hdfs_deparse_bool_expr((BoolExpr *) node, context);
 			break;
 		case T_NullTest:
-			deparseNullTest((NullTest *) node, context);
+			hdfs_deparse_null_test((NullTest *) node, context);
 			break;
 		case T_ArrayExpr:
-			deparseArrayExpr((ArrayExpr *) node, context);
+			hdfs_deparse_array_expr((ArrayExpr *) node, context);
 			break;
 		default:
-			elog(ERROR, "unsupported expression type for deparse: %d",
-				 (int) nodeTag(node));
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("unsupported expression type for deparse: %d",
+							(int) nodeTag(node))));
 			break;
 	}
 }
@@ -859,10 +797,10 @@ deparseExpr(Expr *node, deparse_expr_cxt *context)
  * If the Var belongs to the foreign relation, just print its remote name.
  * Otherwise, it's effectively a Param (and will in fact be a Param at
  * run time).  Handle it the same way we handle plain Params --- see
- * deparseParam for comments.
+ * hdfs_deparse_param for comments.
  */
 static void
-deparseVar(Var *node, deparse_expr_cxt *context)
+hdfs_deparse_var(Var *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
@@ -870,7 +808,8 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 		node->varlevelsup == 0)
 	{
 		/* Var belongs to foreign table */
-		deparseColumnRef(buf, node->varno, node->varattno, context->root);
+		hdfs_deparse_column_ref(buf, node->varno, node->varattno,
+								context->root);
 	}
 	else
 	{
@@ -880,12 +819,10 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 			int			pindex = list_length(*context->params_list) + 1;
 
 			*context->params_list = lappend(*context->params_list, node);
-			printRemoteParam(pindex, node->vartype, node->vartypmod, context);
+			hdfs_print_remote_param(context);
 		}
 		else
-		{
-			printRemotePlaceholder(node->vartype, node->vartypmod, context);
-		}
+			hdfs_print_remote_placeholder(context);
 	}
 }
 
@@ -895,7 +832,7 @@ deparseVar(Var *node, deparse_expr_cxt *context)
  * This function has to be kept in sync with ruleutils.c's get_const_expr.
  */
 static void
-deparseConst(Const *node, deparse_expr_cxt *context)
+hdfs_deparse_const(Const *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	Oid			typoutput;
@@ -908,30 +845,17 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 		return;
 	}
 
-	getTypeOutputInfo(node->consttype,
-					  &typoutput, &typIsVarlena);
+	getTypeOutputInfo(node->consttype, &typoutput, &typIsVarlena);
 	extval = OidOutputFunctionCall(typoutput, node->constvalue);
 
 	switch (node->consttype)
 	{
 		case DATEOID:
-			appendStringInfo(buf, "'%s'", extval);
-			break;
 		case TIMEOID:
-			appendStringInfo(buf, "'%s'", extval);
-			break;
 		case TIMESTAMPOID:
-			appendStringInfo(buf, "'%s'", extval);
-			break;
 		case TIMESTAMPTZOID:
-			appendStringInfo(buf, "'%s'", extval);
-			break;
 		case INTERVALOID:
-			appendStringInfo(buf, "'%s'", extval);
-			break;
 		case TIMETZOID:
-			appendStringInfo(buf, "'%s'", extval);
-			break;
 		case INT2OID:
 		case INT4OID:
 		case INT8OID:
@@ -952,7 +876,7 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 				appendStringInfoString(buf, "false");
 			break;
 		default:
-			deparseStringLiteral(buf, extval);
+			hdfs_deparse_string_literal(buf, extval);
 			break;
 	}
 }
@@ -961,24 +885,22 @@ deparseConst(Const *node, deparse_expr_cxt *context)
  * Deparse given Param node.
  *
  * If we're generating the query "for real", add the Param to
- * context->params_list, and then use its index
- * in that list as the remote parameter number.  During EXPLAIN, there's
- * no need to identify a parameter number.
+ * context->params_list, and then use its index in that list as the remote
+ * parameter number. During EXPLAIN, there's no need to identify a parameter
+ * number.
  */
 static void
-deparseParam(Param *node, deparse_expr_cxt *context)
+hdfs_deparse_param(Param *node, deparse_expr_cxt *context)
 {
 	if (context->params_list)
 	{
 		int			pindex = list_length(*context->params_list) + 1;
 
 		*context->params_list = lappend(*context->params_list, node);
-		printRemoteParam(pindex, node->paramtype, node->paramtypmod, context);
+		hdfs_print_remote_param(context);
 	}
 	else
-	{
-		printRemotePlaceholder(node->paramtype, node->paramtypmod, context);
-	}
+		hdfs_print_remote_placeholder(context);
 }
 
 /*
@@ -986,9 +908,10 @@ deparseParam(Param *node, deparse_expr_cxt *context)
  */
 static void
 #if PG_VERSION_NUM < 120000
-deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context)
+hdfs_deparse_array_ref(ArrayRef *node, deparse_expr_cxt *context)
 #else
-deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
+hdfs_deparse_subscripting_ref(SubscriptingRef *node,
+							  deparse_expr_cxt *context)
 #endif
 {
 	StringInfo	buf = context->buf;
@@ -1005,11 +928,11 @@ deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
 	 * case of subscripting a Var, but otherwise do it.
 	 */
 	if (IsA(node->refexpr, Var))
-		deparseExpr(node->refexpr, context);
+		hdfs_deparse_expr(node->refexpr, context);
 	else
 	{
 		appendStringInfoChar(buf, '(');
-		deparseExpr(node->refexpr, context);
+		hdfs_deparse_expr(node->refexpr, context);
 		appendStringInfoChar(buf, ')');
 	}
 
@@ -1018,9 +941,10 @@ deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
 	foreach(uplist_item, node->refupperindexpr)
 	{
 		appendStringInfoChar(buf, '[');
+
 		if (lowlist_item)
 		{
-			deparseExpr(lfirst(lowlist_item), context);
+			hdfs_deparse_expr(lfirst(lowlist_item), context);
 			appendStringInfoChar(buf, ':');
 #if PG_VERSION_NUM < 130000
 			lowlist_item = lnext(lowlist_item);
@@ -1028,7 +952,8 @@ deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
 			lowlist_item = lnext(node->reflowerindexpr, lowlist_item);
 #endif
 		}
-		deparseExpr(lfirst(uplist_item), context);
+
+		hdfs_deparse_expr(lfirst(uplist_item), context);
 		appendStringInfoChar(buf, ']');
 	}
 
@@ -1039,7 +964,7 @@ deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
  * Deparse a function call.
  */
 static void
-deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
+hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	HeapTuple	proctup;
@@ -1055,7 +980,7 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 	 */
 	if (node->funcformat == COERCE_IMPLICIT_CAST)
 	{
-		deparseExpr((Expr *) linitial(node->args), context);
+		hdfs_deparse_expr((Expr *) linitial(node->args), context);
 		return;
 	}
 
@@ -1070,7 +995,7 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 		/* Get the typmod if this is a length-coercion function */
 		(void) exprIsLengthCoercion((Node *) node, &coercedTypmod);
 
-		deparseExpr((Expr *) linitial(node->args), context);
+		hdfs_deparse_expr((Expr *) linitial(node->args), context);
 		return;
 	}
 
@@ -1097,7 +1022,8 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 	/* Deparse the function name ... */
 	proname = NameStr(procform->proname);
 	appendStringInfo(buf, "%s(", quote_identifier(proname));
-	/* ... and all the arguments */
+
+	/* Deparse all the arguments */
 	first = true;
 	foreach(arg, node->args)
 	{
@@ -1109,9 +1035,10 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 		if (use_variadic && lnext(node->args, arg) == NULL)
 #endif
 			appendStringInfoString(buf, "VARIADIC ");
-		deparseExpr((Expr *) lfirst(arg), context);
+		hdfs_deparse_expr((Expr *) lfirst(arg), context);
 		first = false;
 	}
+
 	appendStringInfoChar(buf, ')');
 
 	ReleaseSysCache(proctup);
@@ -1122,7 +1049,7 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
  * priority of operations, we always parenthesize the arguments.
  */
 static void
-deparseOpExpr(OpExpr *node, deparse_expr_cxt *context)
+hdfs_deparse_op_expr(OpExpr *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	HeapTuple	tuple;
@@ -1149,19 +1076,19 @@ deparseOpExpr(OpExpr *node, deparse_expr_cxt *context)
 	if (oprkind == 'r' || oprkind == 'b')
 	{
 		arg = list_head(node->args);
-		deparseExpr(lfirst(arg), context);
+		hdfs_deparse_expr(lfirst(arg), context);
 		appendStringInfoChar(buf, ' ');
 	}
 
 	/* Deparse operator name. */
-	deparseOperatorName(buf, form);
+	hdfs_deparse_operator_name(buf, form);
 
 	/* Deparse right operand. */
 	if (oprkind == 'l' || oprkind == 'b')
 	{
 		arg = list_tail(node->args);
 		appendStringInfoChar(buf, ' ');
-		deparseExpr(lfirst(arg), context);
+		hdfs_deparse_expr(lfirst(arg), context);
 	}
 
 	appendStringInfoChar(buf, ')');
@@ -1173,7 +1100,7 @@ deparseOpExpr(OpExpr *node, deparse_expr_cxt *context)
  * Print the name of an operator.
  */
 static void
-deparseOperatorName(StringInfo buf, Form_pg_operator opform)
+hdfs_deparse_operator_name(StringInfo buf, Form_pg_operator opform)
 {
 	char	   *opname;
 
@@ -1186,6 +1113,7 @@ deparseOperatorName(StringInfo buf, Form_pg_operator opform)
 		const char *opnspname;
 
 		opnspname = get_namespace_name(opform->oprnamespace);
+
 		/* Print fully qualified operator name. */
 		appendStringInfo(buf, "OPERATOR(%s.%s)",
 						 quote_identifier(opnspname), opname);
@@ -1193,21 +1121,13 @@ deparseOperatorName(StringInfo buf, Form_pg_operator opform)
 	else
 	{
 		if (strcmp(opname, "~~") == 0)
-		{
 			appendStringInfoString(buf, "LIKE");
-		}
 		else if (strcmp(opname, "~~*") == 0)
-		{
 			appendStringInfoString(buf, "LIKE");
-		}
 		else if (strcmp(opname, "!~~") == 0)
-		{
 			appendStringInfoString(buf, "NOT LIKE");
-		}
 		else if (strcmp(opname, "!~~*") == 0)
-		{
 			appendStringInfoString(buf, "NOT LIKE");
-		}
 		else if (strcmp(opname, "~") == 0)
 		{
 			/* TODO: use hive operator */
@@ -1236,52 +1156,46 @@ deparseOperatorName(StringInfo buf, Form_pg_operator opform)
  * Deparse IS DISTINCT FROM.
  */
 static void
-deparseDistinctExpr(DistinctExpr *node, deparse_expr_cxt *context)
+hdfs_deparse_distinct_expr(DistinctExpr *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
 	Assert(list_length(node->args) == 2);
 
 	appendStringInfoChar(buf, '(');
-	deparseExpr(linitial(node->args), context);
+	hdfs_deparse_expr(linitial(node->args), context);
 	appendStringInfoString(buf, " IS DISTINCT FROM ");
-	deparseExpr(lsecond(node->args), context);
+	hdfs_deparse_expr(lsecond(node->args), context);
 	appendStringInfoChar(buf, ')');
 }
 
 static void
-deparseString(StringInfo buf, const char *val, bool isstr)
+hdfs_deparse_string(StringInfo buf, const char *val, bool isstr)
 {
 	const char *valptr;
-	int			i = -1;
+	int			i;
 
-	for (valptr = val; *valptr; valptr++)
+	if (isstr)
+		appendStringInfoChar(buf, '\'');
+
+	for (valptr = val, i = 0; *valptr; valptr++, i++)
 	{
 		char		ch = *valptr;
 
-		i++;
-
-		if (i == 0 && isstr)
-			appendStringInfoChar(buf, '\'');
-
 		/*
 		 * Remove '{', '}' and \" character from the string. Because this
-		 * syntax is not recognize by the remote MySQL server.
+		 * syntax is not recognize by the remote HiveServer.
 		 */
 		if ((ch == '{' && i == 0) ||
 			(ch == '}' && (i == (strlen(val) - 1))) || ch == '\"')
 			continue;
 
 		if (ch == ',' && isstr)
-		{
-			appendStringInfoChar(buf, '\'');
+			appendStringInfoString(buf, "', '");
+		else
 			appendStringInfoChar(buf, ch);
-			appendStringInfoChar(buf, ' ');
-			appendStringInfoChar(buf, '\'');
-			continue;
-		}
-		appendStringInfoChar(buf, ch);
 	}
+
 	if (isstr)
 		appendStringInfoChar(buf, '\'');
 }
@@ -1291,7 +1205,8 @@ deparseString(StringInfo buf, const char *val, bool isstr)
  * around priority of operations, we always parenthesize the arguments.
  */
 static void
-deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
+hdfs_deparse_scalar_array_op_expr(ScalarArrayOpExpr *node,
+								  deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	HeapTuple	tuple;
@@ -1314,15 +1229,16 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 
 	/* Deparse left operand. */
 	arg1 = linitial(node->args);
-	deparseExpr(arg1, context);
+	hdfs_deparse_expr(arg1, context);
 	appendStringInfoChar(buf, ' ');
 
 	opname = NameStr(form->oprname);
 	if (strcmp(opname, "<>") == 0)
-		appendStringInfo(buf, " NOT ");
+		appendStringInfoString(buf, " NOT ");
 
 	/* Deparse operator name plus decoration. */
-	appendStringInfo(buf, " IN (");
+	appendStringInfoString(buf, " IN ");
+	appendStringInfoChar(buf, '(');
 
 	/* Deparse right operand. */
 	arg2 = lsecond(node->args);
@@ -1332,34 +1248,33 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 			{
 				Const	   *c = (Const *) arg2;
 
-				if (!c->constisnull)
-				{
-					getTypeOutputInfo(c->consttype,
-									  &typoutput, &typIsVarlena);
-					extval = OidOutputFunctionCall(typoutput, c->constvalue);
-
-					switch (c->consttype)
-					{
-						case INT4ARRAYOID:
-						case OIDARRAYOID:
-							deparseString(buf, extval, false);
-							break;
-						default:
-							deparseString(buf, extval, true);
-							break;
-					}
-				}
-				else
+				if (c->constisnull)
 				{
 					appendStringInfoString(buf, " NULL");
+					ReleaseSysCache(tuple);
 					return;
+				}
+
+				getTypeOutputInfo(c->consttype, &typoutput, &typIsVarlena);
+				extval = OidOutputFunctionCall(typoutput, c->constvalue);
+
+				switch (c->consttype)
+				{
+					case INT4ARRAYOID:
+					case OIDARRAYOID:
+						hdfs_deparse_string(buf, extval, false);
+						break;
+					default:
+						hdfs_deparse_string(buf, extval, true);
+						break;
 				}
 			}
 			break;
 		default:
-			deparseExpr(arg2, context);
+			hdfs_deparse_expr(arg2, context);
 			break;
 	}
+
 	appendStringInfoChar(buf, ')');
 	ReleaseSysCache(tuple);
 }
@@ -1368,16 +1283,16 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
  * Deparse a RelabelType (binary-compatible cast) node.
  */
 static void
-deparseRelabelType(RelabelType *node, deparse_expr_cxt *context)
+hdfs_deparse_relabel_type(RelabelType *node, deparse_expr_cxt *context)
 {
-	deparseExpr(node->arg, context);
+	hdfs_deparse_expr(node->arg, context);
 }
 
 /*
  * Deparse a BoolExpr node.
  */
 static void
-deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context)
+hdfs_deparse_bool_expr(BoolExpr *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	const char *op = NULL;		/* keep compiler quiet */
@@ -1393,8 +1308,9 @@ deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context)
 			op = "OR";
 			break;
 		case NOT_EXPR:
-			appendStringInfoString(buf, "(NOT ");
-			deparseExpr(linitial(node->args), context);
+			appendStringInfoChar(buf, '(');
+			appendStringInfoString(buf, "NOT ");
+			hdfs_deparse_expr(linitial(node->args), context);
 			appendStringInfoChar(buf, ')');
 			return;
 	}
@@ -1405,7 +1321,7 @@ deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context)
 	{
 		if (!first)
 			appendStringInfo(buf, " %s ", op);
-		deparseExpr((Expr *) lfirst(lc), context);
+		hdfs_deparse_expr((Expr *) lfirst(lc), context);
 		first = false;
 	}
 	appendStringInfoChar(buf, ')');
@@ -1415,23 +1331,26 @@ deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context)
  * Deparse IS [NOT] NULL expression.
  */
 static void
-deparseNullTest(NullTest *node, deparse_expr_cxt *context)
+hdfs_deparse_null_test(NullTest *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
 	appendStringInfoChar(buf, '(');
-	deparseExpr(node->arg, context);
+	hdfs_deparse_expr(node->arg, context);
+
 	if (node->nulltesttype == IS_NULL)
-		appendStringInfoString(buf, " IS NULL)");
+		appendStringInfoString(buf, " IS NULL");
 	else
-		appendStringInfoString(buf, " IS NOT NULL)");
+		appendStringInfoString(buf, " IS NOT NULL");
+
+	appendStringInfoChar(buf, ')');
 }
 
 /*
  * Deparse ARRAY[...] construct.
  */
 static void
-deparseArrayExpr(ArrayExpr *node, deparse_expr_cxt *context)
+hdfs_deparse_array_expr(ArrayExpr *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	bool		first = true;
@@ -1442,7 +1361,7 @@ deparseArrayExpr(ArrayExpr *node, deparse_expr_cxt *context)
 	{
 		if (!first)
 			appendStringInfoString(buf, ", ");
-		deparseExpr(lfirst(lc), context);
+		hdfs_deparse_expr(lfirst(lc), context);
 		first = false;
 	}
 	appendStringInfoChar(buf, ']');
@@ -1458,13 +1377,9 @@ deparseArrayExpr(ArrayExpr *node, deparse_expr_cxt *context)
  * do locally --- they need only have the same names.
  */
 static void
-printRemoteParam(int paramindex, Oid paramtype, int32 paramtypmod,
-				 deparse_expr_cxt *context)
+hdfs_print_remote_param(deparse_expr_cxt *context)
 {
-	StringInfo	buf = context->buf;
-	char	   *ptypename = format_type_with_typemod(paramtype, paramtypmod);
-
-	appendStringInfo(buf, "?");
+	appendStringInfoChar(context->buf, '?');
 }
 
 /*
@@ -1484,11 +1399,7 @@ printRemoteParam(int paramindex, Oid paramtype, int32 paramtypmod,
  * would do the wrong thing in the context "x = ANY(...)".
  */
 static void
-printRemotePlaceholder(Oid paramtype, int32 paramtypmod,
-					   deparse_expr_cxt *context)
+hdfs_print_remote_placeholder(deparse_expr_cxt *context)
 {
-	StringInfo	buf = context->buf;
-	char	   *ptypename = format_type_with_typemod(paramtype, paramtypmod);
-
-	appendStringInfo(buf, "((SELECT null))");
+	appendStringInfoString(context->buf, "(SELECT null)");
 }

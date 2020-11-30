@@ -25,7 +25,7 @@ CREATE EXTENSION hdfs_fdw;
 -- Use wrong parameter name, error message will be displayed.
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimates 'aasaaaa');
 ERROR:  invalid option "use_remote_estimates"
-HINT:  Valid options in this context are: host, port, client_type, auth_type, use_remote_estimate, query_timeout, connect_timeout, fetch_size, log_remote_sql
+HINT:  Valid options in this context are: host, port, client_type, auth_type, use_remote_estimate, query_timeout, connect_timeout, fetch_size, log_remote_sql.
 -- Create Hadoop FDW Server with wrong value in use_remote_estimate 'sasaaa'.
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'aasaaaa');
 -- Create Hadoop USER MAPPING.

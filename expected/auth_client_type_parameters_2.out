@@ -44,7 +44,7 @@ CREATE FOREIGN TABLE dept (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : A valid user name is required)
+ERROR:  failed to initialize the connection: (ERROR : A valid user name is required)
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 3 other objects
 CREATE EXTENSION hdfs_fdw;
@@ -57,7 +57,7 @@ CREATE FOREIGN TABLE dept (
 )
 SERVER hdfs_svr OPTIONS (dbname 'fdw_db', table_name 'dept');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : A valid user name is required)
+ERROR:  failed to initialize the connection: (ERROR : A valid user name is required)
 DROP EXTENSION hdfs_fdw CASCADE;
 NOTICE:  drop cascades to 3 other objects
 --=========================================================================================
@@ -143,7 +143,7 @@ END;
 CREATE EXTENSION hdfs_fdw;
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'false', log_remote_sql 'true',auth_type :AUTH_TYPE);
 SELECT  execute_based_client(:HIVE_CLIENT_TYPE,'kzeeshan','edb',:AUTH_TYPE);
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
+ERROR:  failed to initialize the connection: (ERROR : Could not connect to jdbc:hive2://127.0.0.1:10000/fdw_db within 300000 seconds)
 CONTEXT:  SQL statement "ANALYZE dept_dt_mp1"
 PL/pgSQL function execute_based_client(character varying,character varying,character varying,character varying) line 58 at EXECUTE
 -- DROP EXTENSION

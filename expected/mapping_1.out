@@ -216,24 +216,24 @@ SELECT * FROM dept;
 --empty string, should fail
 ALTER SERVER hdfs_srv3a OPTIONS (SET host '');
 SELECT * FROM dept;
-ERROR:  failed to initialize the HDFS connection object (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db within 4000000 seconds)
+ERROR:  failed to initialize the connection: (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db within 4000000 seconds)
 --test cient_type
 --set to hiveserver1, should error when querying 
 --since the target is hiveserver2
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'hiverserver1');
 SELECT * FROM dept;
 ERROR:  invalid option "hiverserver1"
-HINT:  Valid client_type values are hiveserver2 and spark
+HINT:  Valid client_type values are hiveserver2 and spark.
 --set to invalid value, should error when querying 
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
-HINT:  Valid client_type values are hiveserver2 and spark
+HINT:  Valid client_type values are hiveserver2 and spark.
 --set to invalid value, should error when querying 
 ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
 SELECT * FROM dept;
 ERROR:  invalid option "invalidserver"
-HINT:  Valid client_type values are hiveserver2 and spark
+HINT:  Valid client_type values are hiveserver2 and spark.
 --test DROP SERVER
 --should fail, RESTRICT enforced
 DROP SERVER hdfs_srv3a;

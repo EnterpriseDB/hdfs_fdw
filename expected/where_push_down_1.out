@@ -905,7 +905,7 @@ CREATE FOREIGN TABLE json_test (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 SELECT bol1 FROM json_test;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
 --******* TIMEOID  -->  TIME ************
 CREATE FOREIGN TABLE time_test (
     col1              	TIME

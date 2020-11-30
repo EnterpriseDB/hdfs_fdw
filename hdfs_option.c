@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * hdfs_option.c
- * 		Foreign-data wrapper for remote Hadoop servers
+ * 		FDW option handling for hdfs_fdw
  *
  * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
  * Portions Copyright (c) 2004-2020, EnterpriseDB Corporation.
@@ -14,50 +14,32 @@
 
 #include "postgres.h"
 
-#include "hdfs_fdw.h"
-
-#include "libhive/jdbc/hiveclient.h"
-
-#include <stdio.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include "funcapi.h"
 #include "access/reloptions.h"
 #include "catalog/pg_foreign_server.h"
 #include "catalog/pg_foreign_table.h"
 #include "catalog/pg_user_mapping.h"
-#include "catalog/pg_type.h"
 #include "commands/defrem.h"
-#include "commands/explain.h"
-#include "foreign/fdwapi.h"
-#include "foreign/foreign.h"
+#include "hdfs_fdw.h"
 #include "miscadmin.h"
-#include "mb/pg_wchar.h"
-#include "optimizer/cost.h"
-#include "storage/fd.h"
-#include "utils/array.h"
 #include "utils/lsyscache.h"
-#include "utils/builtins.h"
-#include "utils/rel.h"
 
-#include "optimizer/pathnode.h"
-#include "optimizer/restrictinfo.h"
-#include "optimizer/planmain.h"
+/* Default connection parameters */
+#define DEFAULT_DATABASE "default"
+#define DEFAULT_HOST "localhost"
+#define DEFAULT_PORT 10000
 
 /*
- * Describes the valid options for objects that use this wrapper.
+ * Describes the valid options for objects that this wrapper uses.
  */
 struct HDFSFdwOption
 {
-	const char *optname;		/* Name of the options */
+	const char *optname;		/* name of the options */
 	Oid			optcontext;		/* Oid of catalog in which option may appear */
 };
 
 
 /*
  * Valid options for hdfs_fdw.
- *
  */
 static struct HDFSFdwOption valid_options[] =
 {
@@ -78,18 +60,18 @@ static struct HDFSFdwOption valid_options[] =
 	{NULL, InvalidOid}
 };
 
-extern Datum hdfs_fdw_validator(PG_FUNCTION_ARGS);
-
-PG_FUNCTION_INFO_V1(hdfs_fdw_validator);
 
 static bool hdfs_is_valid_option(const char *option, Oid context);
 
+
 /*
  * Validate the generic options given to a FOREIGN DATA WRAPPER, SERVER,
- * USER MAPPING or FOREIGN TABLE that uses file_fdw.
+ * USER MAPPING or FOREIGN TABLE that uses hdfs_fdw.
  *
  * Raise an ERROR if the option or its value is considered invalid.
  */
+PG_FUNCTION_INFO_V1(hdfs_fdw_validator);
+
 Datum
 hdfs_fdw_validator(PG_FUNCTION_ARGS)
 {
@@ -105,15 +87,15 @@ hdfs_fdw_validator(PG_FUNCTION_ARGS)
 	{
 		DefElem    *def = (DefElem *) lfirst(cell);
 
+		/*
+		 * If an unknown option specified, complain about it. Provide a hint
+		 * with list of valid options for the object.
+		 */
 		if (!hdfs_is_valid_option(def->defname, catalog))
 		{
 			struct HDFSFdwOption *opt;
 			StringInfoData buf;
 
-			/*
-			 * Unknown option specified, complain about it. Provide a hint
-			 * with list of valid options for the object.
-			 */
 			initStringInfo(&buf);
 			for (opt = valid_options; opt->optname; opt++)
 			{
@@ -125,17 +107,18 @@ hdfs_fdw_validator(PG_FUNCTION_ARGS)
 			ereport(ERROR,
 					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
 					 errmsg("invalid option \"%s\"", def->defname),
-					 errhint("Valid options in this context are: %s",
+					 errhint("Valid options in this context are: %s.",
 							 buf.len ? buf.data : "<none>")));
 		}
 	}
+
 	PG_RETURN_VOID();
 }
 
 
 /*
- * Check if the provided option is one of the valid options.
- * context is the Oid of the catalog holding the object the option is for.
+ * Check if the provided option is one of the valid hdfs_fdw options.
+ * Context is the Oid of the catalog holding the object the option is for.
  */
 static bool
 hdfs_is_valid_option(const char *option, Oid context)
@@ -147,6 +130,7 @@ hdfs_is_valid_option(const char *option, Oid context)
 		if (context == opt->optcontext && strcmp(opt->optname, option) == 0)
 			return true;
 	}
+
 	return false;
 }
 
@@ -164,17 +148,18 @@ hdfs_get_options(Oid foreigntableid)
 	hdfs_opt   *opt;
 	char	   *table_name = NULL;
 
-	opt = (hdfs_opt *) palloc(sizeof(hdfs_opt));
-	memset(opt, 0, sizeof(hdfs_opt));
+	opt = (hdfs_opt *) palloc0(sizeof(hdfs_opt));
 
-	opt->receive_timeout = 1000 * 300;	/* Default timeout is 300 seconds */
-	opt->connect_timeout = 1000 * 300;	/* Default timeout is 300 seconds */
-	opt->fetch_size = 10000;	/* Default fetch size */
+	/* Set default values for options. */
+	opt->receive_timeout = 1000 * 300;
+	opt->connect_timeout = 1000 * 300;
+	opt->fetch_size = 10000;
 	opt->log_remote_sql = false;
+	opt->host = DEFAULT_HOST;
+	opt->port = DEFAULT_PORT;
+	opt->dbname = DEFAULT_DATABASE;
 
-	/*
-	 * Extract options from FDW objects.
-	 */
+	/* Extract options from FDW objects. */
 	f_table = GetForeignTable(foreigntableid);
 	f_server = GetForeignServer(f_table->serverid);
 	f_mapping = GetUserMapping(GetUserId(), f_table->serverid);
@@ -184,12 +169,10 @@ hdfs_get_options(Oid foreigntableid)
 	options = list_concat(options, f_server->options);
 	options = list_concat(options, f_mapping->options);
 
-	/* Set default clinet type to HiverServer2 */
+	/* Set default client type to HiverServer2 and auth type to unspecified. */
 	opt->client_type = HIVESERVER2;
-
 	opt->auth_type = AUTH_TYPE_UNSPECIFIED;
 
-	/* Loop through the options, and get the server/port */
 	foreach(lc, options)
 	{
 		DefElem    *def = (DefElem *) lfirst(lc);
@@ -201,7 +184,9 @@ hdfs_get_options(Oid foreigntableid)
 		{
 			opt->port = atoi(defGetString(def));
 			if (opt->port <= 0 || opt->port >= 65535)
-				elog(ERROR, "invalid port number: %s", defGetString(def));
+				ereport(ERROR,
+						(errmsg("invalid port number: %s",
+								defGetString(def))));
 		}
 
 		if (strcmp(def->defname, "username") == 0)
@@ -220,34 +205,26 @@ hdfs_get_options(Oid foreigntableid)
 		{
 			if (strcasecmp(defGetString(def), "hiveserver2") == 0)
 				opt->client_type = HIVESERVER2;
+			else if (strcasecmp(defGetString(def), "spark") == 0)
+				opt->client_type = SPARKSERVER;
 			else
-			{
-				if (strcasecmp(defGetString(def), "spark") == 0)
-					opt->client_type = SPARKSERVER;
-				else
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
-							 errmsg("invalid option \"%s\"", defGetString(def)),
-							 errhint("Valid client_type values are hiveserver2 and spark")));
-				}
-			}
+				ereport(ERROR,
+						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+						 errmsg("invalid option \"%s\"", defGetString(def)),
+						 errhint("Valid client_type values are hiveserver2 and spark.")));
 		}
 
 		if (strcmp(def->defname, "auth_type") == 0)
 		{
 			if (strcasecmp(defGetString(def), "NOSASL") == 0)
 				opt->auth_type = AUTH_TYPE_NOSASL;
+			else if (strcasecmp(defGetString(def), "LDAP") == 0)
+				opt->auth_type = AUTH_TYPE_LDAP;
 			else
-			{
-				if (strcasecmp(defGetString(def), "LDAP") == 0)
-					opt->auth_type = AUTH_TYPE_LDAP;
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
-							 errmsg("invalid option \"%s\"", defGetString(def)),
-							 errhint("Valid auth_type are NOSASL & LDAP")));
-			}
+				ereport(ERROR,
+						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+						 errmsg("invalid option \"%s\"", defGetString(def)),
+						 errhint("Valid auth_type are NOSASL & LDAP.")));
 		}
 
 		if (strcmp(def->defname, "log_remote_sql") == 0)
@@ -265,32 +242,29 @@ hdfs_get_options(Oid foreigntableid)
 			if (opt->receive_timeout <= 0 || opt->receive_timeout >= 100000)
 				ereport(ERROR,
 						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
-						 errmsg("invalid query timeout \"%s\"", defGetString(def)),
-						 errhint("Valid range is 1 - 100000 S")));
+						 errmsg("invalid query timeout \"%s\"",
+								defGetString(def)),
+						 errhint("Valid range is 1 - 100000 S.")));
 			opt->receive_timeout = opt->receive_timeout * 1000;
 		}
+
 		if (strcmp(def->defname, "connect_timeout") == 0)
 		{
 			opt->connect_timeout = atoi(defGetString(def));
 			if (opt->connect_timeout <= 0 || opt->connect_timeout >= 100000)
 				ereport(ERROR,
 						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
-						 errmsg("invalid connect timeout \"%s\"", defGetString(def)),
-						 errhint("Valid range is 1 - 100000 S")));
+						 errmsg("invalid connect timeout \"%s\"",
+								defGetString(def)),
+						 errhint("Valid range is 1 - 100000 S.")));
 			opt->connect_timeout = opt->connect_timeout * 1000;
 		}
 	}
 
-	/* Default values, if required */
-	if (!opt->host)
-		opt->host = (char *) DEFAULT_HOST;
-
-	if (!opt->port)
-		opt->port = atoi(DEFAULT_PORT);
-
-	if (!opt->dbname)
-		opt->dbname = (char *) DEFAULT_DATABASE;
-
+	/*
+	 * If the table name is not provided, we assume it to be same as foreign
+	 * table name.
+	 */
 	if (!table_name)
 		table_name = get_rel_name(foreigntableid);
 
