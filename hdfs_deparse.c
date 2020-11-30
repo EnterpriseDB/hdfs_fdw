@@ -11,7 +11,7 @@
  *
  *-------------------------------------------------------------------------
  */
- 
+
 #include "postgres.h"
 
 #include "hdfs_fdw.h"
@@ -83,21 +83,21 @@ typedef struct deparse_expr_cxt
  * remote server.
  */
 static bool foreign_expr_walker(Node *node,
-					foreign_glob_cxt *glob_cxt,
-					foreign_loc_cxt *outer_cxt);
+								foreign_glob_cxt *glob_cxt,
+								foreign_loc_cxt *outer_cxt);
 static bool is_builtin(Oid procid);
 
 /*
  * Functions to construct string representation of a node tree.
  */
 static void deparseTargetList(StringInfo buf,
-				  PlannerInfo *root,
-				  Index rtindex,
-				  Relation rel,
-				  Bitmapset *attrs_used,
-				  List **retrieved_attrs);
+							  PlannerInfo *root,
+							  Index rtindex,
+							  Relation rel,
+							  Bitmapset *attrs_used,
+							  List **retrieved_attrs);
 static void deparseColumnRef(StringInfo buf, int varno, int varattno,
-				 PlannerInfo *root);
+							 PlannerInfo *root);
 static void deparseRelation(hdfs_opt *opt, StringInfo buf);
 static void deparseExpr(Expr *expr, deparse_expr_cxt *context);
 static void deparseVar(Var *node, deparse_expr_cxt *context);
@@ -106,22 +106,23 @@ static void deparseParam(Param *node, deparse_expr_cxt *context);
 #if PG_VERSION_NUM < 120000
 static void deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context);
 #else
-static void deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context);
+static void deparseSubscriptingRef(SubscriptingRef *node,
+								   deparse_expr_cxt *context);
 #endif
 static void deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context);
 static void deparseOpExpr(OpExpr *node, deparse_expr_cxt *context);
 static void deparseOperatorName(StringInfo buf, Form_pg_operator opform);
 static void deparseDistinctExpr(DistinctExpr *node, deparse_expr_cxt *context);
 static void deparseScalarArrayOpExpr(ScalarArrayOpExpr *node,
-						 deparse_expr_cxt *context);
+									 deparse_expr_cxt *context);
 static void deparseRelabelType(RelabelType *node, deparse_expr_cxt *context);
 static void deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context);
 static void deparseNullTest(NullTest *node, deparse_expr_cxt *context);
 static void deparseArrayExpr(ArrayExpr *node, deparse_expr_cxt *context);
 static void printRemoteParam(int paramindex, Oid paramtype, int32 paramtypmod,
-				 deparse_expr_cxt *context);
+							 deparse_expr_cxt *context);
 static void printRemotePlaceholder(Oid paramtype, int32 paramtypmod,
-					   deparse_expr_cxt *context);
+								   deparse_expr_cxt *context);
 
 
 /*
@@ -226,7 +227,7 @@ foreign_expr_walker(Node *node,
 	{
 		case T_Var:
 			{
-				Var *var = (Var *) node;
+				Var		   *var = (Var *) node;
 
 				if (bms_is_member(var->varno, glob_cxt->foreignrel->relids) &&
 					var->varlevelsup == 0)
@@ -274,7 +275,7 @@ foreign_expr_walker(Node *node,
 #else
 		case T_SubscriptingRef:
 			{
-				SubscriptingRef   *sbref = (SubscriptingRef *) node;;
+				SubscriptingRef *sbref = (SubscriptingRef *) node;;
 
 				/* Assignment should not be in restrictions. */
 				if (sbref->refassgnexpr != NULL)
@@ -459,18 +460,19 @@ is_builtin(Oid oid)
 
 void
 hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf, PlannerInfo *root,
-					RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
+					 RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
 {
-	List *params_list = NIL;
+	List	   *params_list = NIL;
+
 	appendStringInfo(buf, "EXPLAIN SELECT * FROM ");
 	appendStringInfo(buf, "%s", opt->table_name);
+
 	/*
-	 * For accurate row counts we should append where clauses
-	 * with the statement, but if where clause is parameterized
-	 * we should handle it the way pg fdw does
-	 * TODO
-	 * if (fpinfo->remote_conds)
-	 * 	hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds, true, &params_list);
+	 * For accurate row counts we should append where clauses with the
+	 * statement, but if where clause is parameterized we should handle it the
+	 * way pg fdw does TODO if (fpinfo->remote_conds)
+	 * hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds,
+	 * true, &params_list);
 	 */
 }
 
@@ -501,11 +503,11 @@ hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt)
  */
 void
 hdfs_deparse_select(hdfs_opt *opt,
-				 StringInfo buf,
-				 PlannerInfo *root,
-				 RelOptInfo *baserel,
-				 Bitmapset *attrs_used,
-				 List **retrieved_attrs)
+					StringInfo buf,
+					PlannerInfo *root,
+					RelOptInfo *baserel,
+					Bitmapset *attrs_used,
+					List **retrieved_attrs)
 {
 	RangeTblEntry *rte = planner_rt_fetch(baserel->relid, root);
 	Relation	rel;
@@ -548,10 +550,10 @@ deparseTargetList(StringInfo buf,
 				  Bitmapset *attrs_used,
 				  List **retrieved_attrs)
 {
-	TupleDesc   tupdesc = RelationGetDescr(rel);
-	int         i;
-	bool        first = true;
-	bool        have_wholerow = false;
+	TupleDesc	tupdesc = RelationGetDescr(rel);
+	int			i;
+	bool		first = true;
+	bool		have_wholerow = false;
 
 	*retrieved_attrs = NIL;
 
@@ -604,11 +606,11 @@ deparseTargetList(StringInfo buf,
  */
 void
 hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
-				  PlannerInfo *root,
-				  RelOptInfo *baserel,
-				  List *exprs,
-				  bool is_first,
-				  List **params)
+						 PlannerInfo *root,
+						 RelOptInfo *baserel,
+						 List *exprs,
+						 bool is_first,
+						 List **params)
 {
 	deparse_expr_cxt context;
 	ListCell   *lc;
@@ -648,7 +650,8 @@ hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
  * is returned to *retrieved_attrs.
  */
 void
-deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel, List **retrieved_attrs)
+deparseAnalyzeSql(hdfs_opt *opt, StringInfo buf, Relation rel,
+				  List **retrieved_attrs)
 {
 	Oid			relid = RelationGetRelid(rel);
 	TupleDesc	tupdesc = RelationGetDescr(rel);
@@ -742,7 +745,7 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
 	 */
 	if (colname == NULL)
 #if PG_VERSION_NUM >= 110000
-		colname = get_attname(rte->relid, varattno,false);
+		colname = get_attname(rte->relid, varattno, false);
 #else
 		colname = get_relid_attribute_name(rte->relid, varattno);
 #endif
@@ -874,7 +877,7 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 		/* Treat like a Param */
 		if (context->params_list)
 		{
-			int pindex = list_length(*context->params_list) + 1;
+			int			pindex = list_length(*context->params_list) + 1;
 
 			*context->params_list = lappend(*context->params_list, node);
 			printRemoteParam(pindex, node->vartype, node->vartypmod, context);
@@ -929,7 +932,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 		case TIMETZOID:
 			appendStringInfo(buf, "'%s'", extval);
 			break;
-
 		case INT2OID:
 		case INT4OID:
 		case INT8OID:
@@ -968,7 +970,8 @@ deparseParam(Param *node, deparse_expr_cxt *context)
 {
 	if (context->params_list)
 	{
-		int pindex = list_length(*context->params_list) + 1;
+		int			pindex = list_length(*context->params_list) + 1;
+
 		*context->params_list = lappend(*context->params_list, node);
 		printRemoteParam(pindex, node->paramtype, node->paramtypmod, context);
 	}
@@ -1115,7 +1118,7 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 }
 
 /*
- * Deparse given operator expression.   To avoid problems around
+ * Deparse given operator expression. To avoid problems around
  * priority of operations, we always parenthesize the arguments.
  */
 static void
@@ -1235,7 +1238,7 @@ deparseOperatorName(StringInfo buf, Form_pg_operator opform)
 static void
 deparseDistinctExpr(DistinctExpr *node, deparse_expr_cxt *context)
 {
-	StringInfo buf = context->buf;
+	StringInfo	buf = context->buf;
 
 	Assert(list_length(node->args) == 2);
 
@@ -1250,21 +1253,23 @@ static void
 deparseString(StringInfo buf, const char *val, bool isstr)
 {
 	const char *valptr;
-	int i = -1;
+	int			i = -1;
 
 	for (valptr = val; *valptr; valptr++)
 	{
-		char ch = *valptr;
+		char		ch = *valptr;
+
 		i++;
 
 		if (i == 0 && isstr)
 			appendStringInfoChar(buf, '\'');
 
 		/*
-		 * Remove '{', '}' and \" character from the string. Because
-		 * this syntax is not recognize by the remote MySQL server.
+		 * Remove '{', '}' and \" character from the string. Because this
+		 * syntax is not recognize by the remote MySQL server.
 		 */
-		if ((ch == '{' && i == 0) || (ch == '}' && (i == (strlen(val) - 1))) || ch == '\"')
+		if ((ch == '{' && i == 0) ||
+			(ch == '}' && (i == (strlen(val) - 1))) || ch == '\"')
 			continue;
 
 		if (ch == ',' && isstr)
@@ -1288,15 +1293,15 @@ deparseString(StringInfo buf, const char *val, bool isstr)
 static void
 deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 {
-	StringInfo        buf = context->buf;
-	HeapTuple         tuple;
-	Expr              *arg1;
-	Expr              *arg2;
-	Form_pg_operator  form;
-	char              *opname;
-	Oid               typoutput;
-	bool              typIsVarlena;
-	char              *extval;
+	StringInfo	buf = context->buf;
+	HeapTuple	tuple;
+	Expr	   *arg1;
+	Expr	   *arg2;
+	Form_pg_operator form;
+	char	   *opname;
+	Oid			typoutput;
+	bool		typIsVarlena;
+	char	   *extval;
 
 	/* Retrieve information about the operator from system catalog. */
 	tuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(node->opno));
@@ -1321,35 +1326,36 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 
 	/* Deparse right operand. */
 	arg2 = lsecond(node->args);
-	switch (nodeTag((Node*)arg2))
+	switch (nodeTag((Node *) arg2))
 	{
 		case T_Const:
-		{
-			Const *c = (Const*)arg2;
-			if (!c->constisnull)
 			{
-				getTypeOutputInfo(c->consttype,
-								&typoutput, &typIsVarlena);
-				extval = OidOutputFunctionCall(typoutput, c->constvalue);
+				Const	   *c = (Const *) arg2;
 
-				switch (c->consttype)
+				if (!c->constisnull)
 				{
-					case INT4ARRAYOID:
-					case OIDARRAYOID:
-						deparseString(buf, extval, false);
-						break;
-					default:
-						deparseString(buf, extval, true);
-						break;
+					getTypeOutputInfo(c->consttype,
+									  &typoutput, &typIsVarlena);
+					extval = OidOutputFunctionCall(typoutput, c->constvalue);
+
+					switch (c->consttype)
+					{
+						case INT4ARRAYOID:
+						case OIDARRAYOID:
+							deparseString(buf, extval, false);
+							break;
+						default:
+							deparseString(buf, extval, true);
+							break;
+					}
+				}
+				else
+				{
+					appendStringInfoString(buf, " NULL");
+					return;
 				}
 			}
-			else
-			{
-				appendStringInfoString(buf, " NULL");
-				return;
-			}
-		}
-		break;
+			break;
 		default:
 			deparseExpr(arg2, context);
 			break;

@@ -57,8 +57,8 @@
 double
 hdfs_find_row_count(char *src)
 {
-	char	rc[100];
-	int	i;
+	char		rc[100];
+	int			i;
 
 	memset(rc, 0, 100);
 	if (src == NULL || strlen(src) < 80)
@@ -85,14 +85,14 @@ hdfs_find_row_count(char *src)
 
 double
 hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
-				RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
+			  RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo)
 {
-	bool            is_null;
-	char            *value = NULL;
-	int             idx = 0;
-	double          rows = 1000.0;
-	StringInfoData  sql;
-	int		i;
+	bool		is_null;
+	char	   *value = NULL;
+	int			idx = 0;
+	double		rows = 1000.0;
+	StringInfoData sql;
+	int			i;
 	double		rc;
 
 	initStringInfo(&sql);
@@ -112,8 +112,8 @@ hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 				{
 					/*
 					 * Any value below 1000 is going to caluse materilization
-					 * step to be skipped from the plan, which is very
-					 * crucial to avoid requery in rescan
+					 * step to be skipped from the plan, which is very crucial
+					 * to avoid requery in rescan
 					 */
 					if (rc > 1000)
 						rows = rc;
@@ -133,7 +133,7 @@ hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 void
 hdfs_analyze(int con_index, hdfs_opt *opt)
 {
-	StringInfoData  sql;
+	StringInfoData sql;
 
 	initStringInfo(&sql);
 	hdfs_deparse_analyze(&sql, opt);
@@ -147,13 +147,13 @@ hdfs_analyze(int con_index, hdfs_opt *opt)
 double
 hdfs_describe(int con_index, hdfs_opt *opt)
 {
-	char            *value;
-	double          rows = 0;
-	StringInfoData  sql;
-	int             i = 0;
-	int             count;
-	bool            is_null;
-	int             found = 0;
+	char	   *value;
+	double		rows = 0;
+	StringInfoData sql;
+	int			i = 0;
+	int			count;
+	bool		is_null;
+	int			found = 0;
 
 	initStringInfo(&sql);
 	hdfs_deparse_describe(&sql, opt);
@@ -169,7 +169,7 @@ hdfs_describe(int con_index, hdfs_opt *opt)
 
 			if (found == 1)
 			{
-				rows = (double)strtoul(value, NULL, 10);
+				rows = (double) strtoul(value, NULL, 10);
 				hdfs_close_result_set(con_index, opt);
 				return rows;
 			}
