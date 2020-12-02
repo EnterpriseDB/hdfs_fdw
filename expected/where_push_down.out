@@ -194,8 +194,8 @@ ORDER BY deptno;
 
 --Normal WHERE will not be parameterized.
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptno ORDER BY deptno;
-                       QUERY PLAN                        
----------------------------------------------------------
+                     QUERY PLAN                     
+----------------------------------------------------
  Sort
    Output: deptno, count(emp.*)
    Sort Key: emp.deptno
@@ -204,7 +204,7 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT deptno "Department", COUNT(emp) "Total
          Group Key: emp.deptno
          ->  Foreign Scan on public.emp
                Output: deptno, emp.*
-               Remote SQL: SELECT deptno FROM fdw_db.emp
+               Remote SQL: SELECT * FROM fdw_db.emp
 (9 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT deptno, SUM(sal) FROM emp GROUP BY deptno HAVING deptno IN (10, 30) ORDER BY deptno;

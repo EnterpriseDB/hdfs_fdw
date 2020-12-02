@@ -92,6 +92,19 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'jobhist');
 
 SELECT * FROM DEPT;
 
+-- Test whole row reference works correctly.
+EXPLAIN (VERBOSE, COSTS OFF) SELECT dept FROM dept;
+SELECT dept FROM dept;
+
+-- Make sure if whole row reference is requested and also any individual
+-- attributes of the same table are requested - we do not add the attribute
+-- more than once to remote query.
+EXPLAIN (VERBOSE, COSTS OFF) SELECT dept, deptno FROM dept;
+SELECT dept, deptno FROM dept;
+
+-- Test if all the columns in the relation are referenced we instead send
+-- 'SELECT *' in remote query(this will avoid map-reduce job).
+EXPLAIN (VERBOSE, COSTS OFF) SELECT deptno, dname, loc FROM DEPT;
 SELECT deptno,dname,loc FROM DEPT;
 
 SELECT * FROM EMP;

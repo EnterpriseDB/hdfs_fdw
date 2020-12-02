@@ -546,17 +546,18 @@ hdfs_deparse_target_list(StringInfo buf,
 
 	*retrieved_attrs = NIL;
 
+	/*
+	 * If whole-row reference is used or all the columns in the table are
+	 * referenced, instead of sending all the column's list, send 'SELECT *'
+	 * query to avoid the Map-reduce job.
+	 */
 	if (attrs_used != NULL &&
-		tupdesc->natts == bms_num_members(attrs_used))
+		(bms_is_member(0 - FirstLowInvalidHeapAttributeNumber, attrs_used) ||
+		 tupdesc->natts == bms_num_members(attrs_used)))
 	{
 		have_wholerow = true;
-
-		/* Send SELECT * query to avoid Map-Reduce job */
 		appendStringInfoChar(buf, '*');
 	}
-
-	if (bms_num_members(attrs_used) == 0)
-		appendStringInfoChar(buf, '*');
 
 	for (i = 1; i <= tupdesc->natts; i++)
 	{
@@ -581,6 +582,10 @@ hdfs_deparse_target_list(StringInfo buf,
 			*retrieved_attrs = lappend_int(*retrieved_attrs, i);
 		}
 	}
+
+	/* Don't generate bad syntax if no undropped columns */
+	if (first && !have_wholerow)
+		appendStringInfoString(buf, "NULL");
 }
 
 /*

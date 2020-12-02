@@ -78,6 +78,54 @@ SELECT * FROM DEPT;
      40 | OPERATIONS | BOSTON
 (4 rows)
 
+-- Test whole row reference works correctly.
+EXPLAIN (VERBOSE, COSTS OFF) SELECT dept FROM dept;
+               QUERY PLAN                
+-----------------------------------------
+ Foreign Scan on public.dept
+   Output: dept.*
+   Remote SQL: SELECT * FROM fdw_db.dept
+(3 rows)
+
+SELECT dept FROM dept;
+            dept            
+----------------------------
+ (10,ACCOUNTING,"NEW YORK")
+ (20,RESEARCH,DALLAS)
+ (30,SALES,CHICAGO)
+ (40,OPERATIONS,BOSTON)
+(4 rows)
+
+-- Make sure if whole row reference is requested and also any individual
+-- attributes of the same table are requested - we do not add the attribute
+-- more than once to remote query.
+EXPLAIN (VERBOSE, COSTS OFF) SELECT dept, deptno FROM dept;
+               QUERY PLAN                
+-----------------------------------------
+ Foreign Scan on public.dept
+   Output: dept.*, deptno
+   Remote SQL: SELECT * FROM fdw_db.dept
+(3 rows)
+
+SELECT dept, deptno FROM dept;
+            dept            | deptno 
+----------------------------+--------
+ (10,ACCOUNTING,"NEW YORK") |     10
+ (20,RESEARCH,DALLAS)       |     20
+ (30,SALES,CHICAGO)         |     30
+ (40,OPERATIONS,BOSTON)     |     40
+(4 rows)
+
+-- Test if all the columns in the relation are referenced we instead send
+-- 'SELECT *' in remote query(this will avoid map-reduce job).
+EXPLAIN (VERBOSE, COSTS OFF) SELECT deptno, dname, loc FROM DEPT;
+               QUERY PLAN                
+-----------------------------------------
+ Foreign Scan on public.dept
+   Output: deptno, dname, loc
+   Remote SQL: SELECT * FROM fdw_db.dept
+(3 rows)
+
 SELECT deptno,dname,loc FROM DEPT;
  deptno |   dname    |   loc    
 --------+------------+----------
