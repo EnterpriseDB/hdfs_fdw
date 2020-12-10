@@ -502,6 +502,37 @@ ORDER BY d.deptno;
 EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d FULL OUTER JOIN emp e
 ON d.deptno=e.deptno ORDER BY d.deptno;
 
+-- FDW-251
+-- LEFT JOIN LATERAL case should not crash
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM dept t1 LEFT JOIN LATERAL (
+  SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1.deptno = t3.deptno
+  ORDER BY 1;
+
+SELECT * FROM dept t1 LEFT JOIN LATERAL (
+  SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1.deptno = t3.deptno
+  ORDER BY 1;
+
+-- LEFT JOIN LATERAL involving local and foreign table should not crash.
+SELECT * FROM dept_lcl t1 LEFT JOIN LATERAL (
+  SELECT empno, ename, t1.deptno FROM emp WHERE empno < 7400) t3 ON t1.deptno = t3.deptno
+  ORDER BY 1;
+
+-- Test INNER JOIN LATERAL syntax works fine.
+SELECT t3.empno, t3.ename, t1.dname, t3.dno FROM dept t1 INNER JOIN LATERAL (
+  SELECT empno, ename, t1.deptno AS dno FROM emp t2) t3 ON t1.deptno = dno
+  ORDER BY 1, 2, 3, 4
+  LIMIT 4;
+
+-- Test LATERAL works for inner query
+SELECT *, (SELECT r FROM (SELECT empno AS c1) x, LATERAL (SELECT empno AS r) y)
+  FROM emp ORDER BY empno;
+
+-- RIGHT JOIN LATERAL should error out
+SELECT * FROM dept t1 RIGHT JOIN LATERAL (
+  SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1.deptno = t3.deptno
+  ORDER BY 1;
+
 --VACUUM, ANAYLZE
 
 VACUUM emp;   

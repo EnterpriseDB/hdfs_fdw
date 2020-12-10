@@ -359,7 +359,7 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 								   fpinfo->fdw_startup_cost,
 								   total_cost,
 								   NIL, 	/* no pathkeys */
-								   NULL,	/* no outer rel either */
+								   baserel->lateral_relids,
 #if PG_VERSION_NUM >= 90500
 								   NULL,	/* no extra plan */
 #endif
