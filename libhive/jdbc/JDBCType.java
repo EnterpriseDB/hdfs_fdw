@@ -3,7 +3,7 @@
  * JDBCType.java
  * 		Class to store parameter values
  *
- * Copyright (c) 2019-2020, EnterpriseDB Corporation.
+ * Copyright (c) 2019-2021, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		JDBCType.java

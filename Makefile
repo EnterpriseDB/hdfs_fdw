@@ -1,7 +1,7 @@
 ##############################################################
 # Makefile
 #
-# Portions Copyright (c) 2004-2020, EnterpriseDB Corporation.
+# Portions Copyright (c) 2004-2021, EnterpriseDB Corporation.
 #
 ##############################################################
 
