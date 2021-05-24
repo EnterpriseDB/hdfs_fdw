@@ -30,14 +30,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal IN (800,2450)
  ORDER BY deptno;
-                                           QUERY PLAN                                            
--------------------------------------------------------------------------------------------------
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE (sal  IN (800,2450))
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp` WHERE (`sal`  IN (800,2450))
 (6 rows)
 
 DROP FOREIGN TABLE emp;
@@ -59,14 +59,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal, deptno
  FROM emp e
  WHERE sal > 3000
  ORDER BY deptno;
-                                         QUERY PLAN                                          
----------------------------------------------------------------------------------------------
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((sal > '3000'))
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp` WHERE ((`sal` > '3000'))
 (6 rows)
 
 DROP FOREIGN TABLE emp;
@@ -85,14 +85,14 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- Execute the query and the normal WHERE clause will be pushed as shown here.
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
 WHERE sal = 2450 ORDER BY deptno;
-                                         QUERY PLAN                                          
----------------------------------------------------------------------------------------------
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((sal = '2450'))
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp` WHERE ((`sal` = '2450'))
 (6 rows)
 
 DROP FOREIGN TABLE emp;
@@ -113,14 +113,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal, deptno
  FROM emp e
  WHERE sal BETWEEN 1000 AND 4000
  ORDER BY deptno;
-                                                     QUERY PLAN                                                     
---------------------------------------------------------------------------------------------------------------------
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((sal >= '1000')) AND ((sal <= '4000'))
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp` WHERE ((`sal` >= '1000')) AND ((`sal` <= '4000'))
 (6 rows)
 
 DROP FOREIGN TABLE emp;
@@ -142,14 +142,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT *
  FROM emp e
  WHERE ename IS NOT NULL
  ORDER BY deptno;
-                                QUERY PLAN                                
---------------------------------------------------------------------------
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
  Sort
    Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
-         Remote SQL: SELECT * FROM fdw_db.emp WHERE ((ename IS NOT NULL))
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` WHERE ((`ename` IS NOT NULL))
 (6 rows)
 
 -- Execute the query and the normal WHERE clause will be pushed as shown here.
@@ -157,14 +157,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal, deptno
  FROM emp e
  WHERE hiredate IS NOT NULL
  ORDER BY deptno;
-                                             QUERY PLAN                                              
------------------------------------------------------------------------------------------------------
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((hiredate IS NOT NULL))
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp` WHERE ((`hiredate` IS NOT NULL))
 (6 rows)
 
 DROP FOREIGN TABLE emp;
@@ -186,14 +186,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT ename
  FROM emp e
  WHERE empno NOT IN (10,20)
  ORDER BY ename;
-                                   QUERY PLAN                                    
----------------------------------------------------------------------------------
+                                       QUERY PLAN                                        
+-----------------------------------------------------------------------------------------
  Sort
    Output: ename
    Sort Key: e.ename
    ->  Foreign Scan on public.emp e
          Output: ename
-         Remote SQL: SELECT ename FROM fdw_db.emp WHERE (empno  NOT  IN (10,20))
+         Remote SQL: SELECT `ename` FROM `fdw_db`.`emp` WHERE (`empno`  NOT  IN (10,20))
 (6 rows)
 
 -- Execute the query and the normal WHERE clause will be pushed as shown here.
@@ -201,14 +201,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal, deptno
  FROM emp e
  WHERE hiredate <= '1980-12-17'
  ORDER BY deptno;
-                                               QUERY PLAN                                                
----------------------------------------------------------------------------------------------------------
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
  Sort
    Output: empno, ename, sal, deptno
    Sort Key: e.deptno
    ->  Foreign Scan on public.emp e
          Output: empno, ename, sal, deptno
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp WHERE ((hiredate <= '12-17-1980'))
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp` WHERE ((`hiredate` <= '12-17-1980'))
 (6 rows)
 
 DROP FOREIGN TABLE emp;
@@ -223,14 +223,14 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT bol1,bol2
  FROM bool_test b
  WHERE bol1 = 'f'
  ORDER BY bol1;
-                              QUERY PLAN                               
------------------------------------------------------------------------
+                                 QUERY PLAN                                  
+-----------------------------------------------------------------------------
  Sort
    Output: bol1, bol2
    Sort Key: b.bol1
    ->  Foreign Scan on public.bool_test b
          Output: bol1, bol2
-         Remote SQL: SELECT * FROM fdw_db.bool_test WHERE ((NOT bol1))
+         Remote SQL: SELECT * FROM `fdw_db`.`bool_test` WHERE ((NOT `bol1`))
 (6 rows)
 
 DROP FOREIGN TABLE bool_test;

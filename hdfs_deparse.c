@@ -92,6 +92,7 @@ static void hdfs_deparse_target_list(StringInfo buf,
 									 Relation rel,
 									 Bitmapset *attrs_used,
 									 List **retrieved_attrs);
+static char *hdfs_quote_identifier(const char *str, char quotechar);
 static void hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
 									PlannerInfo *root);
 static void hdfs_deparse_relation(hdfs_opt *opt, StringInfo buf);
@@ -454,7 +455,8 @@ hdfs_is_builtin(Oid oid)
 void
 hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf)
 {
-	appendStringInfo(buf, "EXPLAIN SELECT * FROM %s", opt->table_name);
+	appendStringInfo(buf, "EXPLAIN SELECT * FROM ");
+	hdfs_deparse_relation(opt, buf);
 
 	/*
 	 * For accurate row counts we should append where clauses with the
@@ -470,14 +472,16 @@ hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf)
 void
 hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt)
 {
-	appendStringInfo(buf, "DESCRIBE FORMATTED %s", opt->table_name);
+	appendStringInfo(buf, "DESCRIBE FORMATTED ");
+	hdfs_deparse_relation(opt, buf);
 }
 
 void
 hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt)
 {
-	appendStringInfo(buf, "ANALYZE TABLE %s COMPUTE STATISTICS",
-					 opt->table_name);
+	appendStringInfo(buf, "ANALYZE TABLE ");
+	hdfs_deparse_relation(opt, buf);
+	appendStringInfo(buf, " COMPUTE STATISTICS");
 }
 
 /*
@@ -640,6 +644,26 @@ hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
 	}
 }
 
+static char *
+hdfs_quote_identifier(const char *str, char quotechar)
+{
+	char       *result = palloc(strlen(str) * 2 + 3);
+	char       *res = result;
+
+	*res++ = quotechar;
+	while (*str)
+	{
+		if (*str == quotechar)
+			*res++ = *str;
+		*res++ = *str;
+		str++;
+	}
+	*res++ = quotechar;
+	*res = '\0';
+
+	return result;
+}
+
 /*
  * Construct name to use for given column, and emit it into buf.
  * If it has a column_name FDW option, use that instead of attribute name.
@@ -686,13 +710,14 @@ hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
 		colname = get_relid_attribute_name(rte->relid, varattno);
 #endif
 
-	appendStringInfoString(buf, quote_identifier(colname));
+	appendStringInfoString(buf, hdfs_quote_identifier(colname, '`'));
 }
 
 static void
 hdfs_deparse_relation(hdfs_opt *opt, StringInfo buf)
 {
-	appendStringInfo(buf, "%s", opt->table_name);
+	appendStringInfo(buf, "%s.%s", hdfs_quote_identifier(opt->dbname, '`'),
+					 hdfs_quote_identifier(opt->table_name, '`'));
 }
 
 /*

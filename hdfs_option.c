@@ -146,7 +146,6 @@ hdfs_get_options(Oid foreigntableid)
 	List	   *options;
 	ListCell   *lc;
 	hdfs_opt   *opt;
-	char	   *table_name = NULL;
 
 	opt = (hdfs_opt *) palloc0(sizeof(hdfs_opt));
 
@@ -199,7 +198,7 @@ hdfs_get_options(Oid foreigntableid)
 			opt->dbname = defGetString(def);
 
 		if (strcmp(def->defname, "table_name") == 0)
-			table_name = defGetString(def);
+			opt->table_name = defGetString(def);
 
 		if (strcmp(def->defname, "client_type") == 0)
 		{
@@ -265,11 +264,8 @@ hdfs_get_options(Oid foreigntableid)
 	 * If the table name is not provided, we assume it to be same as foreign
 	 * table name.
 	 */
-	if (!table_name)
-		table_name = get_rel_name(foreigntableid);
-
-	opt->table_name = palloc(strlen(table_name) + strlen(opt->dbname) + 2);
-	sprintf(opt->table_name, "%s.%s", opt->dbname, table_name);
+	if (!opt->table_name)
+		opt->table_name = get_rel_name(foreigntableid);
 
 	return opt;
 }

@@ -41,13 +41,13 @@ ORDER BY 1, 2, 3;
    ->  Foreign Scan on public.emp ea
          Output: ea.empno, ea.ename, ea.deptno
          Filter: (ea.sal = (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: max(eb.sal)
                  ->  Foreign Scan on public.emp eb
                        Output: eb.empno, eb.ename, eb.job, eb.mgr, eb.hiredate, eb.sal, eb.comm, eb.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`deptno` = ?))
 (13 rows)
 
 SELECT empno, ename, sal, deptno FROM emp e
@@ -76,13 +76,13 @@ ORDER BY 1, 2, 3, 4;
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: ((e.sal)::numeric > (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((deptno = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`deptno` = ?))
 (13 rows)
 
 DROP FOREIGN TABLE emp;
@@ -112,13 +112,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -134,13 +134,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -156,13 +156,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: ((e.sal)::numeric > (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 DROP FOREIGN TABLE emp;
@@ -191,13 +191,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -213,13 +213,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -235,13 +235,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: ((e.sal)::numeric > (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 DROP FOREIGN TABLE emp;
@@ -270,13 +270,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -292,13 +292,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -314,13 +314,13 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (e.sal > (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 DROP FOREIGN TABLE emp;
@@ -349,13 +349,13 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -371,13 +371,13 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
@@ -393,13 +393,13 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (e.sal > (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Aggregate
                  Output: avg(emp.sal)
                  ->  Foreign Scan on public.emp
                        Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (13 rows)
 
 DROP FOREIGN TABLE emp;
@@ -420,19 +420,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
  WHERE ename IN
  (SELECT ename FROM emp WHERE  emp.ename = e.ename)
  ORDER BY 1, 2, 3, 4;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                      QUERY PLAN                                      
+--------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.ename
-                 Remote SQL: SELECT ename FROM fdw_db.emp WHERE ((ename = ?))
+                 Remote SQL: SELECT `ename` FROM `fdw_db`.`emp` WHERE ((`ename` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
@@ -440,19 +440,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
  WHERE ename NOT IN
  (SELECT ename FROM emp WHERE  emp.ename = e.ename)
  ORDER BY 1, 2, 3, 4;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                      QUERY PLAN                                      
+--------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.ename
-                 Remote SQL: SELECT ename FROM fdw_db.emp WHERE ((ename = ?))
+                 Remote SQL: SELECT `ename` FROM `fdw_db`.`emp` WHERE ((`ename` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE emp;
@@ -473,19 +473,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT comm
  WHERE hiredate IN
  (SELECT hiredate FROM emp WHERE  emp.hiredate = e.hiredate)
  ORDER BY comm;
-                                     QUERY PLAN                                     
-------------------------------------------------------------------------------------
+                                         QUERY PLAN                                         
+--------------------------------------------------------------------------------------------
  Sort
    Output: e.comm
    Sort Key: e.comm
    ->  Foreign Scan on public.emp e
          Output: e.comm
          Filter: (SubPlan 1)
-         Remote SQL: SELECT hiredate, comm FROM fdw_db.emp
+         Remote SQL: SELECT `hiredate`, `comm` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.hiredate
-                 Remote SQL: SELECT hiredate FROM fdw_db.emp WHERE ((hiredate = ?))
+                 Remote SQL: SELECT `hiredate` FROM `fdw_db`.`emp` WHERE ((`hiredate` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT comm
@@ -493,19 +493,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT comm
  WHERE hiredate NOT IN
  (SELECT hiredate FROM emp WHERE  emp.hiredate = e.hiredate)
  ORDER BY comm;
-                                     QUERY PLAN                                     
-------------------------------------------------------------------------------------
+                                         QUERY PLAN                                         
+--------------------------------------------------------------------------------------------
  Sort
    Output: e.comm
    Sort Key: e.comm
    ->  Foreign Scan on public.emp e
          Output: e.comm
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT hiredate, comm FROM fdw_db.emp
+         Remote SQL: SELECT `hiredate`, `comm` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.hiredate
-                 Remote SQL: SELECT hiredate FROM fdw_db.emp WHERE ((hiredate = ?))
+                 Remote SQL: SELECT `hiredate` FROM `fdw_db`.`emp` WHERE ((`hiredate` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE emp;
@@ -526,19 +526,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
  WHERE hiredate IN
  (SELECT hiredate FROM emp WHERE  emp.hiredate = e.hiredate)
  ORDER BY 1, 2, 3, 4;
-                                     QUERY PLAN                                      
--------------------------------------------------------------------------------------
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, hiredate, sal, deptno FROM fdw_db.emp2
+         Remote SQL: SELECT `empno`, `ename`, `hiredate`, `sal`, `deptno` FROM `fdw_db`.`emp2`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.hiredate
-                 Remote SQL: SELECT hiredate FROM fdw_db.emp2 WHERE ((hiredate = ?))
+                 Remote SQL: SELECT `hiredate` FROM `fdw_db`.`emp2` WHERE ((`hiredate` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
@@ -546,19 +546,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
  WHERE  hiredate IN
  (SELECT hiredate FROM emp WHERE  emp.hiredate = e.hiredate)
  ORDER BY 1, 2, 3, 4;
-                                     QUERY PLAN                                      
--------------------------------------------------------------------------------------
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, hiredate, sal, deptno FROM fdw_db.emp2
+         Remote SQL: SELECT `empno`, `ename`, `hiredate`, `sal`, `deptno` FROM `fdw_db`.`emp2`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.hiredate
-                 Remote SQL: SELECT hiredate FROM fdw_db.emp2 WHERE ((hiredate = ?))
+                 Remote SQL: SELECT `hiredate` FROM `fdw_db`.`emp2` WHERE ((`hiredate` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE emp;
@@ -579,19 +579,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
  WHERE sal IN
  (SELECT sal FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                QUERY PLAN                                
---------------------------------------------------------------------------
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (SubPlan 1)
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.sal
-                 Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                 Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
@@ -599,19 +599,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno
  WHERE sal NOT IN
  (SELECT sal FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                QUERY PLAN                                
---------------------------------------------------------------------------
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
    ->  Foreign Scan on public.emp e
          Output: e.empno, e.ename, e.sal, e.deptno
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT empno, ename, sal, deptno FROM fdw_db.emp
+         Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
            ->  Foreign Scan on public.emp
                  Output: emp.sal
-                 Remote SQL: SELECT sal FROM fdw_db.emp WHERE ((sal = ?))
+                 Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE emp;
@@ -626,19 +626,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT bol1, bol2
  WHERE bol1 IN
  (SELECT bol1 FROM bool_test WHERE  bool_test.bol1 = b.bol1)
  ORDER BY 1, 2;
-                                    QUERY PLAN                                    
-----------------------------------------------------------------------------------
+                                        QUERY PLAN                                        
+------------------------------------------------------------------------------------------
  Sort
    Output: b.bol1, b.bol2
    Sort Key: b.bol1, b.bol2
    ->  Foreign Scan on public.bool_test b
          Output: b.bol1, b.bol2
          Filter: (SubPlan 1)
-         Remote SQL: SELECT * FROM fdw_db.bool_test
+         Remote SQL: SELECT * FROM `fdw_db`.`bool_test`
          SubPlan 1
            ->  Foreign Scan on public.bool_test
                  Output: bool_test.bol1
-                 Remote SQL: SELECT bol1 FROM fdw_db.bool_test WHERE ((bol1 = ?))
+                 Remote SQL: SELECT `bol1` FROM `fdw_db`.`bool_test` WHERE ((`bol1` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT bol1, bol2
@@ -646,19 +646,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT bol1, bol2
  WHERE bol1 IN
  (SELECT bol1 FROM bool_test WHERE  bool_test.bol1 = b.bol1)
  ORDER BY 1, 2;
-                                    QUERY PLAN                                    
-----------------------------------------------------------------------------------
+                                        QUERY PLAN                                        
+------------------------------------------------------------------------------------------
  Sort
    Output: b.bol1, b.bol2
    Sort Key: b.bol1, b.bol2
    ->  Foreign Scan on public.bool_test b
          Output: b.bol1, b.bol2
          Filter: (SubPlan 1)
-         Remote SQL: SELECT * FROM fdw_db.bool_test
+         Remote SQL: SELECT * FROM `fdw_db`.`bool_test`
          SubPlan 1
            ->  Foreign Scan on public.bool_test
                  Output: bool_test.bol1
-                 Remote SQL: SELECT bol1 FROM fdw_db.bool_test WHERE ((bol1 = ?))
+                 Remote SQL: SELECT `bol1` FROM `fdw_db`.`bool_test` WHERE ((`bol1` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE bool_test;
@@ -683,19 +683,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1
  FROM time_test b
  WHERE col1 NOT IN (SELECT col1 FROM time_test WHERE  time_test.col1 = b.col1)
  ORDER BY col1;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Sort
    Output: b.col1
    Sort Key: b.col1
    ->  Foreign Scan on public.time_test b
          Output: b.col1
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT * FROM fdw_db.var_date
+         Remote SQL: SELECT * FROM `fdw_db`.`var_date`
          SubPlan 1
            ->  Foreign Scan on public.time_test
                  Output: time_test.col1
-                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+                 Remote SQL: SELECT * FROM `fdw_db`.`var_date` WHERE ((`col1` = ?))
 (11 rows)
 
 -- Error will be displayed as TIME is not handled by JDBC Driver.
@@ -715,19 +715,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE)  SELECT col1
  WHERE col1 NOT IN
  (SELECT col1 FROM name_test WHERE  name_test.col1 = b.col1)
  ORDER BY col1;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Sort
    Output: b.col1
    Sort Key: b.col1
    ->  Foreign Scan on public.name_test b
          Output: b.col1
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT * FROM fdw_db.var_date
+         Remote SQL: SELECT * FROM `fdw_db`.`var_date`
          SubPlan 1
            ->  Foreign Scan on public.name_test
                  Output: name_test.col1
-                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+                 Remote SQL: SELECT * FROM `fdw_db`.`var_date` WHERE ((`col1` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE)  SELECT col1
@@ -735,19 +735,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE)  SELECT col1
  WHERE col1 IN
  (SELECT col1 FROM name_test WHERE  name_test.col1 = b.col1)
  ORDER BY col1;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Sort
    Output: b.col1
    Sort Key: b.col1
    ->  Foreign Scan on public.name_test b
          Output: b.col1
          Filter: (SubPlan 1)
-         Remote SQL: SELECT * FROM fdw_db.var_date
+         Remote SQL: SELECT * FROM `fdw_db`.`var_date`
          SubPlan 1
            ->  Foreign Scan on public.name_test
                  Output: name_test.col1
-                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+                 Remote SQL: SELECT * FROM `fdw_db`.`var_date` WHERE ((`col1` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE name_test;
@@ -762,19 +762,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1
  WHERE col1 NOT IN
  (SELECT col1 FROM bit_test WHERE  bit_test.col1 = b.col1)
  ORDER BY col1;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Sort
    Output: b.col1
    Sort Key: b.col1
    ->  Foreign Scan on public.bit_test b
          Output: b.col1
          Filter: (NOT (SubPlan 1))
-         Remote SQL: SELECT * FROM fdw_db.var_date
+         Remote SQL: SELECT * FROM `fdw_db`.`var_date`
          SubPlan 1
            ->  Foreign Scan on public.bit_test
                  Output: bit_test.col1
-                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+                 Remote SQL: SELECT * FROM `fdw_db`.`var_date` WHERE ((`col1` = ?))
 (11 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1
@@ -782,19 +782,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT col1
  WHERE col1 IN
  (SELECT col1 FROM bit_test WHERE  bit_test.col1 = b.col1)
  ORDER BY col1;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Sort
    Output: b.col1
    Sort Key: b.col1
    ->  Foreign Scan on public.bit_test b
          Output: b.col1
          Filter: (SubPlan 1)
-         Remote SQL: SELECT * FROM fdw_db.var_date
+         Remote SQL: SELECT * FROM `fdw_db`.`var_date`
          SubPlan 1
            ->  Foreign Scan on public.bit_test
                  Output: bit_test.col1
-                 Remote SQL: SELECT * FROM fdw_db.var_date WHERE ((col1 = ?))
+                 Remote SQL: SELECT * FROM `fdw_db`.`var_date` WHERE ((`col1` = ?))
 (11 rows)
 
 DROP FOREIGN TABLE bit_test;

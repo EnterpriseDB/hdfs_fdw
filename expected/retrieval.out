@@ -51,14 +51,14 @@ SELECT * FROM DEPT ORDER BY 1, 2;
 
 -- Test whole row reference works correctly.
 EXPLAIN (VERBOSE, COSTS OFF) SELECT dept FROM dept ORDER BY dept;
-                  QUERY PLAN                   
------------------------------------------------
+                    QUERY PLAN                     
+---------------------------------------------------
  Sort
    Output: dept.*
    Sort Key: dept.*
    ->  Foreign Scan on public.dept
          Output: dept.*
-         Remote SQL: SELECT * FROM fdw_db.dept
+         Remote SQL: SELECT * FROM `fdw_db`.`dept`
 (6 rows)
 
 SELECT dept FROM dept ORDER BY dept;
@@ -74,14 +74,14 @@ SELECT dept FROM dept ORDER BY dept;
 -- attributes of the same table are requested - we do not add the attribute
 -- more than once to remote query.
 EXPLAIN (VERBOSE, COSTS OFF) SELECT dept, deptno FROM dept ORDER BY deptno;
-                  QUERY PLAN                   
------------------------------------------------
+                    QUERY PLAN                     
+---------------------------------------------------
  Sort
    Output: dept.*, deptno
    Sort Key: dept.deptno
    ->  Foreign Scan on public.dept
          Output: dept.*, deptno
-         Remote SQL: SELECT * FROM fdw_db.dept
+         Remote SQL: SELECT * FROM `fdw_db`.`dept`
 (6 rows)
 
 SELECT dept, deptno FROM dept ORDER BY deptno;
@@ -96,14 +96,14 @@ SELECT dept, deptno FROM dept ORDER BY deptno;
 -- Test if all the columns in the relation are referenced we instead send
 -- 'SELECT *' in remote query(this will avoid map-reduce job).
 EXPLAIN (VERBOSE, COSTS OFF) SELECT deptno, dname, loc FROM DEPT ORDER BY deptno;
-                  QUERY PLAN                   
------------------------------------------------
+                    QUERY PLAN                     
+---------------------------------------------------
  Sort
    Output: deptno, dname, loc
    Sort Key: dept.deptno
    ->  Foreign Scan on public.dept
          Output: deptno, dname, loc
-         Remote SQL: SELECT * FROM fdw_db.dept
+         Remote SQL: SELECT * FROM `fdw_db`.`dept`
 (6 rows)
 
 SELECT deptno, dname, loc FROM DEPT ORDER BY deptno;
@@ -1476,8 +1476,8 @@ EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM dept t1 LEFT JOIN LATERAL (
   SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1.deptno = t3.deptno
   ORDER BY 1;
-                                  QUERY PLAN                                   
--------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: t1.deptno, t1.dname, t1.loc, t2.deptno, (t1.deptno)
    Sort Key: t1.deptno
@@ -1485,10 +1485,10 @@ SELECT * FROM dept t1 LEFT JOIN LATERAL (
          Output: t1.deptno, t1.dname, t1.loc, t2.deptno, (t1.deptno)
          ->  Foreign Scan on public.dept t1
                Output: t1.deptno, t1.dname, t1.loc
-               Remote SQL: SELECT * FROM fdw_db.dept
+               Remote SQL: SELECT * FROM `fdw_db`.`dept`
          ->  Foreign Scan on public.dept t2
                Output: t2.deptno, t1.deptno
-               Remote SQL: SELECT deptno FROM fdw_db.dept WHERE ((? = deptno))
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept` WHERE ((? = `deptno`))
 (11 rows)
 
 SELECT * FROM dept t1 LEFT JOIN LATERAL (

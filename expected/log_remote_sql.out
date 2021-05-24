@@ -18,11 +18,11 @@ CREATE FOREIGN TABLE dept (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 -- server without log_remote_sql option
 EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM dept;
-               QUERY PLAN                
------------------------------------------
+                 QUERY PLAN                  
+---------------------------------------------
  Foreign Scan on public.dept
    Output: deptno, dname, loc
-   Remote SQL: SELECT * FROM fdw_db.dept
+   Remote SQL: SELECT * FROM `fdw_db`.`dept`
 (3 rows)
 
 -- Use wrong parameter name, error message will be displayed.
@@ -40,11 +40,11 @@ ERROR:  log_remote_sql requires a Boolean value
 -- 'false' is valid value, should pass
 ALTER SERVER hdfs_server OPTIONS (SET log_remote_sql 'false');
 EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM dept;
-               QUERY PLAN                
------------------------------------------
+                 QUERY PLAN                  
+---------------------------------------------
  Foreign Scan on public.dept
    Output: deptno, dname, loc
-   Remote SQL: SELECT * FROM fdw_db.dept
+   Remote SQL: SELECT * FROM `fdw_db`.`dept`
 (3 rows)
 
 -- When set to 'true', logging will include SQL commands executed

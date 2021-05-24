@@ -36,7 +36,7 @@ EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM weblogs;
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Foreign Scan on public.weblogs
    Output: client_ip, full_request_date, day, month, month_num, year, hour, minute, second, timezone, http_verb, uri, http_status_code, bytes_returned, referrer, user_agent
-   Remote SQL: SELECT * FROM fdw_db.weblogs
+   Remote SQL: SELECT * FROM `fdw_db`.`weblogs`
 (3 rows)
 
 -- Use wrong parameter name, error message will be displayed.
@@ -55,7 +55,7 @@ EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM weblogs;
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Foreign Scan on public.weblogs
    Output: client_ip, full_request_date, day, month, month_num, year, hour, minute, second, timezone, http_verb, uri, http_status_code, bytes_returned, referrer, user_agent
-   Remote SQL: SELECT * FROM fdw_db.weblogs
+   Remote SQL: SELECT * FROM `fdw_db`.`weblogs`
 (3 rows)
 
 -- Function to fetch rows.
