@@ -1,204 +1,165 @@
--- Connection Settings.
-
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
-\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
-CREATE DATABASE fdw_regression;
-\c fdw_regression postgres
+\c contrib_regression
 
---create a non superuser
-CREATE ROLE low_priv_user LOGIN;
-
---create a schema
-CREATE SCHEMA test_ext_schema;
-
---- CREATE/ALTER/DROP EXTENSION ---
-
---Check the installed extensions in system and it should not list hdfs_fdw.
-\dx+ hdfs_fdw
-
---switch to low privileged user
-\c fdw_regression low_priv_user
-
---Try to create the hdfs_fdw extension with an unprivileged user. Should error out.
+-- Test CREATE/ALTER/DROP EXTENSION commands for hdfs_fdw.
+-- Create the extension hdfs_fdw using minimal syntax and it should be created
+-- successfully.
 CREATE EXTENSION hdfs_fdw;
 
---switch back to superuser
-\c fdw_regression postgres
+-- Validate extension, server and mapping details
+SELECT e.extname AS extension, s.nspname AS schema
+ FROM pg_extension e
+ LEFT JOIN pg_namespace s ON (e.extnamespace = s.oid)
+ WHERE e.extname = 'hdfs_fdw';
 
--- Create the extension hdfs_fdw using the minimal syntax and it should create successfully. 
+-- Recreate the extension (while it already exists) and it should error out.
 CREATE EXTENSION hdfs_fdw;
 
---Check the installed extensions in system and it should list hdfs_fdw and its properties.
-\dx hdfs_fdw
-
---ReCreate the extension (while it already exists) and it should error out.
-CREATE EXTENSION hdfs_fdw;
-
--- Create extension with IF NOT EXISTS syntax. It should show a notice message indicating 
--- the pre-existence of extension.
+-- Create extension with IF NOT EXISTS syntax. It should show a notice message
+-- indicating the pre-existence of extension.
 CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
 
---switch to non superuser to ensure extension cannot be dropped
-\c fdw_regression low_priv_user
+-- DROP EXTENSION
 DROP EXTENSION hdfs_fdw;
-
---switch back to postgres superuser
-\c fdw_regression postgres
-
--- DROP EXTENSION with IF EXISTS clause
-DROP EXTENSION IF EXISTS hdfs_fdw;
 
 -- Attempt DROP EXTENSION with IF EXISTS clause when extension doesn't pre-exist
 -- Ensure a NOTICE is raise
 DROP EXTENSION IF EXISTS hdfs_fdw;
 
--- create extension WITH SCHEMA and IF NOT EXISTS and VERSION option to ensure extension 
--- objects are created in the schema
-CREATE EXTENSION IF NOT EXISTS hdfs_fdw WITH SCHEMA test_ext_schema VERSION '1.0';
-
-\dx hdfs_fdw
-------------------------------------
-----------ALTER EXTENSION ----------
------------------------------------
-
--- UPDATE .. Since there is no update path available, it will display NOTICE
-ALTER EXTENSION hdfs_fdw UPDATE;
-\dx hdfs_fdw
+-- Create extension WITH SCHEMA to ensure extension objects are created in the schema
+CREATE SCHEMA test_ext_schema;
+CREATE EXTENSION IF NOT EXISTS hdfs_fdw WITH SCHEMA test_ext_schema;
+SELECT e.extname AS extension, s.nspname AS schema
+ FROM pg_extension e
+ JOIN pg_namespace s ON (e.extnamespace = s.oid)
+ WHERE e.extname = 'hdfs_fdw';
 
 -- Change schema
 ALTER EXTENSION hdfs_fdw SET SCHEMA public;
-\dx hdfs_fdw
+SELECT e.extname AS extension, s.nspname AS schema
+ FROM pg_extension e
+ JOIN pg_namespace s ON (e.extnamespace = s.oid)
+ WHERE e.extname = 'hdfs_fdw';
 
 -- Create a view to add as member to extension
-CREATE TABLE DUAL (a INTEGER);
-CREATE VIEW ext_v1 AS SELECT * FROM DUAL;
-ALTER EXTENSION hdfs_fdw ADD VIEW ext_v1; 
---should list the view in the members list
-\dx+ hdfs_fdw
+CREATE FUNCTION ext_fun (a INT) RETURNS INT AS $$
+ BEGIN
+  RETURN 1;
+ END;
+$$ LANGUAGE plpgsql;
 
---remove the view member
-ALTER EXTENSION hdfs_fdw DROP VIEW ext_v1;
-\dx+ hdfs_fdw
+ALTER EXTENSION hdfs_fdw ADD FUNCTION ext_fun(int);
 
-------------------------------------
-----------CREATE SERVER ----------
------------------------------------
+-- Should list the view in the members list
+SELECT e.extname, p.proname
+ FROM pg_extension e INNER JOIN pg_depend d ON (d.refobjid = e.oid)
+ JOIN pg_proc p ON (p.oid = d.objid)
+ WHERE e.extname = 'hdfs_fdw' ORDER BY 2;
 
+-- Remove the view member
+ALTER EXTENSION hdfs_fdw DROP FUNCTION ext_fun(int);
+SELECT e.extname, p.proname
+ FROM pg_extension e INNER JOIN pg_depend d ON (d.refobjid = e.oid)
+ JOIN pg_proc p ON (p.oid = d.objid)
+ WHERE e.extname = 'hdfs_fdw' ORDER BY 2;
+DROP FUNCTION ext_fun (int);
 
---Create a server without providing optional parameters using the hdfs_fdw wrapper.
+-- CREATE SERVER
+
+-- Create a server without providing optional parameters using the hdfs_fdw wrapper.
 -- host defaults to localhost, port to 10000, client_type to hiverserver2 (RM 37660)
--- 
-CREATE SERVER hdfs_srv1 FOREIGN DATA WRAPPER hdfs_fdw OPTIONS (client_type :HIVE_CLIENT_TYPE);
-\des+ hdfs_srv1
+CREATE SERVER hdfs_srv1 FOREIGN DATA WRAPPER hdfs_fdw
+ OPTIONS (client_type 'hiveserver2');
+SELECT e.fdwname as "Extension", srvname AS "Server", s.srvoptions AS "Server_Options"
+  FROM pg_foreign_data_wrapper e JOIN pg_foreign_server s ON e.oid = s.srvfdw
+  WHERE e.fdwname = 'hdfs_fdw'
+  ORDER BY 1, 2, 3;
 
---test server
-CREATE USER MAPPING FOR postgres SERVER hdfs_srv1 OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
---\deu+  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
-
---test ALTER SERVER OWNER TO, and RENAME to clauses
+-- Test ALTER SERVER OWNER TO, and RENAME to clauses
 ALTER SERVER hdfs_srv1 RENAME TO hdfs_srv1_renamed;
-\des+ hdfs_srv1
-ALTER SERVER hdfs_srv1_renamed OWNER to low_priv_user;
-\des+ hdfs_srv1_renamed
+SELECT e.fdwname as "Extension", srvname AS "Server", s.srvoptions AS "Server_Options"
+  FROM pg_foreign_data_wrapper e JOIN pg_foreign_server s ON e.oid = s.srvfdw
+  WHERE e.fdwname = 'hdfs_fdw'
+  ORDER BY 1, 2, 3;
+DROP SERVER hdfs_srv1_renamed;
 
-DROP USER MAPPING FOR postgres SERVER hdfs_srv1_renamed;
---end test server
+-- Create a server providing TYPE and VERSION clauses.
+-- Also check host parameter can take IP address and host a numeric port
+-- Also the named parameters to have mixed cased names e.g. host, PORT, Client_Type
+CREATE SERVER hdfs_srv2 TYPE 'abc' VERSION '1.0'
+ FOREIGN DATA WRAPPER hdfs_fdw
+ OPTIONS (host '127.0.0.1', PORT :HIVE_PORT, Client_Type 'hiveserver2');
 
-
---Create a server providing TYPE and VERSION clauses. 
---Also check host parameter can take IP address and host a numeric port
---Also the named parameters to have mixed cased names e.g. host, PORT, Client_Type
-CREATE SERVER hdfs_srv2 TYPE 'abc' VERSION '1.0' 
-FOREIGN DATA WRAPPER hdfs_fdw 
-OPTIONS (host '127.0.0.1', PORT:HIVE_PORT,Client_Type :HIVE_CLIENT_TYPE);
---verify that the supplied clauses TYPE, VERSION and host,port,client_type are
--- as specified
-\des+ hdfs_srv2
-
---Create a server providing valid OPTIONS (HOST,PORT,CLIENT_TYPE,connect_timeout,query_timeout)
-
-CREATE SERVER hdfs_srv3a FOREIGN DATA WRAPPER hdfs_fdw 
- OPTIONS (host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, connect_timeout '4000',query_timeout '4000',auth_type :AUTH_TYPE);
---\des+ hdfs_srv3a  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
-
---test server
-CREATE USER MAPPING FOR postgres SERVER hdfs_srv3a OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-CREATE FOREIGN TABLE dept (
-deptno INTEGER,
-dname VARCHAR(14),
-loc VARCHAR(13)
-)
-SERVER hdfs_srv3a OPTIONS (dbname 'fdw_db', table_name 'dept');
-SELECT * FROM dept; 
-
---test port
---negative, raise error
-ALTER SERVER hdfs_srv3a OPTIONS (SET port '-1');
---\des+ hdfs_srv3a  (As per discussion with dev, commenting it out as these value can change and will fail a test case)
-SELECT * FROM dept;
---zero, raise error
-ALTER SERVER hdfs_srv3a OPTIONS (SET port '0');
-SELECT * FROM dept;
--- very large number, raise error
-ALTER SERVER hdfs_srv3a OPTIONS (SET port '12345678');
-SELECT * FROM dept;
--- empty string, raise error (RM37655)
-ALTER SERVER hdfs_srv3a OPTIONS (SET port '');
-SELECT * FROM dept;
--- non numeric, raise error (RM37655)
-ALTER SERVER hdfs_srv3a OPTIONS (SET port 'abc');
-SELECT * FROM dept;
--- drop port to see it goes back to default 10000, should succeed
-ALTER SERVER hdfs_srv3a OPTIONS (DROP port );
-SELECT * FROM dept;
-
-
---test host
---empty string, should fail
-ALTER SERVER hdfs_srv3a OPTIONS (SET host '');
-SELECT * FROM dept;
-
---test cient_type
---set to hiveserver1, should error when querying 
---since the target is hiveserver2
-ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'hiverserver1');
-SELECT * FROM dept;
-
---set to invalid value, should error when querying 
-ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
-SELECT * FROM dept;
-
---set to invalid value, should error when querying 
-ALTER SERVER hdfs_srv3a OPTIONS (SET client_type 'invalidserver');
-SELECT * FROM dept;
-
---test DROP SERVER
---should fail, RESTRICT enforced
-DROP SERVER hdfs_srv3a;
-
---should fail, RESTRICT enforced
-DROP SERVER hdfs_srv3a RESTRICT;
-
---CASCADE, should pass and drop FOREIGN TABLE and USER MAPPING
-DROP SERVER hdfs_srv3a CASCADE;
-\d dept
-\deu+
-
---end test server
-
-
-DROP SERVER IF EXISTS hdfs_srv1_renamed;
+-- Verify that the supplied clauses TYPE, VERSION and host, port, client_type are
+-- as specified.
+SELECT e.fdwname as "Extension", srvname AS "Server", s.srvoptions AS "Server_Options"
+  FROM pg_foreign_data_wrapper e JOIN pg_foreign_server s ON e.oid = s.srvfdw
+  WHERE e.fdwname = 'hdfs_fdw'
+  ORDER BY 1, 2, 3;
 DROP SERVER hdfs_srv2;
 
--- DROP EXTENSION
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+ OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
+CREATE USER MAPPING FOR public SERVER hdfs_server
+ OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+
+CREATE FOREIGN TABLE dept (
+    deptno INTEGER,
+    dname VARCHAR(14),
+    loc VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+SELECT * FROM dept ORDER BY deptno;
+
+-- Test port option
+-- Negative value, raise error
+ALTER SERVER hdfs_server OPTIONS (SET port '-1');
+SELECT * FROM dept;
+-- Zero value, raise error
+ALTER SERVER hdfs_server OPTIONS (SET port '0');
+SELECT * FROM dept;
+-- Very large number, raise error
+ALTER SERVER hdfs_server OPTIONS (SET port '12345678');
+SELECT * FROM dept;
+-- Empty string, raise error (RM37655)
+ALTER SERVER hdfs_server OPTIONS (SET port '');
+SELECT * FROM dept;
+-- Non numeric value, raise error (RM37655)
+ALTER SERVER hdfs_server OPTIONS (SET port 'abc');
+SELECT * FROM dept;
+-- Drop port to see it goes back to default 10000, should succeed
+ALTER SERVER hdfs_server OPTIONS (DROP port );
+SELECT * FROM dept ORDER BY deptno;
+
+-- Test host option
+-- Empty string, should fail
+ALTER SERVER hdfs_server OPTIONS (SET host '');
+DO
+$$
+BEGIN
+  SELECT * FROM dept;
+  EXCEPTION WHEN others THEN
+	IF SQLERRM LIKE 'failed to initialize the connection: (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db%' THEN
+	   RAISE NOTICE 'ERROR:  failed to initialize the connection: (ERROR : Could not connect to jdbc:hive2://:10000/fdw_db within 300000 seconds)';
+        ELSE
+	   RAISE NOTICE '%', SQLERRM;
+	END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+-- Test DROP SERVER
+-- should fail, RESTRICT enforced
+DROP SERVER hdfs_server RESTRICT;
+
+-- CASCADE, should pass and drop FOREIGN TABLE and USER MAPPING
+DROP SERVER hdfs_server CASCADE;
+
+-- cleanup
 DROP EXTENSION hdfs_fdw;
-DROP SCHEMA test_ext_schema;
-DROP ROLE low_priv_user;
-DROP VIEW ext_v1;
-\c postgres postgres
-DROP DATABASE fdw_regression;

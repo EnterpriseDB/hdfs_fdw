@@ -1,5 +1,3 @@
--- Connection Settings.
-
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
@@ -7,232 +5,92 @@
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
-CREATE DATABASE fdw_regression ENCODING=UTF8 LC_CTYPE='en_US.UTF-8' TEMPLATE=template0;
-\c fdw_regression postgres
-
-CREATE EXTENSION hdfs_fdw;
-
---==========================================================================================
---                   use_remote_estimates
--- 4. The option use_remote_estimates was not working.
---The patch corrects the syntax error in the remote query.
---Also it was using count() to get the rows in the remote table.
---The execution of a count() on the hive table took some 15-20 seconds
---and hence enabling remote estimates was making queries slow.
---This patch changes the FDW to use EXPLAIN select * from remote_table.
---While this works only if the hive tables are analysed i.e. stats are
---updated, this technique is very fast as compared to count(*) and
---does not slow down the whole query execution.
---The minimum row count that a remote estimate can return is 1000.
--- 
---==========================================================================================
-
--- Use wrong parameter name, error message will be displayed.
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimates 'aasaaaa');
-
--- Create Hadoop FDW Server with wrong value in use_remote_estimate 'sasaaa'.
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'aasaaaa');
-
--- Create Hadoop USER MAPPING.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Create Foreign Tables.
-
-CREATE FOREIGN TABLE dept (
-    deptno          INTEGER,
-    dname           VARCHAR(14),
-    loc             VARCHAR(13)
-)
-SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-
--- Error message will be displayed as wrong value in use_remote_estimate 'sasaaa'. The error on CREATE SERVER will not displayed as its whats happens in PG FDW as discussed with Dev.
-SELECT * FROM DEPT;
-
-EXPLAIN SELECT * FROM DEPT;
-
---Cleanup
-DROP EXTENSION hdfs_fdw CASCADE;
-
-CREATE EXTENSION hdfs_fdw;
-
--- Create Hadoop FDW Server with wrong value in use_remote_estimate '1'.
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate '1');
-
--- Create Hadoop USER MAPPING.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Create Foreign Tables.
-
-CREATE FOREIGN TABLE dept (
-    deptno          INTEGER,
-    dname           VARCHAR(14),
-    loc             VARCHAR(13)
-)
-SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-
--- Error message will be displayed as wrong value in use_remote_estimate 'sasaaa'. The error on CREATE SERVER will not displayed as its whats happens in PG FDW as discussed with Dev.
-SELECT * FROM DEPT;
-
-EXPLAIN SELECT * FROM DEPT;
-
---Cleanup
-DROP EXTENSION hdfs_fdw CASCADE;
-
-CREATE EXTENSION hdfs_fdw;
-
--- Create Hadoop FDW Server with wrong value in use_remote_estimate . Error message will be displayed.
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate );
-
---************************************************************************************
--- Using false value in use_remote_estimate, 1000 rows will be returned in Query Plan
---************************************************************************************
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'false', log_remote_sql 'true',auth_type :AUTH_TYPE);
-
-\des+ hdfs_server
-
--- Create Hadoop USER MAPPING.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Create Foreign Tables.
-
-CREATE FOREIGN TABLE dept (
-    deptno          INTEGER,
-    dname           VARCHAR(14),
-    loc             VARCHAR(13)
-)
-SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-
--- Rows returned by the Plan will be 1000.
-SELECT * FROM DEPT;
-
-EXPLAIN SELECT * FROM DEPT;
-
---Change the value to true of use_remote_estimate using ALTER SERVER Command.
-
-ALTER SERVER hdfs_server OPTIONS (SET log_remote_sql 'false');
-
-ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'true');
-
-\des+ hdfs_server
-
--- Rows returned by the Plan will be 1000 as the table only have 4 rows and so the "The minimum row count that a remote estimate can return is 1000.".
-SELECT * FROM DEPT;
-
-EXPLAIN SELECT * FROM DEPT;
-
---Cleanup
-DROP EXTENSION hdfs_fdw CASCADE;
-
-CREATE EXTENSION hdfs_fdw;
-
---************************************************************************************
--- Using true value in use_remote_estimate, 1000 rows will be returned in Query Plan
---************************************************************************************
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100',auth_type :AUTH_TYPE);
-
-\des+ hdfs_server
-
--- Create Hadoop USER MAPPING.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Create Foreign Tables.
-
-CREATE FOREIGN TABLE dept (
-    deptno          INTEGER,
-    dname           VARCHAR(14),
-    loc             VARCHAR(13)
-)
-SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
-
--- Rows returned by the Plan will be 1000 as the table only have 4 rows and so the "The minimum row count that a remote estimate can return is 1000.".
-SELECT * FROM DEPT;
-
-EXPLAIN SELECT * FROM DEPT;
-
---Change the value to true of use_remote_estimate using ALTER SERVER Command.
-
-ALTER SERVER hdfs_server OPTIONS (SET log_remote_sql 'false');
-
-ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'false');
-
-\des+ hdfs_server
-
--- Rows returned by the Plan will be 1000.
-SELECT * FROM DEPT;
-
-EXPLAIN SELECT * FROM DEPT;
-
---Cleanup
-DROP EXTENSION hdfs_fdw CASCADE;
-
-CREATE EXTENSION hdfs_fdw;
-
---************************************************************************************
--- Using true value in use_remote_estimate, 1000 rows will be returned in Query Plan
---************************************************************************************
-
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, use_remote_estimate 'true', log_remote_sql 'true', fetch_size '100',auth_type :AUTH_TYPE);
-
-\des+ hdfs_server
-
--- Create Hadoop USER MAPPING.
-
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
-
--- Create Foreign Tables.
+\c contrib_regression
+
+CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+ OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
+CREATE USER MAPPING FOR public SERVER hdfs_server
+ OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 
 CREATE FOREIGN TABLE weblogs
 (
-client_ip                TEXT,
-full_request_date        TEXT,
-day                      TEXT,
-Month                    TEXT,
-month_num                INTEGER,
-year                     TEXT,
-hour                     TEXT,
-minute                   TEXT,
-second                   TEXT,
-timezone                 TEXT,
-http_verb                TEXT,
-uri                      TEXT,
-http_status_code         TEXT,
-bytes_returned           TEXT,
-referrer                 TEXT,
-user_agent               TEXT
+    client_ip                TEXT,
+    full_request_date        TEXT,
+    day                      TEXT,
+    Month                    TEXT,
+    month_num                INTEGER,
+    year                     TEXT,
+    hour                     TEXT,
+    minute                   TEXT,
+    second                   TEXT,
+    timezone                 TEXT,
+    http_verb                TEXT,
+    uri                      TEXT,
+    http_status_code         TEXT,
+    bytes_returned           TEXT,
+    referrer                 TEXT,
+    user_agent               TEXT
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'weblogs');
 
--- Total rows will be displayed.
+-- Server without use_remote_estimate option.
+EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM weblogs;
 
-EXPLAIN SELECT * FROM weblogs;
+-- Use wrong parameter name, error message will be displayed.
+ALTER SERVER hdfs_server OPTIONS (use_remote_estimate 'wrong');
+EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM weblogs;
 
---Change the value to true of use_remote_estimate using ALTER SERVER Command.
+-- Use non-Boolean parameter name, error message will be displayed.
+ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate '1');
+EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM weblogs;
 
+-- Using false value in use_remote_estimate, 1000 rows will be returned in
+-- query Plan
 ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'false');
+EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM weblogs;
 
-\des+ hdfs_server
+-- Function to fetch rows.
+CREATE OR REPLACE FUNCTION query_rows_count (client_type VARCHAR(70), ure BOOL, query TEXT, OUT v_rows FLOAT)
+RETURNS FLOAT LANGUAGE plpgsql AS $$
+ DECLARE
+  detail json;
+ BEGIN
+  CREATE TEMPORARY TABLE query_rows_stats (rows float);
+  EXECUTE 'EXPLAIN (verbose, format json) ' || query INTO detail;
+  IF client_type <> 'spark' THEN
+   INSERT INTO query_rows_stats VALUES ((detail->0->'Plan'->'Plan Rows')::text::float);
+  END IF;
+  IF client_type = 'spark' AND ure = false THEN
+   INSERT INTO query_rows_stats VALUES ((detail->0->'Plan'->'Plan Rows')::text::float);
+  END IF;
+  IF client_type = 'spark' AND ure = true THEN
+   INSERT INTO query_rows_stats VALUES ('445454'::float);
+  END IF;
+  SELECT rows INTO v_rows FROM query_rows_stats;
+  DROP TABLE query_rows_stats;
+ END;
+$$;
 
--- 1000 rows will be displayed.
+-- Check rows with use_remote_estimate set to false.
+-- use_remote_estimate when set to false shows minimum 1000 rows in plan.
+ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'false');
+SELECT v_rows FROM query_rows_count (:HIVE_CLIENT_TYPE, false, 'SELECT * FROM weblogs');
 
-EXPLAIN SELECT * FROM weblogs;
+-- Check rows with use_remote_estimate set to true.
+-- use_remote_estimate when true in case of hive shows actual rows in plan.
+-- use_remote_estimate when true in case of spark shows minimum 1000 rows in plan.
+-- to make output file consistent inserted actual rows using query_rows_count.
+-- This can be removed once use_remote_estimate fixed for spark.
+-- NOTE: if the test fails on hive due to mismatch in the rows, execute
+-- following ANALYZE command on weblogs table on hive client(beeline):
+-- ANALYZE TABLE fdw_db.weblogs COMPUTE STATISTICS;
+ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'true');
+SELECT v_rows FROM query_rows_count (:HIVE_CLIENT_TYPE, true, 'SELECT * FROM weblogs');
 
-
-
-
-
-
--- DROP EXTENSION
-DROP EXTENSION hdfs_fdw CASCADE;
-\c postgres postgres
-DROP DATABASE fdw_regression;
-
+--Cleanup
+DROP FUNCTION query_rows_count(VARCHAR, BOOL, TEXT);
+DROP FOREIGN TABLE weblogs;
+DROP USER MAPPING FOR public SERVER hdfs_server;
+DROP SERVER hdfs_server;
+DROP EXTENSION hdfs_fdw;

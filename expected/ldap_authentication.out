@@ -1,0 +1,75 @@
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
+\c contrib_regression
+CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+ OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
+CREATE USER MAPPING FOR public SERVER hdfs_server
+ OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+CREATE FOREIGN TABLE dept (
+ deptno INTEGER,
+ dname VARCHAR(14),
+ loc VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+CREATE OR REPLACE FUNCTION verify_auth(auth VARCHAR(70), username VARCHAR(30), passwd VARCHAR(30))
+ RETURNS void AS $$
+DECLARE
+ d_sql text;
+BEGIN
+ IF auth = 'LDAP' THEN
+  d_sql := 'ALTER USER MAPPING FOR public SERVER hdfs_server OPTIONS (SET username '''  || username || ''', SET password ''' || passwd || ''')';
+  EXECUTE d_sql;
+  d_sql := 'SELECT * FROM dept ORDER BY deptno;';
+  EXECUTE d_sql;
+ END IF;
+
+ IF auth = 'NOSASL' THEN
+  RAISE NOTICE 'Either LDAP authentication have wrong username or password OR using NOSASL authentication';
+ END IF;
+
+ EXCEPTION WHEN others THEN
+ IF SQLERRM LIKE 'failed to initialize the connection:%' THEN
+  RAISE NOTICE 'Either LDAP authentication have wrong username or password OR using NOSASL authentication';
+ ELSE
+  RAISE NOTICE '%', SQLERRM;
+ END IF;
+END;
+$$ LANGUAGE plpgsql;
+-- with wrong user and wrong password, should errorout
+SELECT verify_auth(:AUTH_TYPE, 'wrong', 'wrong');
+NOTICE:  Either LDAP authentication have wrong username or password OR using NOSASL authentication
+ verify_auth 
+-------------
+ 
+(1 row)
+
+-- with correct user and wrong password, should errorout
+SELECT verify_auth(:AUTH_TYPE, :HIVE_USER, 'wrong');
+NOTICE:  Either LDAP authentication have wrong username or password OR using NOSASL authentication
+ verify_auth 
+-------------
+ 
+(1 row)
+
+-- with correct user and correct password, should pass
+ALTER USER MAPPING FOR public SERVER hdfs_server OPTIONS (SET username :HIVE_USER ,SET password :HIVE_PASSWORD);
+SELECT * FROM dept ORDER BY deptno;
+ deptno |   dname    |   loc    
+--------+------------+----------
+     10 | ACCOUNTING | NEW YORK
+     20 | RESEARCH   | DALLAS
+     30 | SALES      | CHICAGO
+     40 | OPERATIONS | BOSTON
+(4 rows)
+
+--Cleanup
+DROP FUNCTION verify_auth (character varying,character varying,character varying);
+DROP FOREIGN TABLE dept;
+DROP USER MAPPING FOR public SERVER hdfs_server;
+DROP SERVER hdfs_server;
+DROP EXTENSION hdfs_fdw;

@@ -1,44 +1,15 @@
--- Connection Settings.
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
 \set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
--- Create the database.
-CREATE DATABASE fdw_regression;
-\c fdw_regression postgres
--- Set the Date Style
-SET datestyle TO SQL,DMY;
--- Set the Search Path to PUBLIC Schema
-SET search_path TO public;
--- Create Hadoop FDW Extension.
-CREATE EXTENSION hdfs_fdw;
--- Create Hadoop FDW Server.
-CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
--- Create Hadoop USER MAPPING.
-CREATE USER MAPPING FOR postgres SERVER hdfs_server OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
--- Create Foreign Tables.
-CREATE FOREIGN TABLE weblogs
-(
-client_ip                TEXT,
-full_request_date        TEXT,
-day                      TEXT,
-Month                    TEXT,
-month_num                INTEGER,
-year                     TEXT,
-hour                     TEXT,
-minute                   TEXT,
-second                   TEXT,
-timezone                 TEXT,
-http_verb                TEXT,
-uri                      TEXT,
-http_status_code         TEXT,
-bytes_returned           TEXT,
-referrer                 TEXT,
-user_agent               TEXT
-)
-SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'weblogs');
+\c contrib_regression
+CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+ OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
+CREATE USER MAPPING FOR public SERVER hdfs_server
+ OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 CREATE FOREIGN TABLE dept (
     deptno          INTEGER,
     dname           VARCHAR(14),
@@ -50,17 +21,17 @@ CREATE FOREIGN TABLE emp (
     ename           VARCHAR(10),
     job             VARCHAR(9),
     mgr             INTEGER,
-    hiredate        DATE,
+    hiredate        pg_catalog.DATE,
     sal             INTEGER,
     comm            INTEGER,
     deptno          INTEGER
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
-CREATE FOREIGN TABLE jobhist 
+CREATE FOREIGN TABLE jobhist
 (
     empno           INTEGER,
-    startdate       DATE,
-    enddate         DATE,
+    startdate       pg_catalog.DATE,
+    enddate         pg_catalog.DATE,
     job             VARCHAR(9),
     sal             INTEGER,
     comm            INTEGER,
@@ -68,8 +39,8 @@ CREATE FOREIGN TABLE jobhist
     chgdesc         VARCHAR(80)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'jobhist');
--- Retrive Data from Foreign Table using SELECT Statement.
-SELECT * FROM DEPT;
+-- Retrieve Data from Foreign Table using SELECT Statement.
+SELECT * FROM DEPT ORDER BY 1, 2;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -79,15 +50,18 @@ SELECT * FROM DEPT;
 (4 rows)
 
 -- Test whole row reference works correctly.
-EXPLAIN (VERBOSE, COSTS OFF) SELECT dept FROM dept;
-               QUERY PLAN                
------------------------------------------
- Foreign Scan on public.dept
+EXPLAIN (VERBOSE, COSTS OFF) SELECT dept FROM dept ORDER BY dept;
+                  QUERY PLAN                   
+-----------------------------------------------
+ Sort
    Output: dept.*
-   Remote SQL: SELECT * FROM fdw_db.dept
-(3 rows)
+   Sort Key: dept.*
+   ->  Foreign Scan on public.dept
+         Output: dept.*
+         Remote SQL: SELECT * FROM fdw_db.dept
+(6 rows)
 
-SELECT dept FROM dept;
+SELECT dept FROM dept ORDER BY dept;
             dept            
 ----------------------------
  (10,ACCOUNTING,"NEW YORK")
@@ -99,15 +73,18 @@ SELECT dept FROM dept;
 -- Make sure if whole row reference is requested and also any individual
 -- attributes of the same table are requested - we do not add the attribute
 -- more than once to remote query.
-EXPLAIN (VERBOSE, COSTS OFF) SELECT dept, deptno FROM dept;
-               QUERY PLAN                
------------------------------------------
- Foreign Scan on public.dept
+EXPLAIN (VERBOSE, COSTS OFF) SELECT dept, deptno FROM dept ORDER BY deptno;
+                  QUERY PLAN                   
+-----------------------------------------------
+ Sort
    Output: dept.*, deptno
-   Remote SQL: SELECT * FROM fdw_db.dept
-(3 rows)
+   Sort Key: dept.deptno
+   ->  Foreign Scan on public.dept
+         Output: dept.*, deptno
+         Remote SQL: SELECT * FROM fdw_db.dept
+(6 rows)
 
-SELECT dept, deptno FROM dept;
+SELECT dept, deptno FROM dept ORDER BY deptno;
             dept            | deptno 
 ----------------------------+--------
  (10,ACCOUNTING,"NEW YORK") |     10
@@ -118,15 +95,18 @@ SELECT dept, deptno FROM dept;
 
 -- Test if all the columns in the relation are referenced we instead send
 -- 'SELECT *' in remote query(this will avoid map-reduce job).
-EXPLAIN (VERBOSE, COSTS OFF) SELECT deptno, dname, loc FROM DEPT;
-               QUERY PLAN                
------------------------------------------
- Foreign Scan on public.dept
+EXPLAIN (VERBOSE, COSTS OFF) SELECT deptno, dname, loc FROM DEPT ORDER BY deptno;
+                  QUERY PLAN                   
+-----------------------------------------------
+ Sort
    Output: deptno, dname, loc
-   Remote SQL: SELECT * FROM fdw_db.dept
-(3 rows)
+   Sort Key: dept.deptno
+   ->  Foreign Scan on public.dept
+         Output: deptno, dname, loc
+         Remote SQL: SELECT * FROM fdw_db.dept
+(6 rows)
 
-SELECT deptno,dname,loc FROM DEPT;
+SELECT deptno, dname, loc FROM DEPT ORDER BY deptno;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -135,102 +115,64 @@ SELECT deptno,dname,loc FROM DEPT;
      40 | OPERATIONS | BOSTON
 (4 rows)
 
-SELECT * FROM EMP;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+SELECT * FROM emp ORDER BY deptno, empno;
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
 (14 rows)
 
-SELECT * FROM EMP ORDER BY deptno;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
+SELECT * FROM emp ORDER BY deptno DESC, empno;
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
 (14 rows)
 
-SELECT * FROM EMP ORDER BY deptno, empno;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
+SELECT * FROM emp ORDER BY deptno DESC, empno DESC;
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
 (14 rows)
 
-SELECT * FROM EMP ORDER BY deptno DESC, empno;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
-(14 rows)
-
-SELECT * FROM EMP ORDER BY deptno DESC, empno DESC;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-(14 rows)
-
-SELECT * FROM DEPT ORDER BY dname DESC;
+SELECT * FROM dept ORDER BY dname DESC;
  deptno |   dname    |   loc    
 --------+------------+----------
      30 | SALES      | CHICAGO
@@ -239,16 +181,16 @@ SELECT * FROM DEPT ORDER BY dname DESC;
      10 | ACCOUNTING | NEW YORK
 (4 rows)
 
-SELECT DISTINCT deptno FROM EMP ORDER BY deptno;
- deptno
+SELECT DISTINCT deptno FROM emp ORDER BY deptno;
+ deptno 
 --------
      10
      20
      30
 (3 rows)
 
-SELECT DISTINCT mgr, deptno FROM EMP ORDER BY mgr,deptno;
- mgr  | deptno
+SELECT DISTINCT mgr, deptno FROM emp ORDER BY mgr, deptno;
+ mgr  | deptno 
 ------+--------
  7566 |     20
  7698 |     30
@@ -261,8 +203,8 @@ SELECT DISTINCT mgr, deptno FROM EMP ORDER BY mgr,deptno;
       |     10
 (9 rows)
 
-SELECT DISTINCT empno, deptno FROM EMP ORDER BY empno, deptno;
- empno | deptno
+SELECT DISTINCT empno, deptno FROM emp ORDER BY empno, deptno;
+ empno | deptno 
 -------+--------
   7369 |     20
   7499 |     30
@@ -280,7 +222,7 @@ SELECT DISTINCT empno, deptno FROM EMP ORDER BY empno, deptno;
   7934 |     10
 (14 rows)
 
-SELECT deptno, dname, loc FROM dept;
+SELECT deptno, dname, loc FROM dept ORDER BY 1;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -289,7 +231,7 @@ SELECT deptno, dname, loc FROM dept;
      40 | OPERATIONS | BOSTON
 (4 rows)
 
-SELECT deptno, dname  FROM dept;
+SELECT deptno, dname  FROM dept  ORDER BY 1;
  deptno |   dname    
 --------+------------
      10 | ACCOUNTING
@@ -298,42 +240,42 @@ SELECT deptno, dname  FROM dept;
      40 | OPERATIONS
 (4 rows)
 
-SELECT ename as "Employee Name" FROM emp;
+SELECT ename as "Employee Name" FROM emp ORDER BY 1;
  Employee Name 
 ---------------
- SMITH
+ ADAMS
  ALLEN
- WARD
- JONES
- MARTIN
  BLAKE
  CLARK
- SCOTT
- KING
- TURNER
- ADAMS
- JAMES
  FORD
+ JAMES
+ JONES
+ KING
+ MARTIN
  MILLER
+ SCOTT
+ SMITH
+ TURNER
+ WARD
 (14 rows)
 
-SELECT deptno, sal, comm FROM Emp ORDER BY deptno;
+SELECT deptno, sal, comm FROM Emp ORDER BY deptno, sal;
  deptno | sal  | comm 
 --------+------+------
      10 | 1300 |     
      10 | 2450 |     
      10 | 5000 |     
-     20 | 3000 |     
-     20 | 2975 |     
      20 |  800 |     
      20 | 1100 |     
+     20 | 2975 |     
      20 | 3000 |     
+     20 | 3000 |     
+     30 |  950 |     
      30 | 1250 |  500
+     30 | 1250 | 1400
      30 | 1500 |    0
      30 | 1600 |  300
      30 | 2850 |     
-     30 | 1250 | 1400
-     30 |  950 |     
 (14 rows)
 
 SELECT COUNT(*) FROM jobhist;
@@ -354,68 +296,61 @@ SELECT COUNT(empno) FROM jobhist;
     17
 (1 row)
 
-SELECT empno,startdate,job,sal,deptno FROM jobhist LIMIT 2;
- empno |      startdate      |   job    | sal  | deptno 
--------+---------------------+----------+------+--------
-  7369 | 17/12/1980 00:00:00 | CLERK    |  800 |     20
-  7499 | 20/02/1980 00:00:00 | SALESMAN | 1600 |     30
-(2 rows)
-
 SELECT * FROM emp ORDER BY empno LIMIT ALL;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
 (14 rows)
 
 SELECT * FROM emp ORDER BY empno LIMIT NULL;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
 (14 rows)
 
 SELECT * FROM emp ORDER BY emp OFFSET 13;
- empno | ename  |  job  | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-------+------+---------------------+------+------+--------
-  7934 | MILLER | CLERK | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+ empno | ename  |  job  | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-------+------+------------+------+------+--------
+  7934 | MILLER | CLERK | 7782 | 01-23-1982 | 1300 |      |     10
 (1 row)
 
 SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
- empno | ename  |   job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+----------+------+---------------------+------+------+--------
-  7499 | ALLEN  | SALESMAN | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER  | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER  | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7499 | ALLEN  | SALESMAN | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
 (5 rows)
 
--- Retrive Data from Foreign Table using Group By Clause.
+-- Retrieve Data from Foreign Table using Group By Clause.
 SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptno ORDER BY deptno;
  Department | Total Employees 
 ------------+-----------------
@@ -424,7 +359,10 @@ SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptn
          30 |               6
 (3 rows)
 
-SELECT deptno, SUM(sal) FROM emp GROUP BY deptno HAVING deptno IN (10, 30) ORDER BY deptno;
+SELECT deptno, SUM(sal) FROM emp
+GROUP BY deptno
+HAVING deptno IN (10, 30)
+ORDER BY deptno;
  deptno | sum  
 --------+------
      10 | 8750
@@ -470,17 +408,17 @@ ORDER BY deptno;
      30 |           1567 |         9400 |            950 |           2850
 (3 rows)
 
--- Retrive Data from Foreign Table using Sub Queries.
+-- Retrieve Data from Foreign Table using Sub Queries.
 SELECT * FROM emp
 WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
 ORDER BY empno;
- empno | ename |   job   | mgr  |      hiredate       | sal  | comm | deptno 
--------+-------+---------+------+---------------------+------+------+--------
-  7369 | SMITH | CLERK   | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7566 | JONES | MANAGER | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7788 | SCOTT | ANALYST | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7876 | ADAMS | CLERK   | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7902 | FORD  | ANALYST | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
+ empno | ename |   job   | mgr  |  hiredate  | sal  | comm | deptno 
+-------+-------+---------+------+------------+------+------+--------
+  7369 | SMITH | CLERK   | 7902 | 12-17-1980 |  800 |      |     20
+  7566 | JONES | MANAGER | 7839 | 04-02-1981 | 2975 |      |     20
+  7788 | SCOTT | ANALYST | 7566 | 04-19-1987 | 3000 |      |     20
+  7876 | ADAMS | CLERK   | 7788 | 05-23-1987 | 1100 |      |     20
+  7902 | FORD  | ANALYST | 7566 | 12-03-1981 | 3000 |      |     20
 (5 rows)
 
 SELECT * FROM dept
@@ -505,17 +443,17 @@ ORDER BY empno;
 SELECT * FROM emp
 WHERE deptno = ANY (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
 ORDER BY empno;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
 (9 rows)
 
 SELECT * FROM dept
@@ -531,15 +469,15 @@ ORDER BY deptno;
 SELECT * FROM emp
 WHERE empno IN (SELECT empno FROM emp WHERE sal BETWEEN 5000 AND 6000)
 ORDER BY empno;
- empno | ename |    job    | mgr |      hiredate       | sal  | comm | deptno 
--------+-------+-----------+-----+---------------------+------+------+--------
-  7839 | KING  | PRESIDENT |     | 17/11/1981 00:00:00 | 5000 |      |     10
+ empno | ename |    job    | mgr |  hiredate  | sal  | comm | deptno 
+-------+-------+-----------+-----+------------+------+------+--------
+  7839 | KING  | PRESIDENT |     | 11-17-1981 | 5000 |      |     10
 (1 row)
 
--- Retrive Data from Foreign Table using UNION Operator.
-SELECT deptno,dname FROM dept 
+-- Retrieve Data from Foreign Table using UNION Operator.
+SELECT deptno, dname FROM dept
 UNION
-SELECT empno,ename FROM emp
+SELECT empno, ename FROM emp
 ORDER BY deptno;
  deptno |   dname    
 --------+------------
@@ -563,7 +501,7 @@ ORDER BY deptno;
    7934 | MILLER
 (18 rows)
 
-SELECT dname FROM dept 
+SELECT dname FROM dept
 UNION
 SELECT ename FROM emp
 ORDER BY dname;
@@ -589,7 +527,7 @@ ORDER BY dname;
  WARD
 (18 rows)
 
-SELECT dname FROM dept 
+SELECT dname FROM dept
 UNION ALL
 SELECT ename FROM emp
 ORDER BY dname;
@@ -615,8 +553,8 @@ ORDER BY dname;
  WARD
 (18 rows)
 
--- Retrive Data from Foreign Table using INTERSECT Operator.
-SELECT ename FROM emp WHERE empno >= 7788 
+-- Retrieve Data from Foreign Table using INTERSECT Operator.
+SELECT ename FROM emp WHERE empno >= 7788
 INTERSECT
 SELECT ename FROM emp WHERE empno >= 7566
 ORDER BY ename;
@@ -631,7 +569,7 @@ ORDER BY ename;
  TURNER
 (7 rows)
 
-SELECT ename FROM emp WHERE empno >= 7788 
+SELECT ename FROM emp WHERE empno >= 7788
 INTERSECT ALL
 SELECT ename FROM emp WHERE empno >= 7566
 ORDER BY ename;
@@ -646,9 +584,10 @@ ORDER BY ename;
  TURNER
 (7 rows)
 
--- Retrive Data from Foreign Table using CROSS JOIN.
-SELECT dept.dname, emp.ename FROM dept CROSS JOIN emp
-ORDER BY dept.deptno;
+-- Retrieve Data from Foreign Table using CROSS JOIN.
+SELECT dept.dname, emp.ename
+ FROM dept CROSS JOIN emp
+ ORDER BY dept.deptno;
    dname    | ename  
 ------------+--------
  ACCOUNTING | SMITH
@@ -709,10 +648,11 @@ ORDER BY dept.deptno;
  OPERATIONS | MILLER
 (56 rows)
 
--- Retrive Data from Foreign Table using INNER JOIN.
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d, emp e
-WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+-- Retrieve Data from Foreign Table using INNER JOIN.
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d, emp e
+ WHERE d.deptno=e.deptno
+ ORDER BY d.deptno;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
@@ -731,9 +671,10 @@ ORDER BY d.deptno;
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d INNER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d INNER JOIN emp e
+ ON d.deptno=e.deptno
+ ORDER BY d.deptno;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
@@ -752,8 +693,8 @@ ORDER BY d.deptno;
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
--- Retrive Data from Foreign Table using EXCEPT.
-SELECT ename FROM emp 
+-- Retrieve Data from Foreign Table using EXCEPT.
+SELECT ename FROM emp
 EXCEPT
 SELECT ename FROM emp WHERE empno > 7839
 ORDER BY ename;
@@ -770,7 +711,7 @@ ORDER BY ename;
  WARD
 (9 rows)
 
-SELECT ename FROM emp 
+SELECT ename FROM emp
 EXCEPT ALL
 SELECT ename FROM emp WHERE empno > 7839
 ORDER BY ename;
@@ -787,10 +728,11 @@ ORDER BY ename;
  WARD
 (9 rows)
 
--- Retrive Data from Foreign Table using OUTER JOINS.
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d LEFT OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+-- Retrieve Data from Foreign Table using OUTER JOINS.
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d LEFT OUTER JOIN emp e
+ ON d.deptno=e.deptno
+ ORDER BY d.deptno;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
@@ -810,8 +752,9 @@ ORDER BY d.deptno;
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
+ ORDER BY d.deptno;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
@@ -830,41 +773,40 @@ ORDER BY d.deptno;
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d FULL OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d FULL OUTER JOIN emp e
+ ON d.deptno=e.deptno
+ ORDER BY d.deptno, e.empno, e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
--- Retrive Data from Foreign Table using CTE (With Clause).
-WITH dept_count AS 
+-- Retrieve Data from Foreign Table using CTE (With Clause).
+WITH dept_count AS
 (
   SELECT deptno, COUNT(*) AS dept_count
   FROM   emp
   GROUP BY deptno
 )
-SELECT e.ename AS Employee_Name,
-       dc.dept_count AS "Employee in Same Dept"
-FROM   emp e,
-       dept_count dc
-WHERE  e.deptno = dc.deptno
-ORDER BY e.deptno, e.ename;
+SELECT e.ename AS Employee_Name, dc.dept_count AS "Employee in Same Dept"
+ FROM   emp e, dept_count dc
+ WHERE  e.deptno = dc.deptno
+ ORDER BY e.deptno, e.ename;
  employee_name | Employee in Same Dept 
 ---------------+-----------------------
  CLARK         |                     3
@@ -883,14 +825,14 @@ ORDER BY e.deptno, e.ename;
  WARD          |                     6
 (14 rows)
 
-WITH with_qry AS 
+WITH with_qry AS
 (
-SELECT * FROM dept
+ SELECT * FROM dept
 )
 SELECT e.ename, e.sal, w.deptno, w.dname
-FROM emp e, with_qry w
-WHERE e.deptno = w.deptno
-ORDER BY e.deptno, e.ename;
+ FROM emp e, with_qry w
+ WHERE e.deptno = w.deptno
+ ORDER BY e.deptno, e.ename;
  ename  | sal  | deptno |   dname    
 --------+------+--------+------------
  CLARK  | 2450 |     10 | ACCOUNTING
@@ -909,40 +851,30 @@ ORDER BY e.deptno, e.ename;
  WARD   | 1250 |     30 | SALES
 (14 rows)
 
-WITH dept_costs AS 
+WITH dept_costs AS
 (
-SELECT dname, SUM(sal) dept_total
-FROM   emp e, dept d
-WHERE  e.deptno = d.deptno
-GROUP BY dname
+ SELECT dname, SUM(sal) dept_total
+ FROM   emp e, dept d
+ WHERE  e.deptno = d.deptno
+ GROUP BY dname
 ),
 avg_cost AS
 (
-SELECT SUM(dept_total)/COUNT(*) avg
-FROM   dept_costs
+ SELECT SUM(dept_total)/COUNT(*) avg
+ FROM   dept_costs
 )
 SELECT * FROM dept_costs
-WHERE  dept_total > (SELECT avg FROM avg_cost)
-ORDER BY dname;
+ WHERE  dept_total > (SELECT avg FROM avg_cost)
+ ORDER BY dname;
   dname   | dept_total 
 ----------+------------
  RESEARCH |      10875
 (1 row)
 
-WITH pol_data AS 
-(
-SELECT *
-FROM   dept
-WHERE deptno = 70)
-SELECT * FROM pol_data;
- deptno | dname | loc 
---------+-------+-----
-(0 rows)
-
--- Retrive Data from Foreign Table using Window Clause.
-SELECT deptno, empno, sal, AVG(sal) OVER (PARTITION BY deptno) 
-FROM emp
-ORDER BY deptno, empno;
+-- Retrieve Data from Foreign Table using Window Clause.
+SELECT deptno, empno, sal, AVG(sal) OVER (PARTITION BY deptno)
+ FROM emp
+ ORDER BY deptno, empno;
  deptno | empno | sal  |          avg          
 --------+-------+------+-----------------------
      10 |  7782 | 2450 | 2916.6666666666666667
@@ -961,10 +893,10 @@ ORDER BY deptno, empno;
      30 |  7900 |  950 | 1566.6666666666666667
 (14 rows)
 
-SELECT deptno, empno, sal, COUNT(sal) OVER (PARTITION BY deptno) 
-FROM emp
-WHERE deptno IN (10,30,40,50,60,70)
-ORDER BY deptno, empno;
+SELECT deptno, empno, sal, COUNT(sal) OVER (PARTITION BY deptno)
+ FROM emp
+ WHERE deptno IN (10,30,40,50,60,70)
+ ORDER BY deptno, empno;
  deptno | empno | sal  | count 
 --------+-------+------+-------
      10 |  7782 | 2450 |     3
@@ -978,9 +910,9 @@ ORDER BY deptno, empno;
      30 |  7900 |  950 |     6
 (9 rows)
 
-SELECT deptno, empno, sal, SUM(sal) OVER (PARTITION BY deptno) 
-FROM emp
-ORDER BY deptno, empno;
+SELECT deptno, empno, sal, SUM(sal) OVER (PARTITION BY deptno)
+ FROM emp
+ ORDER BY deptno, empno;
  deptno | empno | sal  |  sum  
 --------+-------+------+-------
      10 |  7782 | 2450 |  8750
@@ -999,7 +931,8 @@ ORDER BY deptno, empno;
      30 |  7900 |  950 |  9400
 (14 rows)
 
-SELECT deptno, empno, sal, RANK() OVER (PARTITION BY deptno ORDER BY sal DESC) FROM emp;
+SELECT deptno, empno, sal, RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
+ FROM emp;
  deptno | empno | sal  | rank 
 --------+-------+------+------
      10 |  7839 | 5000 |    1
@@ -1018,8 +951,9 @@ SELECT deptno, empno, sal, RANK() OVER (PARTITION BY deptno ORDER BY sal DESC) F
      30 |  7900 |  950 |    6
 (14 rows)
 
-SELECT deptno, empno, sal, DENSE_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC) FROM emp
-WHERE deptno IN (10,30,40,50,60,70);
+SELECT deptno, empno, sal, DENSE_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
+ FROM emp
+ WHERE deptno IN (10,30,40,50,60,70);
  deptno | empno | sal  | dense_rank 
 --------+-------+------+------------
      10 |  7839 | 5000 |          1
@@ -1033,11 +967,10 @@ WHERE deptno IN (10,30,40,50,60,70);
      30 |  7900 |  950 |          5
 (9 rows)
 
-SELECT deptno, empno, sal , MIN(sal) OVER (PARTITION BY deptno),
-MAX(sal) OVER (PARTITION BY deptno)
-FROM emp
-WHERE deptno IN (10,30,50,70)
-ORDER BY deptno, empno;
+SELECT deptno, empno, sal , MIN(sal) OVER (PARTITION BY deptno), MAX(sal) OVER (PARTITION BY deptno)
+ FROM emp
+ WHERE deptno IN (10,30,50,70)
+ ORDER BY deptno, empno;
  deptno | empno | sal  | min  | max  
 --------+-------+------+------+------
      10 |  7782 | 2450 | 1300 | 5000
@@ -1051,12 +984,11 @@ ORDER BY deptno, empno;
      30 |  7900 |  950 |  950 | 2850
 (9 rows)
 
-SELECT deptno, empno, sal , MIN(sal) OVER win,
-MAX(sal) OVER win, SUM(sal) OVER win,AVG(sal) OVER win
-FROM emp
-WHERE deptno IN (10,30,50,70)
-WINDOW win AS (PARTITION BY deptno)
-ORDER BY deptno, empno;
+SELECT deptno, empno, sal , MIN(sal) OVER win, MAX(sal) OVER win, SUM(sal) OVER win,AVG(sal) OVER win
+ FROM emp
+ WHERE deptno IN (10,30,50,70)
+ WINDOW win AS (PARTITION BY deptno)
+ ORDER BY deptno, empno;
  deptno | empno | sal  | min  | max  | sum  |          avg          
 --------+-------+------+------+------+------+-----------------------
      10 |  7782 | 2450 | 1300 | 5000 | 8750 | 2916.6666666666666667
@@ -1070,51 +1002,56 @@ ORDER BY deptno, empno;
      30 |  7900 |  950 |  950 | 2850 | 9400 | 1566.6666666666666667
 (9 rows)
 
-SELECT deptno, empno, sal, ROW_NUMBER() OVER (PARTITION BY deptno ORDER BY sal DESC) FROM emp;
+SELECT deptno, empno, sal, ROW_NUMBER() OVER (PARTITION BY deptno ORDER BY sal DESC)
+ FROM emp
+ ORDER BY empno;
  deptno | empno | sal  | row_number 
 --------+-------+------+------------
-     10 |  7839 | 5000 |          1
-     10 |  7782 | 2450 |          2
-     10 |  7934 | 1300 |          3
-     20 |  7788 | 3000 |          1
-     20 |  7902 | 3000 |          2
-     20 |  7566 | 2975 |          3
-     20 |  7876 | 1100 |          4
      20 |  7369 |  800 |          5
-     30 |  7698 | 2850 |          1
      30 |  7499 | 1600 |          2
-     30 |  7844 | 1500 |          3
      30 |  7521 | 1250 |          4
+     20 |  7566 | 2975 |          3
      30 |  7654 | 1250 |          5
+     30 |  7698 | 2850 |          1
+     10 |  7782 | 2450 |          2
+     20 |  7788 | 3000 |          1
+     10 |  7839 | 5000 |          1
+     30 |  7844 | 1500 |          3
+     20 |  7876 | 1100 |          4
      30 |  7900 |  950 |          6
-(14 rows)
-
-SELECT deptno, empno, sal, FIRST_VALUE(sal) OVER (PARTITION BY deptno ORDER BY sal DESC),LAST_VALUE(sal) OVER (PARTITION BY deptno ORDER BY sal DESC) 
-FROM emp;
- deptno | empno | sal  | first_value | last_value 
---------+-------+------+-------------+------------
-     10 |  7839 | 5000 |        5000 |       5000
-     10 |  7782 | 2450 |        5000 |       2450
-     10 |  7934 | 1300 |        5000 |       1300
-     20 |  7788 | 3000 |        3000 |       3000
-     20 |  7902 | 3000 |        3000 |       3000
-     20 |  7566 | 2975 |        3000 |       2975
-     20 |  7876 | 1100 |        3000 |       1100
-     20 |  7369 |  800 |        3000 |        800
-     30 |  7698 | 2850 |        2850 |       2850
-     30 |  7499 | 1600 |        2850 |       1600
-     30 |  7844 | 1500 |        2850 |       1500
-     30 |  7521 | 1250 |        2850 |       1250
-     30 |  7654 | 1250 |        2850 |       1250
-     30 |  7900 |  950 |        2850 |        950
+     20 |  7902 | 3000 |          2
+     10 |  7934 | 1300 |          3
 (14 rows)
 
 SELECT deptno, empno, sal,
-LEAD(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC) NEXT_LOWER_SAL,
-LAG(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC ) PREV_HIGHER_SAL
-FROM emp
-WHERE deptno IN (10, 20,30,40,50)
-ORDER BY deptno, sal DESC;
+ FIRST_VALUE(sal) OVER (PARTITION BY deptno ORDER BY sal DESC),
+ LAST_VALUE(sal) OVER (PARTITION BY deptno ORDER BY sal DESC)
+ FROM emp
+ ORDER BY empno;
+ deptno | empno | sal  | first_value | last_value 
+--------+-------+------+-------------+------------
+     20 |  7369 |  800 |        3000 |        800
+     30 |  7499 | 1600 |        2850 |       1600
+     30 |  7521 | 1250 |        2850 |       1250
+     20 |  7566 | 2975 |        3000 |       2975
+     30 |  7654 | 1250 |        2850 |       1250
+     30 |  7698 | 2850 |        2850 |       2850
+     10 |  7782 | 2450 |        5000 |       2450
+     20 |  7788 | 3000 |        3000 |       3000
+     10 |  7839 | 5000 |        5000 |       5000
+     30 |  7844 | 1500 |        2850 |       1500
+     20 |  7876 | 1100 |        3000 |       1100
+     30 |  7900 |  950 |        2850 |        950
+     20 |  7902 | 3000 |        3000 |       3000
+     10 |  7934 | 1300 |        5000 |       1300
+(14 rows)
+
+SELECT deptno, empno, sal,
+ LEAD(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC) NEXT_LOWER_SAL,
+ LAG(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC ) PREV_HIGHER_SAL
+ FROM emp
+ WHERE deptno IN (10, 20,30,40,50)
+ ORDER BY deptno, sal DESC;
  deptno | empno | sal  | next_lower_sal | prev_higher_sal 
 --------+-------+------+----------------+-----------------
      10 |  7839 | 5000 |           2450 |               0
@@ -1133,46 +1070,51 @@ ORDER BY deptno, sal DESC;
      30 |  7900 |  950 |              0 |            1250
 (14 rows)
 
-SELECT deptno, empno, sal, PERCENT_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC) FROM emp;
+SELECT deptno, empno, sal,
+ PERCENT_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
+ FROM emp
+ ORDER BY empno;
  deptno | empno | sal  | percent_rank 
 --------+-------+------+--------------
-     10 |  7839 | 5000 |            0
-     10 |  7782 | 2450 |          0.5
-     10 |  7934 | 1300 |            1
-     20 |  7788 | 3000 |            0
-     20 |  7902 | 3000 |            0
-     20 |  7566 | 2975 |          0.5
-     20 |  7876 | 1100 |         0.75
      20 |  7369 |  800 |            1
-     30 |  7698 | 2850 |            0
      30 |  7499 | 1600 |          0.2
-     30 |  7844 | 1500 |          0.4
      30 |  7521 | 1250 |          0.6
+     20 |  7566 | 2975 |          0.5
      30 |  7654 | 1250 |          0.6
+     30 |  7698 | 2850 |            0
+     10 |  7782 | 2450 |          0.5
+     20 |  7788 | 3000 |            0
+     10 |  7839 | 5000 |            0
+     30 |  7844 | 1500 |          0.4
+     20 |  7876 | 1100 |         0.75
      30 |  7900 |  950 |            1
+     20 |  7902 | 3000 |            0
+     10 |  7934 | 1300 |            1
 (14 rows)
 
-SELECT deptno, empno, sal, NTH_VALUE(sal,2) 
-OVER (PARTITION BY deptno ORDER BY sal) FROM emp;
+SELECT deptno, empno, sal,
+ NTH_VALUE(sal, 2) OVER (PARTITION BY deptno ORDER BY sal)
+ FROM emp
+ ORDER BY empno;
  deptno | empno | sal  | nth_value 
 --------+-------+------+-----------
-     10 |  7934 | 1300 |          
-     10 |  7782 | 2450 |      2450
-     10 |  7839 | 5000 |      2450
      20 |  7369 |  800 |          
-     20 |  7876 | 1100 |      1100
-     20 |  7566 | 2975 |      1100
-     20 |  7788 | 3000 |      1100
-     20 |  7902 | 3000 |      1100
-     30 |  7900 |  950 |          
-     30 |  7521 | 1250 |      1250
-     30 |  7654 | 1250 |      1250
-     30 |  7844 | 1500 |      1250
      30 |  7499 | 1600 |      1250
+     30 |  7521 | 1250 |      1250
+     20 |  7566 | 2975 |      1100
+     30 |  7654 | 1250 |      1250
      30 |  7698 | 2850 |      1250
+     10 |  7782 | 2450 |      2450
+     20 |  7788 | 3000 |      1100
+     10 |  7839 | 5000 |      2450
+     30 |  7844 | 1500 |      1250
+     20 |  7876 | 1100 |      1100
+     30 |  7900 |  950 |          
+     20 |  7902 | 3000 |      1100
+     10 |  7934 | 1300 |          
 (14 rows)
 
--- Retrive Data from Foreign Table using Query Optimizer.
+-- Retrieve Data from Foreign Table using Query Optimizer.
 EXPLAIN (COSTS OFF) SELECT * FROM DEPT;
       QUERY PLAN      
 ----------------------
@@ -1207,22 +1149,6 @@ EXPLAIN (COSTS OFF) SELECT empno,ename FROM EMP;
  Foreign Scan on emp
 (1 row)
 
-EXPLAIN (COSTS OFF) SELECT DISTINCT deptno FROM EMP;
-        QUERY PLAN         
----------------------------
- HashAggregate
-   Group Key: deptno
-   ->  Foreign Scan on emp
-(3 rows)
-
-EXPLAIN (COSTS OFF) SELECT DISTINCT mgr, deptno FROM EMP;
-        QUERY PLAN         
----------------------------
- HashAggregate
-   Group Key: mgr, deptno
-   ->  Foreign Scan on emp
-(3 rows)
-
 EXPLAIN (COSTS OFF) SELECT ename as "Employee Name" FROM emp;
      QUERY PLAN      
 ---------------------
@@ -1252,23 +1178,10 @@ EXPLAIN (COSTS OFF) SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
          ->  Foreign Scan on emp
 (4 rows)
 
-EXPLAIN (COSTS OFF) SELECT deptno "Department", SUM(sal) "Total Salary…." FROM emp
-GROUP BY deptno
-HAVING SUM(sal) > 8750
-ORDER BY deptno;
-            QUERY PLAN             
------------------------------------
- Sort
-   Sort Key: deptno
-   ->  HashAggregate
-         Group Key: deptno
-         Filter: (sum(sal) > 8750)
-         ->  Foreign Scan on emp
-(6 rows)
-
-EXPLAIN (COSTS OFF) SELECT * FROM emp
-WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
-ORDER BY empno;
+EXPLAIN (COSTS OFF)
+SELECT * FROM emp
+ WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
+ ORDER BY empno;
                 QUERY PLAN                
 ------------------------------------------
  Sort
@@ -1280,11 +1193,11 @@ ORDER BY empno;
                  ->  Foreign Scan on dept
 (7 rows)
 
-EXPLAIN (COSTS OFF) 
-SELECT deptno,dname FROM dept 
-UNION
-SELECT empno,ename FROM emp
-ORDER BY deptno;
+EXPLAIN (COSTS OFF)
+SELECT deptno, dname FROM dept
+ UNION
+ SELECT empno, ename FROM emp
+ ORDER BY deptno;
                  QUERY PLAN                 
 --------------------------------------------
  Sort
@@ -1297,10 +1210,10 @@ ORDER BY deptno;
 (7 rows)
 
 EXPLAIN (COSTS OFF)
-SELECT ename FROM emp WHERE empno >= 7788 
-INTERSECT
-SELECT ename FROM emp WHERE empno >= 7566
-ORDER BY ename;
+SELECT ename FROM emp WHERE empno >= 7788
+ INTERSECT
+ SELECT ename FROM emp WHERE empno >= 7566
+ ORDER BY ename;
                     QUERY PLAN                     
 ---------------------------------------------------
  Sort
@@ -1315,7 +1228,7 @@ ORDER BY ename;
 
 EXPLAIN (COSTS OFF)
 SELECT dept.dname, emp.ename FROM dept CROSS JOIN emp
-ORDER BY dept.deptno;
+ ORDER BY dept.deptno;
               QUERY PLAN               
 ---------------------------------------
  Sort
@@ -1327,9 +1240,9 @@ ORDER BY dept.deptno;
 (6 rows)
 
 EXPLAIN (COSTS OFF)
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d INNER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d INNER JOIN emp e ON d.deptno=e.deptno
+ ORDER BY d.deptno;
              QUERY PLAN              
 -------------------------------------
  Merge Join
@@ -1343,10 +1256,9 @@ ORDER BY d.deptno;
 (8 rows)
 
 EXPLAIN (COSTS OFF)
-SELECT ename FROM emp 
-EXCEPT
-SELECT ename FROM emp WHERE empno > 7839
-ORDER BY ename;
+SELECT ename FROM emp
+ EXCEPT
+ SELECT ename FROM emp WHERE empno > 7839 ORDER BY ename;
                     QUERY PLAN                     
 ---------------------------------------------------
  Sort
@@ -1360,9 +1272,10 @@ ORDER BY ename;
 (8 rows)
 
 EXPLAIN (COSTS OFF)
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept d LEFT OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept d LEFT OUTER JOIN emp e
+ ON d.deptno = e.deptno
+ ORDER BY d.deptno;
              QUERY PLAN              
 -------------------------------------
  Merge Left Join
@@ -1375,60 +1288,19 @@ ORDER BY d.deptno;
          ->  Foreign Scan on emp e
 (8 rows)
 
-EXPLAIN (COSTS OFF)
-WITH dept_count AS 
-(
-SELECT deptno, COUNT(*) AS dept_count
-FROM emp
-GROUP BY deptno
-)
-SELECT e.ename AS Employee_Name,
-dc.dept_count AS "Employee in Same Dept"
-FROM emp e,
-dept_count dc
-WHERE e.deptno = dc.deptno
-ORDER BY e.deptno, e.ename;
-                 QUERY PLAN                  
----------------------------------------------
- Sort
-   Sort Key: e.deptno, e.ename
-   CTE dept_count
-     ->  HashAggregate
-           Group Key: emp.deptno
-           ->  Foreign Scan on emp
-   ->  Hash Join
-         Hash Cond: (e.deptno = dc.deptno)
-         ->  Foreign Scan on emp e
-         ->  Hash
-               ->  CTE Scan on dept_count dc
-(11 rows)
-
-EXPLAIN (COSTS OFF)
-SELECT deptno, empno, sal, AVG(sal) OVER (PARTITION BY deptno) 
-FROM emp
-ORDER BY deptno, empno;
-              QUERY PLAN               
----------------------------------------
- Sort
-   Sort Key: deptno, empno
-   ->  WindowAgg
-         ->  Sort
-               Sort Key: deptno
-               ->  Foreign Scan on emp
-(6 rows)
-
--- Retrive Data from Foreign Table using Query Optimizer.
+-- Retrieve Data from Foreign Table using Query Optimizer.
 CREATE TABLE dept_lcl (
-deptno INTEGER NOT NULL CONSTRAINT dept_pk PRIMARY KEY,
-dname VARCHAR(14) CONSTRAINT dept_dname_uq UNIQUE,
-loc VARCHAR(13)
+  deptno INTEGER NOT NULL CONSTRAINT dept_pk PRIMARY KEY,
+  dname VARCHAR(14) CONSTRAINT dept_dname_uq UNIQUE,
+  loc VARCHAR(13)
 );
 INSERT INTO dept_lcl VALUES (10,'ACCOUNTING','NEW YORK');
 INSERT INTO dept_lcl VALUES (20,'RESEARCH','DALLAS');
 INSERT INTO dept_lcl VALUES (30,'SALES','CHICAGO');
 INSERT INTO dept_lcl VALUES (40,'OPERATIONS','BOSTON');
-SELECT dept_lcl.dname, emp.ename FROM dept_lcl CROSS JOIN emp
-ORDER BY dept_lcl.deptno;
+SELECT dept_lcl.dname, emp.ename
+ FROM dept_lcl CROSS JOIN emp
+ ORDER BY dept_lcl.deptno;
    dname    | ename  
 ------------+--------
  ACCOUNTING | SMITH
@@ -1489,8 +1361,9 @@ ORDER BY dept_lcl.deptno;
  OPERATIONS | MILLER
 (56 rows)
 
-EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp.ename FROM dept_lcl CROSS JOIN emp
-ORDER BY dept_lcl.deptno;
+EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp.ename
+ FROM dept_lcl CROSS JOIN emp
+ ORDER BY dept_lcl.deptno;
                  QUERY PLAN                 
 --------------------------------------------
  Nested Loop
@@ -1499,96 +1372,55 @@ ORDER BY dept_lcl.deptno;
          ->  Foreign Scan on emp
 (4 rows)
 
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
-WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno,d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept_lcl d, emp e
+ WHERE d.deptno = e.deptno
+ ORDER BY d.deptno, e.empno, e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
-EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d, emp e
-WHERE d.deptno=e.deptno
-ORDER BY d.deptno;
-                QUERY PLAN                
-------------------------------------------
- Sort
-   Sort Key: d.deptno
-   ->  Hash Join
-         Hash Cond: (e.deptno = d.deptno)
-         ->  Foreign Scan on emp e
-         ->  Hash
-               ->  Seq Scan on dept_lcl d
-(7 rows)
-
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept_lcl d LEFT OUTER JOIN emp e
+ ON d.deptno=e.deptno
+ ORDER BY d.deptno,e.empno,e.sal;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
      20 | RESEARCH   |  7566 | JONES  | 2975 |     20
      20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7900 | JAMES  |  950 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
+     30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
-EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d LEFT OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
-                  QUERY PLAN                  
-----------------------------------------------
- Nested Loop Left Join
-   Join Filter: (d.deptno = e.deptno)
-   ->  Index Scan using dept_pk on dept_lcl d
-   ->  Materialize
-         ->  Foreign Scan on emp e
-(5 rows)
-
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
-ORDER BY d.deptno;
- deptno |   dname    | empno | ename  | sal  | deptno 
---------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
-     10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
-     10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
-     20 | RESEARCH   |  7369 | SMITH  |  800 |     20
-     20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
-     20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
-     30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
-     30 | SALES      |  7654 | MARTIN | 1250 |     30
-     30 | SALES      |  7900 | JAMES  |  950 |     30
-(14 rows)
-
-EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno ORDER BY d.deptno;
+EXPLAIN (COSTS OFF)
+ SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept_lcl d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
+ ORDER BY d.deptno;
                 QUERY PLAN                
 ------------------------------------------
  Sort
@@ -1600,30 +1432,33 @@ EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM 
                ->  Seq Scan on dept_lcl d
 (7 rows)
 
-SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d FULL OUTER JOIN emp e
-ON d.deptno=e.deptno
-ORDER BY d.deptno;
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept_lcl d FULL OUTER JOIN emp e
+ ON d.deptno=e.deptno
+ ORDER BY d.deptno, e.empno;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
      20 | RESEARCH   |  7566 | JONES  | 2975 |     20
      20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7900 | JAMES  |  950 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
+     30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
-EXPLAIN (COSTS OFF) SELECT d.deptno,d.dname,e.empno,e.ename,e.sal,e.deptno FROM dept_lcl d FULL OUTER JOIN emp e
-ON d.deptno=e.deptno ORDER BY d.deptno;
+EXPLAIN (COSTS OFF)
+ SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
+ FROM dept_lcl d FULL OUTER JOIN emp e
+ ON d.deptno=e.deptno ORDER BY d.deptno;
                 QUERY PLAN                
 ------------------------------------------
  Sort
@@ -1697,20 +1532,20 @@ SELECT *, (SELECT r FROM (SELECT empno AS c1) x, LATERAL (SELECT empno AS r) y)
   FROM emp ORDER BY empno;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno |  r   
 -------+--------+-----------+------+------------+------+------+--------+------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 |  800 |      |     20 | 7369
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 | 1600 |  300 |     30 | 7499
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 | 1250 |  500 |     30 | 7521
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 | 2975 |      |     20 | 7566
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 | 1250 | 1400 |     30 | 7654
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 | 2850 |      |     30 | 7698
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 | 2450 |      |     10 | 7782
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 | 3000 |      |     20 | 7788
-  7839 | KING   | PRESIDENT |      | 17/11/1981 | 5000 |      |     10 | 7839
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 | 1500 |    0 |     30 | 7844
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 | 1100 |      |     20 | 7876
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 |  950 |      |     30 | 7900
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 | 3000 |      |     20 | 7902
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 | 1300 |      |     10 | 7934
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20 | 7369
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30 | 7499
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30 | 7521
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20 | 7566
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30 | 7654
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30 | 7698
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10 | 7782
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20 | 7788
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10 | 7839
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30 | 7844
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20 | 7876
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30 | 7900
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20 | 7902
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10 | 7934
 (14 rows)
 
 -- RIGHT JOIN LATERAL should error out
@@ -1721,49 +1556,45 @@ ERROR:  invalid reference to FROM-clause entry for table "t1"
 LINE 2:   SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1...
                             ^
 DETAIL:  The combining JOIN type must be INNER or LEFT for a LATERAL reference.
---VACUUM, ANAYLZE
-VACUUM emp;   
+--VACUUM, ANALYZE
+VACUUM emp;
 WARNING:  skipping "emp" --- cannot vacuum non-tables or special system tables
 VACUUM FULL emp;
 WARNING:  skipping "emp" --- cannot vacuum non-tables or special system tables
 VACUUM FREEZE emp;
 WARNING:  skipping "emp" --- cannot vacuum non-tables or special system tables
 VACUUM;
-ANALYZE jobhist;
-ANALYZE emp(empno); 
 VACUUM ANALYZE emp;
 WARNING:  skipping "emp" --- cannot vacuum non-tables or special system tables
 --Views
-CREATE VIEW smpl_vw
-AS
-SELECT * FROM emp
-ORDER BY empno;
+CREATE VIEW smpl_vw AS SELECT * FROM emp ORDER BY empno;
 SELECT * FROM smpl_vw;
- empno | ename  |    job    | mgr  |      hiredate       | sal  | comm | deptno 
--------+--------+-----------+------+---------------------+------+------+--------
-  7369 | SMITH  | CLERK     | 7902 | 17/12/1980 00:00:00 |  800 |      |     20
-  7499 | ALLEN  | SALESMAN  | 7698 | 20/02/1981 00:00:00 | 1600 |  300 |     30
-  7521 | WARD   | SALESMAN  | 7698 | 22/02/1981 00:00:00 | 1250 |  500 |     30
-  7566 | JONES  | MANAGER   | 7839 | 02/04/1981 00:00:00 | 2975 |      |     20
-  7654 | MARTIN | SALESMAN  | 7698 | 28/09/1981 00:00:00 | 1250 | 1400 |     30
-  7698 | BLAKE  | MANAGER   | 7839 | 01/05/1981 00:00:00 | 2850 |      |     30
-  7782 | CLARK  | MANAGER   | 7839 | 09/06/1981 00:00:00 | 2450 |      |     10
-  7788 | SCOTT  | ANALYST   | 7566 | 19/04/1987 00:00:00 | 3000 |      |     20
-  7839 | KING   | PRESIDENT |      | 17/11/1981 00:00:00 | 5000 |      |     10
-  7844 | TURNER | SALESMAN  | 7698 | 08/09/1980 00:00:00 | 1500 |    0 |     30
-  7876 | ADAMS  | CLERK     | 7788 | 23/05/1987 00:00:00 | 1100 |      |     20
-  7900 | JAMES  | CLERK     | 7698 | 03/12/1981 00:00:00 |  950 |      |     30
-  7902 | FORD   | ANALYST   | 7566 | 03/12/1981 00:00:00 | 3000 |      |     20
-  7934 | MILLER | CLERK     | 7782 | 23/01/1982 00:00:00 | 1300 |      |     10
+ empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+-----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN  | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN  | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER   | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN  | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER   | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER   | 7839 | 06-09-1981 | 2450 |      |     10
+  7788 | SCOTT  | ANALYST   | 7566 | 04-19-1987 | 3000 |      |     20
+  7839 | KING   | PRESIDENT |      | 11-17-1981 | 5000 |      |     10
+  7844 | TURNER | SALESMAN  | 7698 | 09-08-1980 | 1500 |    0 |     30
+  7876 | ADAMS  | CLERK     | 7788 | 05-23-1987 | 1100 |      |     20
+  7900 | JAMES  | CLERK     | 7698 | 12-03-1981 |  950 |      |     30
+  7902 | FORD   | ANALYST   | 7566 | 12-03-1981 | 3000 |      |     20
+  7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
 (14 rows)
 
-CREATE VIEW comp_vw (empno,ename,job,sal,comm,deptno,dname)
+CREATE VIEW comp_vw (empno, ename, job, sal, comm, deptno, dname)
 AS
-SELECT s.empno,s.ename,s.job,s.sal,s.comm,d.deptno,d.dname FROM dept d, emp s
-WHERE d.deptno=s.deptno
-AND d.deptno = 10
-ORDER BY s.empno;
-SELECT * FROM comp_vw;
+ SELECT s.empno, s.ename, s.job, s.sal, s.comm, d.deptno, d.dname
+ FROM dept d, emp s
+ WHERE d.deptno=s.deptno
+ AND d.deptno = 10
+ ORDER BY s.empno;
+SELECT * FROM comp_vw ORDER BY 1;
  empno | ename  |    job    | sal  | comm | deptno |   dname    
 -------+--------+-----------+------+------+--------+------------
   7782 | CLARK  | MANAGER   | 2450 |      |     10 | ACCOUNTING
@@ -1771,10 +1602,8 @@ SELECT * FROM comp_vw;
   7934 | MILLER | CLERK     | 1300 |      |     10 | ACCOUNTING
 (3 rows)
 
-CREATE OR REPLACE TEMPORARY VIEW temp_vw
-AS
-SELECT * FROM dept;
-SELECT * FROM temp_vw;
+CREATE OR REPLACE TEMPORARY VIEW temp_vw AS SELECT * FROM dept;
+SELECT * FROM temp_vw ORDER BY 1;
  deptno |   dname    |   loc    
 --------+------------+----------
      10 | ACCOUNTING | NEW YORK
@@ -1783,13 +1612,13 @@ SELECT * FROM temp_vw;
      40 | OPERATIONS | BOSTON
 (4 rows)
 
-SELECT * FROM ( 
-		SELECT deptno, count(*) emp_count
-        	FROM emp
-                GROUP BY deptno ) emp,
-         dept dept
-WHERE dept.deptno = emp.deptno
-ORDER BY dept.deptno;
+SELECT * FROM
+ (SELECT deptno, count(*) emp_count
+   FROM emp
+   GROUP BY deptno) emp,
+ dept dept
+ WHERE dept.deptno = emp.deptno
+ ORDER BY dept.deptno;
  deptno | emp_count | deptno |   dname    |   loc    
 --------+-----------+--------+------------+----------
      10 |         3 |     10 | ACCOUNTING | NEW YORK
@@ -1798,18 +1627,13 @@ ORDER BY dept.deptno;
 (3 rows)
 
 --Cleanup
---DROP SYNONYM syn_dept;
 DROP VIEW smpl_vw;
 DROP VIEW comp_vw;
 DROP VIEW temp_vw;
-DROP FOREIGN TABLE weblogs;
 DROP FOREIGN TABLE emp;
 DROP FOREIGN TABLE dept;
 DROP FOREIGN TABLE jobhist;
 DROP TABLE dept_lcl;
-DROP EXTENSION hdfs_fdw CASCADE;
-NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to server hdfs_server
-drop cascades to user mapping for postgres on server hdfs_server
-\c postgres postgres
-DROP DATABASE fdw_regression;
+DROP USER MAPPING FOR public SERVER hdfs_server;
+DROP SERVER hdfs_server;
+DROP EXTENSION hdfs_fdw;
