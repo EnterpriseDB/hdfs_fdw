@@ -42,9 +42,9 @@ PG_MODULE_MAGIC;
 
 /*
  * In PG 9.5.1 the number will be 90501,
- * our version is 2.0.7 so number will be 20007
+ * our version is 2.0.8 so number will be 20008
  */
-#define CODE_VERSION   20007
+#define CODE_VERSION   20008
 
 typedef struct hdfsFdwExecutionState
 {

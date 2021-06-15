@@ -12,6 +12,9 @@ CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
 CREATE USER MAPPING FOR public SERVER hdfs_server
  OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
 
+-- Check version
+SELECT hdfs_fdw_version();
+
 CREATE FOREIGN TABLE dept (
     deptno          INTEGER,
     dname           VARCHAR(14),
