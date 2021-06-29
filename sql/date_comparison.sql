@@ -28,13 +28,16 @@ SET datestyle TO ISO,DMY;
 
 -- Retrieve data based on date comparisons.
 SELECT * FROM emp
-WHERE hiredate = '1980-12-17';
+WHERE hiredate = '1980-12-17'
+ORDER BY empno;
 
 SELECT * FROM emp
-WHERE hiredate < '23/01/1982';
+WHERE hiredate < '23/01/1982'
+ORDER BY empno;
 
 SELECT * FROM emp
-WHERE hiredate BETWEEN '20/02/1981' AND '23/01/1982';
+WHERE hiredate BETWEEN '20/02/1981' AND '23/01/1982'
+ORDER BY empno;
 
 --Cleanup
 DROP FOREIGN TABLE emp;

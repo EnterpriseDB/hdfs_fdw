@@ -72,14 +72,14 @@ SELECT DISTINCT empno, deptno FROM emp ORDER BY empno, deptno;
 SELECT deptno, dname, loc FROM dept ORDER BY 1;
 SELECT deptno, dname  FROM dept  ORDER BY 1;
 SELECT ename as "Employee Name" FROM emp ORDER BY 1;
-SELECT deptno, sal, comm FROM Emp ORDER BY deptno, sal;
+SELECT deptno, sal, comm FROM Emp ORDER BY deptno, sal, comm;
 SELECT COUNT(*) FROM jobhist;
 SELECT COUNT(DISTINCT deptno) FROM jobhist;
 SELECT COUNT(empno) FROM jobhist;
 SELECT * FROM emp ORDER BY empno LIMIT ALL;
 SELECT * FROM emp ORDER BY empno LIMIT NULL;
-SELECT * FROM emp ORDER BY emp OFFSET 13;
-SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
+SELECT * FROM emp ORDER BY empno OFFSET 13;
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 1;
 
 -- Retrieve Data from Foreign Table using Group By Clause.
 SELECT deptno "Department", COUNT(emp) "Total Employees" FROM emp GROUP BY deptno ORDER BY deptno;
@@ -168,18 +168,18 @@ ORDER BY ename;
 -- Retrieve Data from Foreign Table using CROSS JOIN.
 SELECT dept.dname, emp.ename
  FROM dept CROSS JOIN emp
- ORDER BY dept.deptno;
+ ORDER BY 1, 2;
 
 -- Retrieve Data from Foreign Table using INNER JOIN.
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d, emp e
  WHERE d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d INNER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 -- Retrieve Data from Foreign Table using EXCEPT.
 SELECT ename FROM emp
@@ -196,16 +196,16 @@ ORDER BY ename;
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d LEFT OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d FULL OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno, e.empno, e.sal;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 -- Retrieve Data from Foreign Table using CTE (With Clause).
 WITH dept_count AS
@@ -217,7 +217,7 @@ WITH dept_count AS
 SELECT e.ename AS Employee_Name, dc.dept_count AS "Employee in Same Dept"
  FROM   emp e, dept_count dc
  WHERE  e.deptno = dc.deptno
- ORDER BY e.deptno, e.ename;
+ ORDER BY 2, 1;
 
 WITH with_qry AS
 (
@@ -259,11 +259,13 @@ SELECT deptno, empno, sal, SUM(sal) OVER (PARTITION BY deptno)
  ORDER BY deptno, empno;
 
 SELECT deptno, empno, sal, RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
- FROM emp;
+ FROM emp
+ ORDER BY 1, 2, 3, 4;
 
 SELECT deptno, empno, sal, DENSE_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
  FROM emp
- WHERE deptno IN (10,30,40,50,60,70);
+ WHERE deptno IN (10,30,40,50,60,70)
+ ORDER BY 1, 2, 3, 4;
 
 SELECT deptno, empno, sal , MIN(sal) OVER (PARTITION BY deptno), MAX(sal) OVER (PARTITION BY deptno)
  FROM emp
@@ -365,21 +367,21 @@ INSERT INTO dept_lcl VALUES (40,'OPERATIONS','BOSTON');
 
 SELECT dept_lcl.dname, emp.ename
  FROM dept_lcl CROSS JOIN emp
- ORDER BY dept_lcl.deptno;
+ ORDER BY 1, 2;
 
 EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp.ename
  FROM dept_lcl CROSS JOIN emp
  ORDER BY dept_lcl.deptno;
 
-SELECT d.deptno,d.dname, e.empno, e.ename, e.sal, e.deptno
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept_lcl d, emp e
  WHERE d.deptno = e.deptno
- ORDER BY d.deptno, e.empno, e.sal;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept_lcl d LEFT OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno,e.empno,e.sal;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 EXPLAIN (COSTS OFF)
  SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
@@ -389,7 +391,7 @@ EXPLAIN (COSTS OFF)
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept_lcl d FULL OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno, e.empno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
 
 EXPLAIN (COSTS OFF)
  SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
@@ -437,7 +439,7 @@ VACUUM ANALYZE emp;
 --Views
 CREATE VIEW smpl_vw AS SELECT * FROM emp ORDER BY empno;
 
-SELECT * FROM smpl_vw;
+SELECT * FROM smpl_vw ORDER BY empno;
 
 CREATE VIEW comp_vw (empno, ename, job, sal, comm, deptno, dname)
 AS

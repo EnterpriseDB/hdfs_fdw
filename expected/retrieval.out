@@ -259,7 +259,7 @@ SELECT ename as "Employee Name" FROM emp ORDER BY 1;
  WARD
 (14 rows)
 
-SELECT deptno, sal, comm FROM Emp ORDER BY deptno, sal;
+SELECT deptno, sal, comm FROM Emp ORDER BY deptno, sal, comm;
  deptno | sal  | comm 
 --------+------+------
      10 | 1300 |     
@@ -334,13 +334,13 @@ SELECT * FROM emp ORDER BY empno LIMIT NULL;
   7934 | MILLER | CLERK     | 7782 | 01-23-1982 | 1300 |      |     10
 (14 rows)
 
-SELECT * FROM emp ORDER BY emp OFFSET 13;
+SELECT * FROM emp ORDER BY empno OFFSET 13;
  empno | ename  |  job  | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-------+------+------------+------+------+--------
   7934 | MILLER | CLERK | 7782 | 01-23-1982 | 1300 |      |     10
 (1 row)
 
-SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 1;
  empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+----------+------+------------+------+------+--------
   7499 | ALLEN  | SALESMAN | 7698 | 02-20-1981 | 1600 |  300 |     30
@@ -587,109 +587,109 @@ ORDER BY ename;
 -- Retrieve Data from Foreign Table using CROSS JOIN.
 SELECT dept.dname, emp.ename
  FROM dept CROSS JOIN emp
- ORDER BY dept.deptno;
+ ORDER BY 1, 2;
    dname    | ename  
 ------------+--------
- ACCOUNTING | SMITH
+ ACCOUNTING | ADAMS
  ACCOUNTING | ALLEN
- ACCOUNTING | WARD
- ACCOUNTING | JONES
- ACCOUNTING | MARTIN
  ACCOUNTING | BLAKE
  ACCOUNTING | CLARK
- ACCOUNTING | SCOTT
- ACCOUNTING | KING
- ACCOUNTING | TURNER
- ACCOUNTING | ADAMS
- ACCOUNTING | JAMES
  ACCOUNTING | FORD
+ ACCOUNTING | JAMES
+ ACCOUNTING | JONES
+ ACCOUNTING | KING
+ ACCOUNTING | MARTIN
  ACCOUNTING | MILLER
- RESEARCH   | SMITH
- RESEARCH   | ALLEN
- RESEARCH   | WARD
- RESEARCH   | JONES
- RESEARCH   | MARTIN
- RESEARCH   | BLAKE
- RESEARCH   | CLARK
- RESEARCH   | SCOTT
- RESEARCH   | KING
- RESEARCH   | TURNER
- RESEARCH   | ADAMS
- RESEARCH   | JAMES
- RESEARCH   | FORD
- RESEARCH   | MILLER
- SALES      | SMITH
- SALES      | ALLEN
- SALES      | WARD
- SALES      | JONES
- SALES      | MARTIN
- SALES      | BLAKE
- SALES      | CLARK
- SALES      | SCOTT
- SALES      | KING
- SALES      | TURNER
- SALES      | ADAMS
- SALES      | JAMES
- SALES      | FORD
- SALES      | MILLER
- OPERATIONS | SMITH
+ ACCOUNTING | SCOTT
+ ACCOUNTING | SMITH
+ ACCOUNTING | TURNER
+ ACCOUNTING | WARD
+ OPERATIONS | ADAMS
  OPERATIONS | ALLEN
- OPERATIONS | WARD
- OPERATIONS | JONES
- OPERATIONS | MARTIN
  OPERATIONS | BLAKE
  OPERATIONS | CLARK
- OPERATIONS | SCOTT
- OPERATIONS | KING
- OPERATIONS | TURNER
- OPERATIONS | ADAMS
- OPERATIONS | JAMES
  OPERATIONS | FORD
+ OPERATIONS | JAMES
+ OPERATIONS | JONES
+ OPERATIONS | KING
+ OPERATIONS | MARTIN
  OPERATIONS | MILLER
+ OPERATIONS | SCOTT
+ OPERATIONS | SMITH
+ OPERATIONS | TURNER
+ OPERATIONS | WARD
+ RESEARCH   | ADAMS
+ RESEARCH   | ALLEN
+ RESEARCH   | BLAKE
+ RESEARCH   | CLARK
+ RESEARCH   | FORD
+ RESEARCH   | JAMES
+ RESEARCH   | JONES
+ RESEARCH   | KING
+ RESEARCH   | MARTIN
+ RESEARCH   | MILLER
+ RESEARCH   | SCOTT
+ RESEARCH   | SMITH
+ RESEARCH   | TURNER
+ RESEARCH   | WARD
+ SALES      | ADAMS
+ SALES      | ALLEN
+ SALES      | BLAKE
+ SALES      | CLARK
+ SALES      | FORD
+ SALES      | JAMES
+ SALES      | JONES
+ SALES      | KING
+ SALES      | MARTIN
+ SALES      | MILLER
+ SALES      | SCOTT
+ SALES      | SMITH
+ SALES      | TURNER
+ SALES      | WARD
 (56 rows)
 
 -- Retrieve Data from Foreign Table using INNER JOIN.
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d, emp e
  WHERE d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d INNER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
@@ -732,51 +732,51 @@ ORDER BY ename;
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d LEFT OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
      40 | OPERATIONS |       |        |      |       
 (15 rows)
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d RIGHT OUTER JOIN emp e ON d.deptno=e.deptno
- ORDER BY d.deptno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
-     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
      10 | ACCOUNTING |  7839 | KING   | 5000 |     10
-     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
-     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     10 | ACCOUNTING |  7934 | MILLER | 1300 |     10
      20 | RESEARCH   |  7369 | SMITH  |  800 |     20
+     20 | RESEARCH   |  7566 | JONES  | 2975 |     20
+     20 | RESEARCH   |  7788 | SCOTT  | 3000 |     20
      20 | RESEARCH   |  7876 | ADAMS  | 1100 |     20
      20 | RESEARCH   |  7902 | FORD   | 3000 |     20
-     30 | SALES      |  7521 | WARD   | 1250 |     30
-     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7499 | ALLEN  | 1600 |     30
-     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7521 | WARD   | 1250 |     30
      30 | SALES      |  7654 | MARTIN | 1250 |     30
+     30 | SALES      |  7698 | BLAKE  | 2850 |     30
+     30 | SALES      |  7844 | TURNER | 1500 |     30
      30 | SALES      |  7900 | JAMES  |  950 |     30
 (14 rows)
 
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d FULL OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno, e.empno, e.sal;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
@@ -806,7 +806,7 @@ WITH dept_count AS
 SELECT e.ename AS Employee_Name, dc.dept_count AS "Employee in Same Dept"
  FROM   emp e, dept_count dc
  WHERE  e.deptno = dc.deptno
- ORDER BY e.deptno, e.ename;
+ ORDER BY 2, 1;
  employee_name | Employee in Same Dept 
 ---------------+-----------------------
  CLARK         |                     3
@@ -932,38 +932,40 @@ SELECT deptno, empno, sal, SUM(sal) OVER (PARTITION BY deptno)
 (14 rows)
 
 SELECT deptno, empno, sal, RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
- FROM emp;
+ FROM emp
+ ORDER BY 1, 2, 3, 4;
  deptno | empno | sal  | rank 
 --------+-------+------+------
-     10 |  7839 | 5000 |    1
      10 |  7782 | 2450 |    2
+     10 |  7839 | 5000 |    1
      10 |  7934 | 1300 |    3
-     20 |  7788 | 3000 |    1
-     20 |  7902 | 3000 |    1
-     20 |  7566 | 2975 |    3
-     20 |  7876 | 1100 |    4
      20 |  7369 |  800 |    5
-     30 |  7698 | 2850 |    1
+     20 |  7566 | 2975 |    3
+     20 |  7788 | 3000 |    1
+     20 |  7876 | 1100 |    4
+     20 |  7902 | 3000 |    1
      30 |  7499 | 1600 |    2
-     30 |  7844 | 1500 |    3
      30 |  7521 | 1250 |    4
      30 |  7654 | 1250 |    4
+     30 |  7698 | 2850 |    1
+     30 |  7844 | 1500 |    3
      30 |  7900 |  950 |    6
 (14 rows)
 
 SELECT deptno, empno, sal, DENSE_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)
  FROM emp
- WHERE deptno IN (10,30,40,50,60,70);
+ WHERE deptno IN (10,30,40,50,60,70)
+ ORDER BY 1, 2, 3, 4;
  deptno | empno | sal  | dense_rank 
 --------+-------+------+------------
-     10 |  7839 | 5000 |          1
      10 |  7782 | 2450 |          2
+     10 |  7839 | 5000 |          1
      10 |  7934 | 1300 |          3
-     30 |  7698 | 2850 |          1
      30 |  7499 | 1600 |          2
-     30 |  7844 | 1500 |          3
-     30 |  7654 | 1250 |          4
      30 |  7521 | 1250 |          4
+     30 |  7654 | 1250 |          4
+     30 |  7698 | 2850 |          1
+     30 |  7844 | 1500 |          3
      30 |  7900 |  950 |          5
 (9 rows)
 
@@ -1300,65 +1302,65 @@ INSERT INTO dept_lcl VALUES (30,'SALES','CHICAGO');
 INSERT INTO dept_lcl VALUES (40,'OPERATIONS','BOSTON');
 SELECT dept_lcl.dname, emp.ename
  FROM dept_lcl CROSS JOIN emp
- ORDER BY dept_lcl.deptno;
+ ORDER BY 1, 2;
    dname    | ename  
 ------------+--------
- ACCOUNTING | SMITH
+ ACCOUNTING | ADAMS
  ACCOUNTING | ALLEN
- ACCOUNTING | WARD
- ACCOUNTING | JONES
- ACCOUNTING | MARTIN
  ACCOUNTING | BLAKE
  ACCOUNTING | CLARK
- ACCOUNTING | SCOTT
- ACCOUNTING | KING
- ACCOUNTING | TURNER
- ACCOUNTING | ADAMS
- ACCOUNTING | JAMES
  ACCOUNTING | FORD
+ ACCOUNTING | JAMES
+ ACCOUNTING | JONES
+ ACCOUNTING | KING
+ ACCOUNTING | MARTIN
  ACCOUNTING | MILLER
- RESEARCH   | SMITH
- RESEARCH   | ALLEN
- RESEARCH   | WARD
- RESEARCH   | JONES
- RESEARCH   | MARTIN
- RESEARCH   | BLAKE
- RESEARCH   | CLARK
- RESEARCH   | SCOTT
- RESEARCH   | KING
- RESEARCH   | TURNER
- RESEARCH   | ADAMS
- RESEARCH   | JAMES
- RESEARCH   | FORD
- RESEARCH   | MILLER
- SALES      | SMITH
- SALES      | ALLEN
- SALES      | WARD
- SALES      | JONES
- SALES      | MARTIN
- SALES      | BLAKE
- SALES      | CLARK
- SALES      | SCOTT
- SALES      | KING
- SALES      | TURNER
- SALES      | ADAMS
- SALES      | JAMES
- SALES      | FORD
- SALES      | MILLER
- OPERATIONS | SMITH
+ ACCOUNTING | SCOTT
+ ACCOUNTING | SMITH
+ ACCOUNTING | TURNER
+ ACCOUNTING | WARD
+ OPERATIONS | ADAMS
  OPERATIONS | ALLEN
- OPERATIONS | WARD
- OPERATIONS | JONES
- OPERATIONS | MARTIN
  OPERATIONS | BLAKE
  OPERATIONS | CLARK
- OPERATIONS | SCOTT
- OPERATIONS | KING
- OPERATIONS | TURNER
- OPERATIONS | ADAMS
- OPERATIONS | JAMES
  OPERATIONS | FORD
+ OPERATIONS | JAMES
+ OPERATIONS | JONES
+ OPERATIONS | KING
+ OPERATIONS | MARTIN
  OPERATIONS | MILLER
+ OPERATIONS | SCOTT
+ OPERATIONS | SMITH
+ OPERATIONS | TURNER
+ OPERATIONS | WARD
+ RESEARCH   | ADAMS
+ RESEARCH   | ALLEN
+ RESEARCH   | BLAKE
+ RESEARCH   | CLARK
+ RESEARCH   | FORD
+ RESEARCH   | JAMES
+ RESEARCH   | JONES
+ RESEARCH   | KING
+ RESEARCH   | MARTIN
+ RESEARCH   | MILLER
+ RESEARCH   | SCOTT
+ RESEARCH   | SMITH
+ RESEARCH   | TURNER
+ RESEARCH   | WARD
+ SALES      | ADAMS
+ SALES      | ALLEN
+ SALES      | BLAKE
+ SALES      | CLARK
+ SALES      | FORD
+ SALES      | JAMES
+ SALES      | JONES
+ SALES      | KING
+ SALES      | MARTIN
+ SALES      | MILLER
+ SALES      | SCOTT
+ SALES      | SMITH
+ SALES      | TURNER
+ SALES      | WARD
 (56 rows)
 
 EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp.ename
@@ -1372,10 +1374,10 @@ EXPLAIN (COSTS OFF) SELECT dept_lcl.dname, emp.ename
          ->  Foreign Scan on emp
 (4 rows)
 
-SELECT d.deptno,d.dname, e.empno, e.ename, e.sal, e.deptno
+SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept_lcl d, emp e
  WHERE d.deptno = e.deptno
- ORDER BY d.deptno, e.empno, e.sal;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
@@ -1397,7 +1399,7 @@ SELECT d.deptno,d.dname, e.empno, e.ename, e.sal, e.deptno
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept_lcl d LEFT OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno,e.empno,e.sal;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
@@ -1435,7 +1437,7 @@ EXPLAIN (COSTS OFF)
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept_lcl d FULL OUTER JOIN emp e
  ON d.deptno=e.deptno
- ORDER BY d.deptno, e.empno;
+ ORDER BY 1, 2, 3, 4, 5, 6;
  deptno |   dname    | empno | ename  | sal  | deptno 
 --------+------------+-------+--------+------+--------
      10 | ACCOUNTING |  7782 | CLARK  | 2450 |     10
@@ -1568,7 +1570,7 @@ VACUUM ANALYZE emp;
 WARNING:  skipping "emp" --- cannot vacuum non-tables or special system tables
 --Views
 CREATE VIEW smpl_vw AS SELECT * FROM emp ORDER BY empno;
-SELECT * FROM smpl_vw;
+SELECT * FROM smpl_vw ORDER BY empno;
  empno | ename  |    job    | mgr  |  hiredate  | sal  | comm | deptno 
 -------+--------+-----------+------+------------+------+------+--------
   7369 | SMITH  | CLERK     | 7902 | 12-17-1980 |  800 |      |     20

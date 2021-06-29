@@ -86,7 +86,7 @@ SELECT ename FROM emp_ext WHERE empno >= 7788
 -- Data retrieval using CROSS JOIN.
 SELECT dept.dname, emp_ext.ename
  FROM dept CROSS JOIN emp_ext
- ORDER BY dept.deptno;
+ ORDER BY 1, 2;
 
 -- Data retrieval using INNER JOIN.
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
