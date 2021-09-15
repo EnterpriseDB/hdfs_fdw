@@ -14,7 +14,7 @@ CREATE USER MAPPING FOR public SERVER hdfs_server
 SELECT hdfs_fdw_version();
  hdfs_fdw_version 
 ------------------
-            20008
+            20009
 (1 row)
 
 CREATE FOREIGN TABLE dept (
