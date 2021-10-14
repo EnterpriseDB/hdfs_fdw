@@ -535,6 +535,63 @@ SELECT t1.c1, t1.phv, t2.c2, t2.phv
 
 SET enable_partitionwise_join TO off;
 
+-- FDW-389: Support enable_join_pushdown option at server level and table level.
+-- Check only boolean values are accepted.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_join_pushdown 'abc11');
+
+-- Test the option at server level.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+ALTER SERVER hdfs_server OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+-- Test the option with outer rel.
+ALTER FOREIGN TABLE emp OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+-- Test the option with inner rel.
+ALTER FOREIGN TABLE dept OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+-- Test that setting option at table level does not affect the setting at
+-- server level.
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'false');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT t1.c1, t2.c1
+  FROM test1 t1 JOIN test2 t2 ON (t1.c1 = t2.c1)
+  ORDER BY t1.c1;
+
 -- Cleanup
 DROP TABLE local_dept;
 DROP OWNED BY regress_view_owner;

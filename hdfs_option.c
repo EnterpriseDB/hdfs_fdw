@@ -56,6 +56,8 @@ static struct HDFSFdwOption valid_options[] =
 	{"connect_timeout", ForeignServerRelationId},
 	{"fetch_size", ForeignServerRelationId},
 	{"log_remote_sql", ForeignServerRelationId},
+	{"enable_join_pushdown", ForeignServerRelationId},
+	{"enable_join_pushdown", ForeignTableRelationId},
 	{NULL, InvalidOid}
 };
 
@@ -109,6 +111,9 @@ hdfs_fdw_validator(PG_FUNCTION_ARGS)
 					 errhint("Valid options in this context are: %s.",
 							 buf.len ? buf.data : "<none>")));
 		}
+
+		if (strcmp(def->defname, "enable_join_pushdown") == 0)
+			(void) defGetBoolean(def);
 	}
 
 	PG_RETURN_VOID();
@@ -156,6 +161,7 @@ hdfs_get_options(Oid foreigntableid)
 	opt->host = DEFAULT_HOST;
 	opt->port = DEFAULT_PORT;
 	opt->dbname = DEFAULT_DATABASE;
+	opt->enable_join_pushdown = true;
 
 	/* Extract options from FDW objects. */
 	f_table = GetForeignTable(foreigntableid);
@@ -163,8 +169,8 @@ hdfs_get_options(Oid foreigntableid)
 	f_mapping = GetUserMapping(GetUserId(), f_table->serverid);
 
 	options = NIL;
-	options = list_concat(options, f_table->options);
 	options = list_concat(options, f_server->options);
+	options = list_concat(options, f_table->options);
 	options = list_concat(options, f_mapping->options);
 
 	/* Set default client type to HiverServer2 and auth type to unspecified. */
@@ -230,6 +236,9 @@ hdfs_get_options(Oid foreigntableid)
 
 		if (strcmp(def->defname, "use_remote_estimate") == 0)
 			opt->use_remote_estimate = defGetBoolean(def);
+
+		if (strcmp(def->defname, "enable_join_pushdown") == 0)
+			opt->enable_join_pushdown = defGetBoolean(def);
 
 		if (strcmp(def->defname, "fetch_size") == 0)
 			opt->fetch_size = atoi(defGetString(def));

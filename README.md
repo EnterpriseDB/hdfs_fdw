@@ -93,6 +93,13 @@ be specified in options:
 	the server to use EXPLAIN commands on the remote server when estimating
 	processing costs. By default, use_remote_estimate is false, and remote
 	tables are assumed to have `1000` rows.
+  * `enable_join_pushdown`: If `true`, pushes the join between two foreign
+	tables from the same foreign server, instead of fetching all the rows
+	for both the tables and performing a join locally. This option can also
+	be set for an individual table, and if any of the tables involved in the
+	join has set it to false then the join will not be pushed down. The
+	table-level value of the option takes precedence over the server-level
+	option value. Default is `true`.
 
 When creating user mapping following options can be provided:
 
@@ -110,6 +117,8 @@ options:
 	`'default'`.
   * `table_name`: Name of the metastore table. Default is the same as
 	foreign table name.
+  * `enable_join_pushdown`: Similar to the server-level option, but can be
+	configured at table level as well. Default is `true`.
 
 
 Using HDFS FDW with Apache Hive on top of Hadoop

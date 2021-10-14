@@ -53,6 +53,7 @@ typedef struct hdfs_opt
 	int			receive_timeout;
 	int			fetch_size;
 	bool		log_remote_sql;
+	bool		enable_join_pushdown;
 } hdfs_opt;
 
 /*
@@ -118,6 +119,8 @@ typedef struct HDFSFdwRelationInfo
 	 * representing the relation.
 	 */
 	int			relation_index;
+
+	hdfs_opt   *options; /* Options applicable for this relation */
 } HDFSFdwRelationInfo;
 
 /* hdfs_option.c headers */

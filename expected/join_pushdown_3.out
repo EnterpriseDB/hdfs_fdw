@@ -1534,6 +1534,171 @@ SELECT t1.c1, t1.phv, t2.c2, t2.phv
 
 SET enable_partitionwise_join TO off;
 ERROR:  unrecognized configuration parameter "enable_partitionwise_join"
+-- FDW-389: Support enable_join_pushdown option at server level and table level.
+-- Check only boolean values are accepted.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_join_pushdown 'abc11');
+ERROR:  enable_join_pushdown requires a Boolean value
+-- Test the option at server level.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.dname, d.deptno
+                     Remote SQL: SELECT `deptno`, `dname` FROM `fdw_db`.`dept`
+(14 rows)
+
+ALTER SERVER hdfs_server OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+-- Test the option with outer rel.
+ALTER FOREIGN TABLE emp OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.dname, d.deptno
+                     Remote SQL: SELECT `deptno`, `dname` FROM `fdw_db`.`dept`
+(14 rows)
+
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+-- Test the option with inner rel.
+ALTER FOREIGN TABLE dept OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.dname, d.deptno
+                     Remote SQL: SELECT `deptno`, `dname` FROM `fdw_db`.`dept`
+(14 rows)
+
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+-- Test that setting option at table level does not affect the setting at
+-- server level.
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'false');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.dname, d.deptno
+                     Remote SQL: SELECT `deptno`, `dname` FROM `fdw_db`.`dept`
+(14 rows)
+
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT t1.c1, t2.c1
+  FROM test1 t1 JOIN test2 t2 ON (t1.c1 = t2.c1)
+  ORDER BY t1.c1;
+                                                            QUERY PLAN                                                            
+----------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: t1.c1, t2.c1
+   Sort Key: t1.c1
+   ->  Foreign Scan
+         Output: t1.c1, t2.c1
+         Relations: (fdw_db.test1 t1) INNER JOIN (fdw_db.test2 t2)
+         Remote SQL: SELECT r1.`c1`, r2.`c1` FROM (`fdw_db`.`test1` r1 INNER JOIN `fdw_db`.`test2` r2 ON (((r1.`c1` = r2.`c1`))))
+(7 rows)
+
 -- Cleanup
 DROP TABLE local_dept;
 DROP OWNED BY regress_view_owner;

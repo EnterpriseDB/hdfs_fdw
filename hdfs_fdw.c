@@ -459,6 +459,9 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 
 	fpinfo->rows = baserel->tuples = baserel->rows;
 
+	/* Also store the options in fpinfo for further use */
+	fpinfo->options = options;
+
 	/*
 	 * Set the name of relation in fpinfo, while we are constructing it here.
 	 * It will be used to build the string describing the join relation in
@@ -1214,13 +1217,26 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 		jointype != JOIN_RIGHT && jointype != JOIN_FULL)
 		return false;
 
+	fpinfo = (HDFSFdwRelationInfo *) joinrel->fdw_private;
+	fpinfo_o = (HDFSFdwRelationInfo *) outerrel->fdw_private;
+	fpinfo_i = (HDFSFdwRelationInfo *) innerrel->fdw_private;
+
+	/* If join pushdown is not enabled, honor it. */
+#if PG_VERSION_NUM >= 100000
+	if ((!IS_JOIN_REL(outerrel) && !fpinfo_o->options->enable_join_pushdown) ||
+		(!IS_JOIN_REL(innerrel) && !fpinfo_i->options->enable_join_pushdown))
+#else
+	if ((outerrel->reloptkind != RELOPT_JOINREL &&
+		 !fpinfo_o->options->enable_join_pushdown) ||
+		(innerrel->reloptkind != RELOPT_JOINREL &&
+		 !fpinfo_i->options->enable_join_pushdown))
+#endif
+		return false;
+
 	/*
 	 * If either of the joining relations is marked as unsafe to pushdown, the
 	 * join can not be pushed down.
 	 */
-	fpinfo = (HDFSFdwRelationInfo *) joinrel->fdw_private;
-	fpinfo_o = (HDFSFdwRelationInfo *) outerrel->fdw_private;
-	fpinfo_i = (HDFSFdwRelationInfo *) innerrel->fdw_private;
 	if (!fpinfo_o || !fpinfo_o->pushdown_safe ||
 		!fpinfo_i || !fpinfo_i->pushdown_safe)
 		return false;
