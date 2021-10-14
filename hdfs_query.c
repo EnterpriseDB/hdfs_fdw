@@ -123,12 +123,12 @@ hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
  * 		Sends analyze query to remote server to compute the statistics.
  */
 void
-hdfs_analyze(int con_index, hdfs_opt *opt)
+hdfs_analyze(int con_index, hdfs_opt *opt, Relation rel)
 {
 	StringInfoData sql;
 
 	initStringInfo(&sql);
-	hdfs_deparse_analyze(&sql, opt);
+	hdfs_deparse_analyze(&sql, rel);
 
 	if (opt->client_type == SPARKSERVER)
 		hdfs_query_execute(con_index, opt, sql.data);
@@ -144,13 +144,13 @@ hdfs_analyze(int con_index, hdfs_opt *opt)
  * 		the total size of the data in remote table.
  */
 double
-hdfs_describe(int con_index, hdfs_opt *opt)
+hdfs_describe(int con_index, hdfs_opt *opt, Relation rel)
 {
 	double		row_count = 0;
 	StringInfoData sql;
 
 	initStringInfo(&sql);
-	hdfs_deparse_describe(&sql, opt);
+	hdfs_deparse_describe(&sql, rel);
 	hdfs_query_execute(con_index, opt, sql.data);
 
 	/*

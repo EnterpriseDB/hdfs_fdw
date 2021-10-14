@@ -18,6 +18,7 @@
 #include "access/xact.h"
 #include "commands/explain.h"
 #include "foreign/fdwapi.h"
+#include "funcapi.h"
 #include "hdfs_fdw.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -28,6 +29,7 @@
 #else
 #include "optimizer/var.h"
 #endif
+#include "parser/parsetree.h"
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -46,6 +48,22 @@ PG_MODULE_MAGIC;
  */
 #define CODE_VERSION   20009
 
+/*
+ * Indexes of FDW-private information stored in fdw_private lists.
+ *
+ * These items are indexed with the enum hdfsFdwScanPrivateIndex, so an item
+ * can be fetched with list_nth().  For example, to get the SELECT statement:
+ *		sql = strVal(list_nth(fdw_private, hdfsFdwScanPrivateSelectSql));
+ */
+enum hdfsFdwScanPrivateIndex
+{
+	/* SQL statement to execute remotely (as a String node) */
+	hdfsFdwScanPrivateSelectSql,
+
+	/* Integer list of attribute numbers retrieved by the SELECT */
+	hdfsFdwScanPrivateRetrievedAttrs,
+};
+
 typedef struct hdfsFdwExecutionState
 {
 	char	   *query;
@@ -61,6 +79,7 @@ typedef struct hdfsFdwExecutionState
 	Oid		   *param_types;	/* type of query parameters */
 
 	int			rescan_count;	/* number of times a foreign scan is restarted */
+	AttInMetadata *attinmeta;
 } hdfsFdwExecutionState;
 
 extern void _PG_init(void);
@@ -376,7 +395,7 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 #if PG_VERSION_NUM >= 90500
 static ForeignScan *
 hdfsGetForeignPlan(PlannerInfo *root,
-				   RelOptInfo *baserel,
+				   RelOptInfo *foreignrel,
 				   Oid foreigntableid,
 				   ForeignPath *best_path,
 				   List *tlist,
@@ -385,14 +404,14 @@ hdfsGetForeignPlan(PlannerInfo *root,
 #else
 static ForeignScan *
 hdfsGetForeignPlan(PlannerInfo *root,
-				   RelOptInfo *baserel,
+				   RelOptInfo *foreignrel,
 				   Oid foreigntableid,
 				   ForeignPath *best_path,
 				   List *tlist,
 				   List *scan_clauses)
 #endif
 {
-	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) baserel->fdw_private;
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
 	List	   *fdw_private;
 	List	   *remote_conds = NIL;
 	List	   *remote_exprs = NIL;
@@ -401,10 +420,6 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	List	   *retrieved_attrs;
 	StringInfoData sql;
 	ListCell   *lc;
-	hdfs_opt   *options;
-
-	/* Get the options */
-	options = hdfs_get_options(foreigntableid);
 
 	/*
 	 * Separate the scan_clauses into those that can be executed remotely and
@@ -437,7 +452,7 @@ hdfsGetForeignPlan(PlannerInfo *root,
 		}
 		else if (list_member_ptr(fpinfo->local_conds, rinfo))
 			local_exprs = lappend(local_exprs, rinfo->clause);
-		else if (hdfs_is_foreign_expr(root, baserel, rinfo->clause))
+		else if (hdfs_is_foreign_expr(root, foreignrel, rinfo->clause))
 		{
 			remote_conds = lappend(remote_conds, rinfo);
 			remote_exprs = lappend(remote_exprs, rinfo->clause);
@@ -451,11 +466,8 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	 * expressions to be sent as parameters.
 	 */
 	initStringInfo(&sql);
-	hdfs_deparse_select(options, &sql, root, baserel, fpinfo->attrs_used,
-						&retrieved_attrs);
-	if (remote_conds)
-		hdfs_append_where_clause(options, &sql, root, baserel, remote_conds,
-								 true, &params_list);
+	hdfs_deparse_select_stmt_for_rel(&sql, root, foreignrel, remote_conds,
+									 &retrieved_attrs, &params_list);
 
 	/* Build the fdw_private list that will be available to the executor. */
 	fdw_private = list_make2(makeString(sql.data),
@@ -471,7 +483,7 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	 */
 	return make_foreignscan(tlist,
 							local_exprs,
-							baserel->relid,
+							foreignrel->relid,
 							params_list,
 							fdw_private
 #if PG_VERSION_NUM >= 90500
@@ -489,6 +501,8 @@ hdfsGetForeignPlan(PlannerInfo *root,
 static void
 hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 {
+	TupleTableSlot *tupleSlot = node->ss.ss_ScanTupleSlot;
+	TupleDesc	tupleDescriptor = tupleSlot->tts_tupleDescriptor;
 	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
 	hdfsFdwExecutionState *festate;
 	Oid			foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
@@ -511,9 +525,12 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 #endif
 
 	festate->query_executed = false;
-	festate->query = strVal(list_nth(fsplan->fdw_private, 0));
-	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private, 1);
+	festate->query = strVal(list_nth(fsplan->fdw_private,
+									 hdfsFdwScanPrivateSelectSql));
+	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private,
+											hdfsFdwScanPrivateRetrievedAttrs);
 	festate->rescan_count = 0;
+	festate->attinmeta = TupleDescGetAttInMetadata(tupleDescriptor);
 
 	/*
 	 * Prepare for processing of parameters used in remote query, if any.
@@ -537,13 +554,16 @@ hdfsIterateForeignScan(ForeignScanState *node)
 {
 	Datum	   *values;
 	bool	   *nulls;
+	int			natts;
 	hdfs_opt   *options;
 	Oid			foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	hdfsFdwExecutionState *festate = (hdfsFdwExecutionState *) node->fdw_state;
-	TupleDesc	tupdesc = node->ss.ss_currentRelation->rd_att;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
 	MemoryContext oldcontext;
 	ExprContext *econtext = node->ss.ps.ps_ExprContext;
+	AttInMetadata *attinmeta = festate->attinmeta;
+
+	natts = attinmeta->tupdesc->natts;
 
 	ExecClearTuple(slot);
 
@@ -553,11 +573,11 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	MemoryContextReset(festate->batch_cxt);
 	oldcontext = MemoryContextSwitchTo(festate->batch_cxt);
 
-	values = (Datum *) palloc0(tupdesc->natts * sizeof(Datum));
-	nulls = (bool *) palloc(tupdesc->natts * sizeof(bool));
+	values = (Datum *) palloc0(natts * sizeof(Datum));
+	nulls = (bool *) palloc(natts * sizeof(bool));
 
 	/* Initialize to nulls for any columns not present in result */
-	memset(nulls, true, tupdesc->natts * sizeof(bool));
+	memset(nulls, true, natts * sizeof(bool));
 
 	if (!festate->query_executed)
 	{
@@ -581,8 +601,8 @@ hdfsIterateForeignScan(ForeignScanState *node)
 		{
 			bool		isnull = true;
 			int			attnum = lfirst_int(lc) - 1;
-			Oid			pgtype = TupleDescAttr(tupdesc, attnum)->atttypid;
-			int32		pgtypmod = TupleDescAttr(tupdesc, attnum)->atttypmod;
+			Oid			pgtype = TupleDescAttr(attinmeta->tupdesc, attnum)->atttypid;
+			int32		pgtypmod = TupleDescAttr(attinmeta->tupdesc, attnum)->atttypmod;
 			Datum		v;
 
 			v = hdfs_get_value(festate->con_index, options, pgtype,
@@ -596,7 +616,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 			attid++;
 		}
 
-		tuple = heap_form_tuple(tupdesc, values, nulls);
+		tuple = heap_form_tuple(attinmeta->tupdesc, values, nulls);
 
 #if PG_VERSION_NUM < 120000
 		ExecStoreTuple(tuple, slot, InvalidBuffer, true);
@@ -661,7 +681,7 @@ hdfsExplainForeignScan(ForeignScanState *node, ExplainState *es)
 		char	   *sql;
 
 		fdw_private = ((ForeignScan *) node->ss.ps.plan)->fdw_private;
-		sql = strVal(list_nth(fdw_private, 0));
+		sql = strVal(list_nth(fdw_private, hdfsFdwScanPrivateSelectSql));
 		ExplainPropertyText("Remote SQL", sql, es);
 	}
 }
@@ -697,8 +717,8 @@ hdfsAnalyzeForeignTable(Relation relation, AcquireSampleRowsFunc *func,
 	/* Connect to HIVE server */
 	con_index = GetConnection(options, foreigntableid);
 
-	hdfs_analyze(con_index, options);
-	totalsize = hdfs_describe(con_index, options);
+	hdfs_analyze(con_index, options, relation);
+	totalsize = hdfs_describe(con_index, options, relation);
 
 	*totalpages = totalsize / BLCKSZ;
 	return true;

@@ -24,6 +24,12 @@
 #endif
 #include "utils/rel.h"
 
+/*
+ * Default database name if, the dbname option is not provided either in
+ * connection or table options.
+ */
+#define DEFAULT_DATABASE "default"
+
 /* Options structure to store the HDFS server information */
 typedef struct hdfs_opt
 {
@@ -83,28 +89,24 @@ extern int hdfs_get_connection(ForeignServer *server, hdfs_opt *opt);
 extern void hdfs_rel_connection(int con_index);
 
 /* hdfs_deparse.c headers */
-extern void hdfs_deparse_select(hdfs_opt *opt, StringInfo buf,
-								PlannerInfo *root, RelOptInfo *baserel,
-								Bitmapset *attrs_used,
-								List **retrieved_attrs);
-extern void hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
-									 PlannerInfo *root, RelOptInfo *baserel,
-									 List *exprs, bool is_first,
-									 List **params);
+extern void hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
+											 RelOptInfo *rel, List *remote_conds,
+											 List **retrieved_attrs,
+											 List **params_list);
 extern void hdfs_classify_conditions(PlannerInfo *root, RelOptInfo *baserel,
 									 List *input_conds, List **remote_conds,
 									 List **local_conds);
 extern bool hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel,
 								 Expr *expr);
-extern void hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt);
+extern void hdfs_deparse_describe(StringInfo buf, Relation rel);
 extern void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf);
-extern void hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt);
+extern void hdfs_deparse_analyze(StringInfo buf, Relation rel);
 
 /* hdfs_query.c headers */
 extern double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 							RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
-extern double hdfs_describe(int con_index, hdfs_opt *opt);
-extern void hdfs_analyze(int con_index, hdfs_opt *opt);
+extern double hdfs_describe(int con_index, hdfs_opt *opt, Relation rel);
+extern void hdfs_analyze(int con_index, hdfs_opt *opt, Relation rel);
 
 /* hdfs_client.c headers */
 extern int hdfs_get_column_count(int con_index);

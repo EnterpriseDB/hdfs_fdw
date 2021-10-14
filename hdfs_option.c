@@ -24,7 +24,6 @@
 #include "utils/lsyscache.h"
 
 /* Default connection parameters */
-#define DEFAULT_DATABASE "default"
 #define DEFAULT_HOST "localhost"
 #define DEFAULT_PORT 10000
 

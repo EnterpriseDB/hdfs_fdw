@@ -95,7 +95,7 @@ static void hdfs_deparse_target_list(StringInfo buf,
 static char *hdfs_quote_identifier(const char *str, char quotechar);
 static void hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
 									PlannerInfo *root);
-static void hdfs_deparse_relation(hdfs_opt *opt, StringInfo buf);
+static void hdfs_deparse_relation(StringInfo buf, Relation rel);
 static void hdfs_deparse_expr(Expr *expr, deparse_expr_cxt *context);
 static void hdfs_deparse_var(Var *node, deparse_expr_cxt *context);
 static void hdfs_deparse_const(Const *node, deparse_expr_cxt *context);
@@ -123,6 +123,9 @@ static void hdfs_deparse_array_expr(ArrayExpr *node,
 static void hdfs_deparse_string_literal(StringInfo buf, const char *val);
 static void hdfs_print_remote_param(deparse_expr_cxt *context);
 static void hdfs_print_remote_placeholder(deparse_expr_cxt *context);
+static void hdfs_append_conditions(List *exprs, deparse_expr_cxt *context);
+static void hdfs_deparse_select_sql(List **retrieved_attrs,
+									deparse_expr_cxt *context);
 
 
 /*
@@ -456,7 +459,8 @@ void
 hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf)
 {
 	appendStringInfo(buf, "EXPLAIN SELECT * FROM ");
-	hdfs_deparse_relation(opt, buf);
+	appendStringInfo(buf, "%s.%s", hdfs_quote_identifier(opt->dbname, '`'),
+					 hdfs_quote_identifier(opt->table_name, '`'));
 
 	/*
 	 * For accurate row counts we should append where clauses with the
@@ -470,38 +474,77 @@ hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf)
 }
 
 void
-hdfs_deparse_describe(StringInfo buf, hdfs_opt *opt)
+hdfs_deparse_describe(StringInfo buf, Relation rel)
 {
 	appendStringInfo(buf, "DESCRIBE FORMATTED ");
-	hdfs_deparse_relation(opt, buf);
+	hdfs_deparse_relation(buf, rel);
 }
 
 void
-hdfs_deparse_analyze(StringInfo buf, hdfs_opt *opt)
+hdfs_deparse_analyze(StringInfo buf, Relation rel)
 {
 	appendStringInfo(buf, "ANALYZE TABLE ");
-	hdfs_deparse_relation(opt, buf);
+	hdfs_deparse_relation(buf, rel);
 	appendStringInfo(buf, " COMPUTE STATISTICS");
 }
 
 /*
- * Construct a simple SELECT statement that retrieves desired columns
- * of the specified foreign table, and append it to "buf".  The output
- * contains just "SELECT ... FROM tablename".
+ * hdfs_deparse_select_stmt_for_rel
+ * 		Deparse SELECT statement for given relation into buf.
+ *
+ * remote_conds is the list of conditions to be deparsed into the WHERE clause.
+ *
+ * If params_list is not NULL, it receives a list of Params and other-relation
+ * Vars used in the clauses; these values must be transmitted to the remote
+ * server as parameter values.
+ *
+ * List of columns selected is returned in retrieved_attrs.
+ */
+void
+hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
+								 RelOptInfo *rel, List *remote_conds,
+								 List **retrieved_attrs,
+								 List **params_list)
+{
+	deparse_expr_cxt context;
+
+	/* Fill portions of context common to base relation */
+	context.buf = buf;
+	context.root = root;
+	context.foreignrel = rel;
+	context.params_list = params_list;
+
+	/* Construct SELECT clause and FROM clause */
+	hdfs_deparse_select_sql(retrieved_attrs, &context);
+
+	/* Construct WHERE clause */
+	if (remote_conds != NIL)
+	{
+		appendStringInfoString(buf, " WHERE ");
+		hdfs_append_conditions(remote_conds, &context);
+	}
+}
+
+/*
+ * hdfs_deparse_select_sql
+ * 			Construct a simple SELECT statement that retrieves desired columns
+ * 			of the specified foreign table, and append it to "buf".  The output
+ * 			contains just "SELECT ... FROM tablename".
  *
  * We also create an integer List of the columns being retrieved, which is
  * returned to *retrieved_attrs.
  */
-void
-hdfs_deparse_select(hdfs_opt *opt,
-					StringInfo buf,
-					PlannerInfo *root,
-					RelOptInfo *baserel,
-					Bitmapset *attrs_used,
-					List **retrieved_attrs)
+static void
+hdfs_deparse_select_sql(List **retrieved_attrs, deparse_expr_cxt *context)
 {
-	RangeTblEntry *rte = planner_rt_fetch(baserel->relid, root);
+	StringInfo	buf = context->buf;
+	RelOptInfo *foreignrel = context->foreignrel;
+	PlannerInfo *root = context->root;
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
+	RangeTblEntry *rte = planner_rt_fetch(foreignrel->relid, root);
 	Relation	rel;
+
+	appendStringInfoString(buf, "SELECT ");
 
 	/*
 	 * Core code already has some lock on each rel being planned, so we can
@@ -514,19 +557,61 @@ hdfs_deparse_select(hdfs_opt *opt,
 #endif
 
 	/* Construct SELECT list */
-	appendStringInfoString(buf, "SELECT ");
-	hdfs_deparse_target_list(buf, root, baserel->relid, rel, attrs_used,
-							 retrieved_attrs);
+	hdfs_deparse_target_list(buf, root, foreignrel->relid, rel,
+							 fpinfo->attrs_used, retrieved_attrs);
 
 	/* Construct FROM clause */
 	appendStringInfoString(buf, " FROM ");
-	hdfs_deparse_relation(opt, buf);
+	hdfs_deparse_relation(buf, rel);
 
 #if PG_VERSION_NUM < 130000
 	heap_close(rel, NoLock);
 #else
 	table_close(rel, NoLock);
 #endif
+}
+
+/*
+ * hdfs_append_conditions
+ * 		Deparse conditions from the provided list and append them to buf.
+ *
+ * The conditions in the list are assumed to be ANDed.
+ *
+ * Depending on the caller, the list elements might be either RestrictInfos
+ * or bare clauses.
+ */
+static void
+hdfs_append_conditions(List *exprs, deparse_expr_cxt *context)
+{
+	ListCell   *lc;
+	bool		is_first = true;
+	StringInfo	buf = context->buf;
+
+	foreach(lc, exprs)
+	{
+		Expr	   *expr = (Expr *) lfirst(lc);
+
+		/*
+		 * Extract clause from RestrictInfo, if required. See comments in
+		 * declaration of HDFSFdwRelationInfo for details.
+		 */
+		if (IsA(expr, RestrictInfo))
+		{
+			RestrictInfo *ri = (RestrictInfo *) expr;
+
+			expr = ri->clause;
+		}
+
+		/* Connect expressions with "AND" and parenthesize each condition. */
+		if (!is_first)
+			appendStringInfoString(buf, " AND ");
+
+		appendStringInfoChar(buf, '(');
+		hdfs_deparse_expr(expr, context);
+		appendStringInfoChar(buf, ')');
+
+		is_first = false;
+	}
 }
 
 /*
@@ -590,58 +675,6 @@ hdfs_deparse_target_list(StringInfo buf,
 	/* Don't generate bad syntax if no undropped columns */
 	if (first && !have_wholerow)
 		appendStringInfoString(buf, "NULL");
-}
-
-/*
- * Deparse WHERE clauses in given list of RestrictInfos and append them to buf.
- *
- * baserel is the foreign table we're planning for.
- *
- * If no WHERE clause already exists in the buffer, is_first should be true.
- *
- * If params is not NULL, it receives a list of Params and other-relation Vars
- * used in the clauses; these values must be transmitted to the remote server
- * as parameter values.
- *
- * If params is NULL, we're generating the query for EXPLAIN purposes,
- * so Params and other-relation Vars should be replaced by dummy values.
- */
-void
-hdfs_append_where_clause(hdfs_opt *opt, StringInfo buf,
-						 PlannerInfo *root,
-						 RelOptInfo *baserel,
-						 List *exprs,
-						 bool is_first,
-						 List **params)
-{
-	deparse_expr_cxt context;
-	ListCell   *lc;
-
-	if (params)
-		*params = NIL;			/* initialize result list to empty */
-
-	/* Set up context struct for recursion */
-	context.root = root;
-	context.foreignrel = baserel;
-	context.buf = buf;
-	context.params_list = params;
-
-	foreach(lc, exprs)
-	{
-		RestrictInfo *ri = (RestrictInfo *) lfirst(lc);
-
-		/* Connect expressions with "AND" and parenthesize each condition. */
-		if (is_first)
-			appendStringInfoString(buf, " WHERE ");
-		else
-			appendStringInfoString(buf, " AND ");
-
-		appendStringInfoChar(buf, '(');
-		hdfs_deparse_expr(ri->clause, &context);
-		appendStringInfoChar(buf, ')');
-
-		is_first = false;
-	}
 }
 
 static char *
@@ -713,11 +746,44 @@ hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
 	appendStringInfoString(buf, hdfs_quote_identifier(colname, '`'));
 }
 
+/*
+ * hdfs_deparse_relation
+ *			Append remote name of specified foreign table to buf.
+ *
+ * Use value of table_name FDW option (if any) instead of relation's name.
+ * Similarly, dbname FDW option overrides database name.
+ */
 static void
-hdfs_deparse_relation(hdfs_opt *opt, StringInfo buf)
+hdfs_deparse_relation(StringInfo buf, Relation rel)
 {
-	appendStringInfo(buf, "%s.%s", hdfs_quote_identifier(opt->dbname, '`'),
-					 hdfs_quote_identifier(opt->table_name, '`'));
+	ForeignTable *table;
+	const char *dbname = NULL;
+	const char *relname = NULL;
+	ListCell   *lc;
+
+	/* Obtain additional catalog information. */
+	table = GetForeignTable(RelationGetRelid(rel));
+
+	/*
+	 * Use value of FDW options if any, instead of the name of object itself.
+	 */
+	foreach(lc, table->options)
+	{
+		DefElem    *def = (DefElem *) lfirst(lc);
+
+		if (strcmp(def->defname, "dbname") == 0)
+			dbname = defGetString(def);
+		else if (strcmp(def->defname, "table_name") == 0)
+			relname = defGetString(def);
+	}
+
+	if (dbname == NULL)
+		dbname = DEFAULT_DATABASE;
+	if (relname == NULL)
+		relname = RelationGetRelationName(rel);
+
+	appendStringInfo(buf, "%s.%s", hdfs_quote_identifier(dbname, '`'),
+					 hdfs_quote_identifier(relname, '`'));
 }
 
 /*
