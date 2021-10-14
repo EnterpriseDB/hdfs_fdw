@@ -44,6 +44,13 @@ typedef struct foreign_glob_cxt
 {
 	PlannerInfo *root;			/* global planner state */
 	RelOptInfo *foreignrel;		/* the foreign relation we are planning for */
+
+	/*
+	 * For join pushdown, only a limited set of operators are allowed to be
+	 * pushed.  This flag helps us identify if we are walking through the list
+	 * of join conditions.
+	 */
+	bool		is_join_cond;	/* true for join relations */
 } foreign_glob_cxt;
 
 /*
@@ -74,6 +81,13 @@ typedef struct deparse_expr_cxt
 	List	  **params_list;	/* exprs that will become remote Params */
 } deparse_expr_cxt;
 
+#define REL_ALIAS_PREFIX	"r"
+/* Handy macro to add relation name qualification */
+#define ADD_REL_QUALIFIER(buf, varno)	\
+	appendStringInfo((buf), "%s%d.", REL_ALIAS_PREFIX, (varno))
+#define SUBQUERY_REL_ALIAS_PREFIX	"s"
+#define SUBQUERY_COL_ALIAS_PREFIX	"c"
+
 /*
  * Functions to determine whether an expression can be evaluated safely on
  * remote server.
@@ -94,7 +108,7 @@ static void hdfs_deparse_target_list(StringInfo buf,
 									 List **retrieved_attrs);
 static char *hdfs_quote_identifier(const char *str, char quotechar);
 static void hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
-									PlannerInfo *root);
+									PlannerInfo *root, bool qualify_col);
 static void hdfs_deparse_relation(StringInfo buf, Relation rel);
 static void hdfs_deparse_expr(Expr *expr, deparse_expr_cxt *context);
 static void hdfs_deparse_var(Var *node, deparse_expr_cxt *context);
@@ -124,9 +138,29 @@ static void hdfs_deparse_string_literal(StringInfo buf, const char *val);
 static void hdfs_print_remote_param(deparse_expr_cxt *context);
 static void hdfs_print_remote_placeholder(deparse_expr_cxt *context);
 static void hdfs_append_conditions(List *exprs, deparse_expr_cxt *context);
-static void hdfs_deparse_select_sql(List **retrieved_attrs,
+static void hdfs_deparse_select_sql(List *tlist, bool is_subquery,
+									List **retrieved_attrs,
 									deparse_expr_cxt *context);
+static void hdfs_deparse_from_expr(StringInfo buf, PlannerInfo *root,
+								   RelOptInfo *foreignrel, bool use_alias,
+								   List **params_list);
+static void hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
+									 RelOptInfo *foreignrel, bool make_subquery,
+									 List **params_list);
+static void hdfs_deparse_explicit_target_list(List *tlist,
+											  List **retrieved_attrs,
+											  deparse_expr_cxt *context);
+static void hdfs_deparse_subquery_target_list(deparse_expr_cxt *context);
 
+/*
+ * Helper functions
+ */
+static bool hdfs_is_subquery_var(Var *node, RelOptInfo *foreignrel,
+								 int *relno, int *colno,
+								 deparse_expr_cxt *context);
+static void hdfs_get_relation_column_alias_ids(Var *node, RelOptInfo *foreignrel,
+											   int *relno, int *colno,
+											   deparse_expr_cxt *context);
 
 /*
  * Examine each qual clause in input_conds, and classify them into two groups,
@@ -150,7 +184,7 @@ hdfs_classify_conditions(PlannerInfo *root,
 	{
 		RestrictInfo *ri = (RestrictInfo *) lfirst(lc);
 
-		if (hdfs_is_foreign_expr(root, baserel, ri->clause))
+		if (hdfs_is_foreign_expr(root, baserel, ri->clause, false))
 			*remote_conds = lappend(*remote_conds, ri);
 		else
 			*local_conds = lappend(*local_conds, ri);
@@ -161,9 +195,8 @@ hdfs_classify_conditions(PlannerInfo *root,
  * Returns true if given expr is safe to evaluate on the foreign server.
  */
 bool
-hdfs_is_foreign_expr(PlannerInfo *root,
-					 RelOptInfo *baserel,
-					 Expr *expr)
+hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr,
+					 bool is_join_cond)
 {
 	foreign_glob_cxt glob_cxt;
 	foreign_loc_cxt loc_cxt;
@@ -174,6 +207,7 @@ hdfs_is_foreign_expr(PlannerInfo *root,
 	 */
 	glob_cxt.root = root;
 	glob_cxt.foreignrel = baserel;
+	glob_cxt.is_join_cond = is_join_cond;
 	loc_cxt.collation = InvalidOid;
 	loc_cxt.state = FDW_COLLATE_NONE;
 	if (!hdfs_foreign_expr_walker((Node *) expr, &glob_cxt, &loc_cxt))
@@ -274,6 +308,10 @@ hdfs_foreign_expr_walker(Node *node,
 			{
 				SubscriptingRef *sbref = (SubscriptingRef *) node;;
 
+				/* Should not be in the join clauses of the Join-pushdown */
+				if (glob_cxt->is_join_cond)
+					return false;
+
 				/* Assignment should not be in restrictions. */
 				if (sbref->refassgnexpr != NULL)
 					return false;
@@ -299,6 +337,10 @@ hdfs_foreign_expr_walker(Node *node,
 			{
 				FuncExpr   *fe = (FuncExpr *) node;
 
+				/* Should not be in the join clauses of the Join-pushdown */
+				if (glob_cxt->is_join_cond)
+					return false;
+
 				/*
 				 * If function used by the expression is not built-in, it
 				 * can't be sent to remote because it might have incompatible
@@ -319,6 +361,24 @@ hdfs_foreign_expr_walker(Node *node,
 		case T_DistinctExpr:	/* struct-equivalent to OpExpr */
 			{
 				OpExpr	   *oe = (OpExpr *) node;
+				const char *operatorName = get_opname(oe->opno);
+
+				/*
+				 * Join-pushdown allows only a few operators to be pushed down.
+				 */
+				if (glob_cxt->is_join_cond &&
+					(!(strcmp(operatorName, "<") == 0 ||
+					   strcmp(operatorName, ">") == 0 ||
+					   strcmp(operatorName, "<=") == 0 ||
+					   strcmp(operatorName, ">=") == 0 ||
+					   strcmp(operatorName, "<>") == 0 ||
+					   strcmp(operatorName, "=") == 0 ||
+					   strcmp(operatorName, "+") == 0 ||
+					   strcmp(operatorName, "-") == 0 ||
+					   strcmp(operatorName, "*") == 0 ||
+					   strcmp(operatorName, "%") == 0 ||
+					   strcmp(operatorName, "/") == 0)))
+					return false;
 
 				/*
 				 * Similarly, only built-in operators can be sent to remote.
@@ -339,6 +399,10 @@ hdfs_foreign_expr_walker(Node *node,
 		case T_ScalarArrayOpExpr:
 			{
 				ScalarArrayOpExpr *oe = (ScalarArrayOpExpr *) node;
+
+				/* Should not be in the join clauses of the Join-pushdown */
+				if (glob_cxt->is_join_cond)
+					return false;
 
 				/*
 				 * Again, only built-in operators can be sent to remote.
@@ -393,6 +457,10 @@ hdfs_foreign_expr_walker(Node *node,
 		case T_ArrayExpr:
 			{
 				ArrayExpr  *a = (ArrayExpr *) node;
+
+				/* Should not be in the join clauses of the Join-pushdown */
+				if (glob_cxt->is_join_cond)
+					return false;
 
 				/*
 				 * Recurse to input subexpressions.
@@ -492,21 +560,38 @@ hdfs_deparse_analyze(StringInfo buf, Relation rel)
  * hdfs_deparse_select_stmt_for_rel
  * 		Deparse SELECT statement for given relation into buf.
  *
+ * tlist contains the list of desired columns to be fetched from foreign
+ * server.  For a base relation fpinfo->attrs_used is used to construct
+ * SELECT clause, hence the tlist is ignored for a base relation.
+ *
  * remote_conds is the list of conditions to be deparsed into the WHERE clause.
  *
  * If params_list is not NULL, it receives a list of Params and other-relation
  * Vars used in the clauses; these values must be transmitted to the remote
  * server as parameter values.
  *
+ * is_subquery is the flag to indicate whether to deparse the specified
+ * relation as a subquery.
+ *
  * List of columns selected is returned in retrieved_attrs.
  */
 void
 hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
-								 RelOptInfo *rel, List *remote_conds,
+								 RelOptInfo *rel, List *tlist,
+								 List *remote_conds, bool is_subquery,
 								 List **retrieved_attrs,
 								 List **params_list)
 {
 	deparse_expr_cxt context;
+
+	/* We handle relations for foreign tables and joins between those */
+#if PG_VERSION_NUM >= 100000
+	Assert(IS_JOIN_REL(rel) || IS_SIMPLE_REL(rel));
+#else
+	Assert(rel->reloptkind == RELOPT_JOINREL ||
+		   rel->reloptkind == RELOPT_BASEREL ||
+		   rel->reloptkind == RELOPT_OTHER_MEMBER_REL);
+#endif
 
 	/* Fill portions of context common to base relation */
 	context.buf = buf;
@@ -515,7 +600,7 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 	context.params_list = params_list;
 
 	/* Construct SELECT clause and FROM clause */
-	hdfs_deparse_select_sql(retrieved_attrs, &context);
+	hdfs_deparse_select_sql(tlist, is_subquery, retrieved_attrs, &context);
 
 	/* Construct WHERE clause */
 	if (remote_conds != NIL)
@@ -532,43 +617,176 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
  * 			contains just "SELECT ... FROM tablename".
  *
  * We also create an integer List of the columns being retrieved, which is
- * returned to *retrieved_attrs.
+ * returned to *retrieved_attrs, unless we deparse the specified relation
+ * as a subquery.
+ *
+ * tlist is the list of desired columns. is_subquery is the flag to
+ * indicate whether to deparse the specified relation as a subquery.
+ * Read prologue of deparseSelectStmtForRel() for details.
  */
 static void
-hdfs_deparse_select_sql(List **retrieved_attrs, deparse_expr_cxt *context)
+hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
+						deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 	RelOptInfo *foreignrel = context->foreignrel;
 	PlannerInfo *root = context->root;
-	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
-	RangeTblEntry *rte = planner_rt_fetch(foreignrel->relid, root);
-	Relation	rel;
 
 	appendStringInfoString(buf, "SELECT ");
 
-	/*
-	 * Core code already has some lock on each rel being planned, so we can
-	 * use NoLock here.
-	 */
-#if PG_VERSION_NUM < 130000
-	rel = heap_open(rte->relid, NoLock);
+	if (is_subquery)
+	{
+		/*
+		 * For a relation that is deparsed as a subquery, emit expressions
+		 * specified in the relation's reltarget.  Note that since this is for
+		 * the subquery, no need to care about *retrieved_attrs.
+		 */
+		hdfs_deparse_subquery_target_list(context);
+
+		appendStringInfoString(buf, " FROM ");
+
+		hdfs_deparse_from_expr(buf, root, foreignrel, true,
+							   context->params_list);
+	}
+#if PG_VERSION_NUM >= 100000
+	else if (IS_JOIN_REL(foreignrel))
 #else
-	rel = table_open(rte->relid, NoLock);
+	else if (foreignrel->reloptkind == RELOPT_JOINREL)
+#endif
+	{
+		/* For a join relation use the input tlist */
+		hdfs_deparse_explicit_target_list(tlist, retrieved_attrs, context);
+
+		/* Construct FROM clause */
+		appendStringInfoString(buf, " FROM ");
+		hdfs_deparse_from_expr(buf, root, foreignrel, true,
+							   context->params_list);
+	}
+	else
+	{
+		HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
+		RangeTblEntry *rte = planner_rt_fetch(foreignrel->relid, root);
+		Relation	rel;
+
+		/*
+		 * Core code already has some lock on each rel being planned, so we can
+		 * use NoLock here.
+		 */
+#if PG_VERSION_NUM < 130000
+		rel = heap_open(rte->relid, NoLock);
+#else
+		rel = table_open(rte->relid, NoLock);
 #endif
 
-	/* Construct SELECT list */
-	hdfs_deparse_target_list(buf, root, foreignrel->relid, rel,
-							 fpinfo->attrs_used, retrieved_attrs);
+		/* Construct target list */
+		hdfs_deparse_target_list(buf, root, foreignrel->relid, rel,
+								 fpinfo->attrs_used, retrieved_attrs);
 
-	/* Construct FROM clause */
-	appendStringInfoString(buf, " FROM ");
-	hdfs_deparse_relation(buf, rel);
+		/* Construct FROM clause */
+		appendStringInfoString(buf, " FROM ");
+		hdfs_deparse_relation(buf, rel);
 
 #if PG_VERSION_NUM < 130000
-	heap_close(rel, NoLock);
+		heap_close(rel, NoLock);
 #else
-	table_close(rel, NoLock);
+		table_close(rel, NoLock);
 #endif
+	}
+}
+
+/*
+ * hdfs_deparse_explicit_target_list
+ * 		Deparse given targetlist and append it to context->buf.
+ *
+ * retrieved_attrs is the list of continuously increasing integers starting
+ * from 1. It has same number of entries as tlist.
+ */
+static void
+hdfs_deparse_explicit_target_list(List *tlist, List **retrieved_attrs,
+								  deparse_expr_cxt *context)
+{
+	ListCell   *lc;
+	StringInfo	buf = context->buf;
+	int			i = 0;
+
+	*retrieved_attrs = NIL;
+
+	foreach(lc, tlist)
+	{
+		Var		   *var;
+
+		var = (Var *) lfirst(lc);
+		/* We expect only Var nodes here */
+		Assert(IsA(var, Var));
+
+		if (i > 0)
+			appendStringInfoString(buf, ", ");
+		hdfs_deparse_var(var, context);
+
+		*retrieved_attrs = lappend_int(*retrieved_attrs, i + 1);
+
+		i++;
+	}
+
+	if (i == 0)
+		appendStringInfoString(buf, "NULL");
+}
+
+/*
+ * hdfs_deparse_subquery_target_list
+ *
+ * Emit expressions specified in the given relation's reltarget.
+ *
+ * This is used for deparsing the given relation as a subquery.
+ */
+static void
+hdfs_deparse_subquery_target_list(deparse_expr_cxt *context)
+{
+	StringInfo	buf = context->buf;
+	RelOptInfo *foreignrel = context->foreignrel;
+	bool		first;
+	ListCell   *lc;
+	int			i;
+	List	   *scan_var_list = NIL;
+	List	   *whole_row_lists = NIL;
+
+
+	/* Should only be called in these cases. */
+#if PG_VERSION_NUM >= 100000
+	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
+#else
+	Assert(foreignrel->reloptkind == RELOPT_JOINREL ||
+		   foreignrel->reloptkind == RELOPT_BASEREL ||
+		   foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
+#endif
+
+	scan_var_list = pull_var_clause((Node *) foreignrel->reltarget->exprs,
+									PVC_RECURSE_PLACEHOLDERS);
+	scan_var_list = hdfs_adjust_whole_row_ref(context->root, scan_var_list,
+											  &whole_row_lists,
+											  foreignrel->relids);
+
+	first = true;
+	i = 1;
+	foreach(lc, scan_var_list)
+	{
+		Node	   *node = (Node *) lfirst(lc);
+
+		if (!first)
+			appendStringInfo(buf, " %s%d, ", SUBQUERY_COL_ALIAS_PREFIX, i++);
+		first = false;
+
+		hdfs_deparse_expr((Expr *) node, context);
+	}
+
+	/* Don't generate bad syntax if no expressions */
+	if (first)
+		appendStringInfoString(buf, "NULL");
+	else
+	{
+		/* Append the column alias for the last expression */
+		appendStringInfo(buf, " %s%d", SUBQUERY_COL_ALIAS_PREFIX, i++);
+	}
 }
 
 /*
@@ -665,7 +883,7 @@ hdfs_deparse_target_list(StringInfo buf,
 					appendStringInfoString(buf, ", ");
 
 				first = false;
-				hdfs_deparse_column_ref(buf, rtindex, i, root);
+				hdfs_deparse_column_ref(buf, rtindex, i, root, false);
 			}
 
 			*retrieved_attrs = lappend_int(*retrieved_attrs, i);
@@ -703,7 +921,7 @@ hdfs_quote_identifier(const char *str, char quotechar)
  */
 static void
 hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
-						PlannerInfo *root)
+						PlannerInfo *root, bool qualify_col)
 {
 	RangeTblEntry *rte;
 	char	   *colname = NULL;
@@ -743,7 +961,179 @@ hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
 		colname = get_relid_attribute_name(rte->relid, varattno);
 #endif
 
+	if (qualify_col)
+		ADD_REL_QUALIFIER(buf, varno);
+
 	appendStringInfoString(buf, hdfs_quote_identifier(colname, '`'));
+}
+
+/*
+ * hdfs_deparse_from_expr
+ * 		Construct a FROM clause
+ */
+static void
+hdfs_deparse_from_expr(StringInfo buf, PlannerInfo *root,
+					   RelOptInfo *foreignrel, bool use_alias,
+					   List **params_list)
+{
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
+
+#if PG_VERSION_NUM >= 100000
+	if (IS_JOIN_REL(foreignrel))
+#else
+	if (foreignrel->reloptkind == RELOPT_JOINREL)
+#endif
+	{
+		RelOptInfo *rel_o = fpinfo->outerrel;
+		RelOptInfo *rel_i = fpinfo->innerrel;
+		StringInfoData join_sql_o;
+		StringInfoData join_sql_i;
+
+		/* Deparse outer relation */
+		initStringInfo(&join_sql_o);
+		hdfs_deparse_rangeTblRef(&join_sql_o, root, rel_o,
+								 fpinfo->make_outerrel_subquery, params_list);
+
+		/* Deparse inner relation */
+		initStringInfo(&join_sql_i);
+		hdfs_deparse_rangeTblRef(&join_sql_i, root, rel_i,
+								 fpinfo->make_innerrel_subquery, params_list);
+
+		/*
+		 * For a join relation FROM clause entry is deparsed as
+		 *
+		 * ((outer relation) <join type> (inner relation) ON (joinclauses)
+		 */
+		appendStringInfo(buf, "(%s %s JOIN %s ON ", join_sql_o.data,
+						 hdfs_get_jointype_name(fpinfo->jointype),
+						 join_sql_i.data);
+
+		/* Append join clause; (TRUE) if no join clause */
+		if (fpinfo->joinclauses)
+		{
+			deparse_expr_cxt context;
+
+			context.buf = buf;
+			context.foreignrel = foreignrel;
+			context.root = root;
+			context.params_list = params_list;
+
+			appendStringInfo(buf, "(");
+			hdfs_append_conditions(fpinfo->joinclauses, &context);
+			appendStringInfo(buf, ")");
+		}
+		else
+			appendStringInfoString(buf, "(TRUE)");
+
+		/* End the FROM clause entry. */
+		appendStringInfo(buf, ")");
+	}
+	else
+	{
+		RangeTblEntry *rte = planner_rt_fetch(foreignrel->relid, root);
+
+		/*
+		 * Core code already has some lock on each rel being planned, so we
+		 * can use NoLock here.
+		 */
+#if PG_VERSION_NUM < 130000
+		Relation	rel = heap_open(rte->relid, NoLock);
+#else
+		Relation	rel = table_open(rte->relid, NoLock);
+#endif
+
+		hdfs_deparse_relation(buf, rel);
+
+		/*
+		 * Add a unique alias to avoid any conflict in relation names due to
+		 * pulled up subqueries in the query being built for a pushed down
+		 * join.
+		 */
+		if (use_alias)
+			appendStringInfo(buf, " %s%d", REL_ALIAS_PREFIX,
+							 foreignrel->relid);
+
+#if PG_VERSION_NUM < 130000
+		heap_close(rel, NoLock);
+#else
+		table_close(rel, NoLock);
+#endif
+	}
+	return;
+}
+
+/*
+ * hdfs_deparse_rangeTblRef
+ *
+ * Append FROM clause entry for the given relation into buf.
+ */
+static void
+hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
+						 RelOptInfo *foreignrel, bool make_subquery,
+						 List **params_list)
+{
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
+
+	/* Should only be called in these cases. */
+#if PG_VERSION_NUM >= 100000
+	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
+#else
+	Assert(foreignrel->reloptkind == RELOPT_JOINREL ||
+		   foreignrel->reloptkind == RELOPT_BASEREL ||
+		   foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
+#endif
+
+	Assert(fpinfo->local_conds == NIL);
+
+	/* If make_subquery is true, deparse the relation as a subquery. */
+	if (make_subquery)
+	{
+		List	   *retrieved_attrs;
+		int			ncols;
+
+		/* Deparse the subquery representing the relation. */
+		appendStringInfoChar(buf, '(');
+		hdfs_deparse_select_stmt_for_rel(buf, root, foreignrel, NIL,
+										 fpinfo->remote_conds, true,
+										 &retrieved_attrs, params_list);
+		appendStringInfoChar(buf, ')');
+
+		/* Append the relation alias. */
+		appendStringInfo(buf, " %s%d", SUBQUERY_REL_ALIAS_PREFIX,
+						 fpinfo->relation_index);
+	}
+	else
+		hdfs_deparse_from_expr(buf, root, foreignrel, true, params_list);
+}
+
+/*
+ * hdfs_get_jointype_name
+ * 		Output join name for given join type
+ */
+const char *
+hdfs_get_jointype_name(JoinType jointype)
+{
+	switch (jointype)
+	{
+		case JOIN_INNER:
+			return "INNER";
+
+		case JOIN_LEFT:
+			return "LEFT";
+
+		case JOIN_RIGHT:
+			return "RIGHT";
+
+		case JOIN_FULL:
+			return "FULL";
+
+		default:
+			/* Shouldn't come here, but protect from buggy code. */
+			elog(ERROR, "unsupported join type %d", jointype);
+	}
+
+	/* Keep compiler happy */
+	return NULL;
 }
 
 /*
@@ -898,14 +1288,31 @@ hdfs_deparse_expr(Expr *node, deparse_expr_cxt *context)
 static void
 hdfs_deparse_var(Var *node, deparse_expr_cxt *context)
 {
-	StringInfo	buf = context->buf;
+	Relids		relids = context->foreignrel->relids;
+	bool		qualify_col;
+	int			relno;
+	int			colno;
 
-	if (node->varno == context->foreignrel->relid &&
-		node->varlevelsup == 0)
+	qualify_col = (bms_membership(relids) == BMS_MULTIPLE);
+
+	/*
+	 * If the Var belongs to the foreign relation that is deparsed as a
+	 * subquery, use the relation and column alias to the Var provided
+	 * by the subquery, instead of the remote name.
+	 */
+	if (hdfs_is_subquery_var(node, context->foreignrel, &relno, &colno, context))
+	{
+		appendStringInfo(context->buf, "%s%d.%s%d",
+						 SUBQUERY_REL_ALIAS_PREFIX, relno,
+						 SUBQUERY_COL_ALIAS_PREFIX, colno);
+		return;
+	}
+
+	if (bms_is_member(node->varno, relids) && node->varlevelsup == 0)
 	{
 		/* Var belongs to foreign table */
-		hdfs_deparse_column_ref(buf, node->varno, node->varattno,
-								context->root);
+		hdfs_deparse_column_ref(context->buf, node->varno, node->varattno,
+								context->root, qualify_col);
 	}
 	else
 	{
@@ -1498,4 +1905,124 @@ static void
 hdfs_print_remote_placeholder(deparse_expr_cxt *context)
 {
 	appendStringInfoString(context->buf, "(SELECT null)");
+}
+
+/*
+ * hdfs_is_subquery_var
+ *
+ * Returns true if given Var is deparsed as a subquery output column, in
+ * which case, *relno and *colno are set to the IDs for the relation and
+ * column alias to the Var provided by the subquery.
+ */
+static bool
+hdfs_is_subquery_var(Var *node, RelOptInfo *foreignrel, int *relno, int *colno,
+					 deparse_expr_cxt *context)
+{
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
+	RelOptInfo *outerrel = fpinfo->outerrel;
+	RelOptInfo *innerrel = fpinfo->innerrel;
+
+	/* Should only be called in these cases. */
+#if PG_VERSION_NUM >= 100000
+	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
+#else
+	Assert(foreignrel->reloptkind == RELOPT_JOINREL ||
+		   foreignrel->reloptkind == RELOPT_BASEREL ||
+		   foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
+#endif
+
+	/*
+	 * If the given relation isn't a join relation, it doesn't have any lower
+	 * subqueries, so the Var isn't a subquery output column.
+	 */
+#if PG_VERSION_NUM >= 100000
+	if (!IS_JOIN_REL(foreignrel))
+#else
+	if (foreignrel->reloptkind != RELOPT_JOINREL)
+#endif
+		return false;
+
+	/*
+	 * If the Var doesn't belong to any lower subqueries, it isn't a subquery
+	 * output column.
+	 */
+	if (!bms_is_member(node->varno, fpinfo->lower_subquery_rels))
+		return false;
+
+	if (bms_is_member(node->varno, outerrel->relids))
+	{
+		/*
+		 * If outer relation is deparsed as a subquery, the Var is an output
+		 * column of the subquery; get the IDs for the relation/column alias.
+		 */
+		if (fpinfo->make_outerrel_subquery)
+		{
+			hdfs_get_relation_column_alias_ids(node, outerrel, relno, colno,
+											   context);
+			return true;
+		}
+
+		/* Otherwise, recurse into the outer relation. */
+		return hdfs_is_subquery_var(node, outerrel, relno, colno, context);
+	}
+	else
+	{
+		Assert(bms_is_member(node->varno, innerrel->relids));
+
+		/*
+		 * If inner relation is deparsed as a subquery, the Var is an output
+		 * column of the subquery; get the IDs for the relation/column alias.
+		 */
+		if (fpinfo->make_innerrel_subquery)
+		{
+			hdfs_get_relation_column_alias_ids(node, innerrel, relno, colno,
+											   context);
+			return true;
+		}
+
+		/* Otherwise, recurse into the inner relation. */
+		return hdfs_is_subquery_var(node, innerrel, relno, colno, context);
+	}
+}
+
+/*
+ * hdfs_get_relation_column_alias_ids
+ *
+ * Get the IDs for the relation and column alias to given Var belonging to
+ * given relation, which are returned into *relno and *colno.
+ */
+static void
+hdfs_get_relation_column_alias_ids(Var *node, RelOptInfo *foreignrel,
+								   int *relno, int *colno,
+								   deparse_expr_cxt *context)
+{
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
+	int			i;
+	ListCell   *lc;
+	List	   *scan_var_list = NIL;
+	List	   *whole_row_lists = NIL;
+
+	scan_var_list = pull_var_clause((Node *) foreignrel->reltarget->exprs,
+									PVC_RECURSE_PLACEHOLDERS);
+
+	scan_var_list = hdfs_adjust_whole_row_ref(context->root, scan_var_list,
+											  &whole_row_lists,
+											  foreignrel->relids);
+	/* Get the relation alias ID */
+	*relno = fpinfo->relation_index;
+
+	/* Get the column alias ID */
+	i = 1;
+	foreach(lc, scan_var_list)
+	{
+		if (equal(lfirst(lc), (Node *) node))
+		{
+			*colno = i;
+			return;
+		}
+		i++;
+	}
+
+	/* Shouldn't get here */
+	elog(ERROR, "unexpected expression in subquery output");
 }

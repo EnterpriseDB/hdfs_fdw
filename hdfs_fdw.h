@@ -30,6 +30,13 @@
  */
 #define DEFAULT_DATABASE "default"
 
+/* Macro for list API backporting. */
+#if PG_VERSION_NUM < 130000
+	#define hdfs_list_concat(l1, l2) list_concat(l1, list_copy(l2))
+#else
+	#define hdfs_list_concat(l1, l2) list_concat((l1), (l2))
+#endif
+
 /* Options structure to store the HDFS server information */
 typedef struct hdfs_opt
 {
@@ -54,6 +61,12 @@ typedef struct hdfs_opt
  */
 typedef struct HDFSFdwRelationInfo
 {
+	/*
+	 * True means that the relation can be pushed down. Always true for simple
+	 * foreign scan.
+	 */
+	bool		pushdown_safe;
+
 	/* baserestrictinfo clauses, broken down into safe and unsafe subsets. */
 	List	   *remote_conds;
 	List	   *local_conds;
@@ -79,6 +92,32 @@ typedef struct HDFSFdwRelationInfo
 	ForeignTable *table;
 	ForeignServer *server;
 	UserMapping *user;			/* only set in use_remote_estimate mode */
+
+	/*
+	 * Name of the relation while EXPLAINing ForeignScan. It is used for join
+	 * relations but is set for all relations. For join relation, the name
+	 * indicates which foreign tables are being joined and the join type used.
+	 */
+	StringInfo	relation_name;
+
+	/* Join information */
+	RelOptInfo *outerrel;
+	RelOptInfo *innerrel;
+	JoinType	jointype;
+	List	   *joinclauses;
+
+	/* Subquery information */
+	bool		make_outerrel_subquery; /* do we deparse outerrel as a
+										 * subquery? */
+	bool		make_innerrel_subquery; /* do we deparse innerrel as a
+										 * subquery? */
+	Relids		lower_subquery_rels;	/* all relids appearing in lower
+										 * subqueries */
+	/*
+	 * Index of the relation.  It is used to create an alias to a subquery
+	 * representing the relation.
+	 */
+	int			relation_index;
 } HDFSFdwRelationInfo;
 
 /* hdfs_option.c headers */
@@ -90,14 +129,16 @@ extern void hdfs_rel_connection(int con_index);
 
 /* hdfs_deparse.c headers */
 extern void hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
-											 RelOptInfo *rel, List *remote_conds,
+											 RelOptInfo *rel, List *tlist,
+											 List *remote_conds,
+											 bool is_subquery,
 											 List **retrieved_attrs,
 											 List **params_list);
 extern void hdfs_classify_conditions(PlannerInfo *root, RelOptInfo *baserel,
 									 List *input_conds, List **remote_conds,
 									 List **local_conds);
 extern bool hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel,
-								 Expr *expr);
+								 Expr *expr, bool is_join_cond);
 extern void hdfs_deparse_describe(StringInfo buf, Relation rel);
 extern void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf);
 extern void hdfs_deparse_analyze(StringInfo buf, Relation rel);
@@ -107,6 +148,7 @@ extern double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 							RelOptInfo *baserel, HDFSFdwRelationInfo *fpinfo);
 extern double hdfs_describe(int con_index, hdfs_opt *opt, Relation rel);
 extern void hdfs_analyze(int con_index, hdfs_opt *opt, Relation rel);
+extern const char *hdfs_get_jointype_name(JoinType jointype);
 
 /* hdfs_client.c headers */
 extern int hdfs_get_column_count(int con_index);
@@ -123,6 +165,11 @@ extern void hdfs_close_result_set(int con_index);
 extern bool hdfs_bind_var(int con_index, int param_index, Oid type,
 						  Datum value, bool *isnull);
 
+/* hdfs_fdw.c headers */
+extern List *hdfs_adjust_whole_row_ref(PlannerInfo *root,
+									   List *scan_var_list,
+									   List **whole_row_lists,
+									   Bitmapset *relids);
 #ifndef TupleDescAttr
 #define TupleDescAttr(tupdesc, i) ((tupdesc)->attrs[(i)])
 #endif
