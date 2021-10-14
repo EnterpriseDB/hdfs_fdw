@@ -1,0 +1,1522 @@
+-- Connection Settings.
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
+\c contrib_regression
+CREATE EXTENSION hdfs_fdw;
+-- Create Hadoop FDW Server. log_remote_sql 'true' is required to setup logging
+-- for Remote SQL Sent to Hive Server.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', auth_type :AUTH_TYPE);
+CREATE SERVER hdfs_server1 FOREIGN DATA WRAPPER hdfs_fdw
+  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', auth_type :AUTH_TYPE);
+-- Create Hadoop USER MAPPING.
+CREATE USER MAPPING FOR public SERVER hdfs_server
+  OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+CREATE USER MAPPING FOR public SERVER hdfs_server1
+  OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+-- Create Foreign Tables.
+CREATE FOREIGN TABLE dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+CREATE FOREIGN TABLE dept_1 (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_server1 OPTIONS (dbname 'fdw_db', table_name 'dept');
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        pg_catalog.DATE,
+    sal             INTEGER,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+CREATE FOREIGN TABLE jobhist
+(
+    empno           INTEGER,
+    startdate       pg_catalog.DATE,
+    enddate         pg_catalog.DATE,
+    job             VARCHAR(9),
+    sal             FLOAT,
+    comm            FLOAT,
+    deptno          INTEGER,
+    chgdesc         VARCHAR(80)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'jobhist');
+CREATE FOREIGN TABLE test1
+(
+	c1			INTEGER,
+	c2			INTEGER,
+	c3			VARCHAR(10)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test1');
+CREATE FOREIGN TABLE test2
+(
+	c1			INTEGER,
+	c2			INTEGER,
+	c3			VARCHAR(10)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test2');
+CREATE FOREIGN TABLE test3
+(
+	c1			INTEGER,
+	c2			INTEGER,
+	c3			VARCHAR(10)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test3');
+CREATE FOREIGN TABLE test4
+(
+	c1			INTEGER,
+	c2			INTEGER,
+	c3			VARCHAR(10)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test4');
+SET enable_mergejoin TO off;
+SET enable_hashjoin TO off;
+SET enable_sort TO off;
+-- Create a local table for further testing.
+CREATE TABLE local_dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+);
+INSERT INTO local_dept VALUES (10, 'ACCOUNTING', 'NEW YORK'), (20, 'RESEARCH', 'DALLAS');
+-- Test INNER JOIN push-down
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+ empno | ename  |   dname    
+-------+--------+------------
+  7369 | SMITH  | RESEARCH
+  7499 | ALLEN  | SALES
+  7521 | WARD   | SALES
+  7566 | JONES  | RESEARCH
+  7654 | MARTIN | SALES
+  7698 | BLAKE  | SALES
+  7782 | CLARK  | ACCOUNTING
+  7788 | SCOTT  | RESEARCH
+  7839 | KING   | ACCOUNTING
+  7844 | TURNER | SALES
+  7876 | ADAMS  | RESEARCH
+  7900 | JAMES  | SALES
+  7902 | FORD   | RESEARCH
+  7934 | MILLER | ACCOUNTING
+(14 rows)
+
+-- Test LEFT OUTER JOIN push-down
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e LEFT JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) LEFT JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 LEFT JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT e.empno, e.ename, d.dname
+  FROM emp e LEFT JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+ empno | ename  |   dname    
+-------+--------+------------
+  7369 | SMITH  | RESEARCH
+  7499 | ALLEN  | SALES
+  7521 | WARD   | SALES
+  7566 | JONES  | RESEARCH
+  7654 | MARTIN | SALES
+  7698 | BLAKE  | SALES
+  7782 | CLARK  | ACCOUNTING
+  7788 | SCOTT  | RESEARCH
+  7839 | KING   | ACCOUNTING
+  7844 | TURNER | SALES
+  7876 | ADAMS  | RESEARCH
+  7900 | JAMES  | SALES
+  7902 | FORD   | RESEARCH
+  7934 | MILLER | ACCOUNTING
+(14 rows)
+
+-- Test RIGHT OUTER JOIN push-down
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e RIGHT JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.dept d) LEFT JOIN (fdw_db.emp e)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`dept` r2 LEFT JOIN `fdw_db`.`emp` r1 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT e.empno, e.ename, d.dname
+  FROM emp e RIGHT JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+ empno | ename  |   dname    
+-------+--------+------------
+  7369 | SMITH  | RESEARCH
+  7499 | ALLEN  | SALES
+  7521 | WARD   | SALES
+  7566 | JONES  | RESEARCH
+  7654 | MARTIN | SALES
+  7698 | BLAKE  | SALES
+  7782 | CLARK  | ACCOUNTING
+  7788 | SCOTT  | RESEARCH
+  7839 | KING   | ACCOUNTING
+  7844 | TURNER | SALES
+  7876 | ADAMS  | RESEARCH
+  7900 | JAMES  | SALES
+  7902 | FORD   | RESEARCH
+  7934 | MILLER | ACCOUNTING
+       |        | OPERATIONS
+(15 rows)
+
+-- Test FULL OUTER JOIN push-down
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e FULL JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) FULL JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 FULL JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT e.empno, e.ename, d.dname
+  FROM emp e FULL JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+ empno | ename  |   dname    
+-------+--------+------------
+  7369 | SMITH  | RESEARCH
+  7499 | ALLEN  | SALES
+  7521 | WARD   | SALES
+  7566 | JONES  | RESEARCH
+  7654 | MARTIN | SALES
+  7698 | BLAKE  | SALES
+  7782 | CLARK  | ACCOUNTING
+  7788 | SCOTT  | RESEARCH
+  7839 | KING   | ACCOUNTING
+  7844 | TURNER | SALES
+  7876 | ADAMS  | RESEARCH
+  7900 | JAMES  | SALES
+  7902 | FORD   | RESEARCH
+  7934 | MILLER | ACCOUNTING
+       |        | OPERATIONS
+(15 rows)
+
+-- Full outer join with restrictions on the joining relations
+-- a. the joining relations are both base relations
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.empno, t2.empno
+  FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t1 FULL JOIN
+    (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t2
+    ON (t1.empno = t2.empno)
+  ORDER BY 1, 2;
+                                                                                                                                         QUERY PLAN                                                                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: emp.empno, jobhist.empno
+   Sort Key: emp.empno, jobhist.empno
+   ->  Foreign Scan
+         Output: emp.empno, jobhist.empno
+         Relations: (fdw_db.emp) FULL JOIN (fdw_db.jobhist)
+         Remote SQL: SELECT s4.c1, s5.c1 FROM ((SELECT `empno` c1 FROM `fdw_db`.`emp` r4 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s4 FULL JOIN (SELECT `empno` c1 FROM `fdw_db`.`jobhist` r5 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s5 ON (((s4.c1 = s5.c1))))
+(7 rows)
+
+SELECT t1.empno, t2.empno
+  FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t1 FULL JOIN
+    (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t2
+    ON (t1.empno = t2.empno)
+  ORDER BY 1, 2;
+ empno | empno 
+-------+-------
+  7521 |  7521
+  7566 |  7566
+  7654 |  7654
+  7698 |  7698
+  7782 |  7782
+  7788 |  7788
+  7788 |  7788
+  7788 |  7788
+(8 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT 1
+  FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t1 FULL JOIN
+    (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t2
+    ON (TRUE);
+                                                                                                                      QUERY PLAN                                                                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: 1
+   Relations: (fdw_db.emp) FULL JOIN (fdw_db.jobhist)
+   Remote SQL: SELECT NULL FROM ((SELECT NULL FROM `fdw_db`.`emp` r4 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s4 FULL JOIN (SELECT NULL FROM `fdw_db`.`jobhist` r5 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s5 ON (TRUE))
+(4 rows)
+
+SELECT 1
+  FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t1 FULL JOIN
+    (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t2
+    ON (TRUE)
+  OFFSET 10 LIMIT 10;
+ ?column? 
+----------
+        1
+        1
+        1
+        1
+        1
+        1
+        1
+        1
+        1
+        1
+(10 rows)
+
+-- b. one of the joining relations is a base relation and the other is a join
+-- relation
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.empno, ss.a, ss.b
+  FROM (SELECT empno FROM emp WHERE empno between 7500 and 7800) t1 FULL JOIN
+    (SELECT t2.empno, t3.empno FROM emp t2 LEFT JOIN jobhist t3
+      ON (t2.empno = t3.empno) WHERE (t2.empno between 7500 and 7800)) ss (a, b)
+    ON (t1.empno = ss.a)
+  ORDER BY t1.empno, ss.a, ss.b;
+                                                                                                                                                                                        QUERY PLAN                                                                                                                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: emp.empno, t2.empno, t3.empno
+   Sort Key: emp.empno, t2.empno, t3.empno
+   ->  Foreign Scan
+         Output: emp.empno, t2.empno, t3.empno
+         Relations: (fdw_db.emp) FULL JOIN ((fdw_db.emp t2) LEFT JOIN (fdw_db.jobhist t3))
+         Remote SQL: SELECT s4.c1, s8.c1, s8.c2 FROM ((SELECT `empno` c1 FROM `fdw_db`.`emp` r4 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s4 FULL JOIN (SELECT r5.`empno` c1, r6.`empno` c2 FROM (`fdw_db`.`emp` r5 LEFT JOIN `fdw_db`.`jobhist` r6 ON (((r5.`empno` = r6.`empno`)))) WHERE ((r5.`empno` >= '7500')) AND ((r5.`empno` <= '7800'))) s8 ON (((s4.c1 = s8.c1))))
+(7 rows)
+
+SELECT t1.empno, ss.a, ss.b
+  FROM (SELECT empno FROM emp WHERE empno between 7500 and 7800) t1 FULL JOIN
+    (SELECT t2.empno, t3.empno FROM emp t2 LEFT JOIN jobhist t3
+      ON (t2.empno = t3.empno) WHERE (t2.empno between 7500 and 7800)) ss (a, b)
+    ON (t1.empno = ss.a)
+  ORDER BY t1.empno, ss.a, ss.b;
+ empno |  a   |  b   
+-------+------+------
+  7521 | 7521 | 7521
+  7566 | 7566 | 7566
+  7654 | 7654 | 7654
+  7698 | 7698 | 7698
+  7782 | 7782 | 7782
+  7788 | 7788 | 7788
+  7788 | 7788 | 7788
+  7788 | 7788 | 7788
+(8 rows)
+
+-- c. test deparsing the remote query as nested subqueries
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.empno, ss.a, ss.b
+  FROM (SELECT empno FROM emp WHERE empno between 7500 and 7800) t1 FULL JOIN
+    (SELECT t2.empno, t3.empno
+      FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t2 FULL JOIN
+       (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t3
+	  ON (t2.empno = t3.empno) WHERE t2.empno IS NULL OR t2.empno IS NOT NULL) ss(a, b)
+  ON (t1.empno = ss.a)
+  ORDER BY t1.empno, ss.a, ss.b;
+                                                                                                                                                                                                                                                             QUERY PLAN                                                                                                                                                                                                                                                             
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: emp.empno, emp_1.empno, jobhist.empno
+   Sort Key: emp.empno, emp_1.empno, jobhist.empno
+   ->  Foreign Scan
+         Output: emp.empno, emp_1.empno, jobhist.empno
+         Relations: (fdw_db.emp) FULL JOIN ((fdw_db.emp) FULL JOIN (fdw_db.jobhist))
+         Remote SQL: SELECT s4.c1, s10.c1, s10.c2 FROM ((SELECT `empno` c1 FROM `fdw_db`.`emp` r4 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s4 FULL JOIN (SELECT s8.c1 c1, s9.c1 c2 FROM ((SELECT `empno` c1 FROM `fdw_db`.`emp` r8 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s8 FULL JOIN (SELECT `empno` c1 FROM `fdw_db`.`jobhist` r9 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s9 ON (((s8.c1 = s9.c1)))) WHERE (((s8.c1 IS NULL) OR (s8.c1 IS NOT NULL)))) s10 ON (((s4.c1 = s10.c1))))
+(7 rows)
+
+SELECT t1.empno, ss.a, ss.b
+  FROM (SELECT empno FROM emp WHERE empno between 7500 and 7800) t1 FULL JOIN
+    (SELECT t2.empno, t3.empno
+      FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t2 FULL JOIN
+       (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t3
+	  ON (t2.empno = t3.empno) WHERE t2.empno IS NULL OR t2.empno IS NOT NULL) ss(a, b)
+  ON (t1.empno = ss.a)
+  ORDER BY t1.empno, ss.a, ss.b;
+ empno |  a   |  b   
+-------+------+------
+  7521 | 7521 | 7521
+  7566 | 7566 | 7566
+  7654 | 7654 | 7654
+  7698 | 7698 | 7698
+  7782 | 7782 | 7782
+  7788 | 7788 | 7788
+  7788 | 7788 | 7788
+  7788 | 7788 | 7788
+(8 rows)
+
+-- d. test deparsing rowmarked relations as subqueries
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.deptno, ss.a, ss.b
+  FROM (SELECT deptno FROM local_dept WHERE deptno = 10) t1 INNER JOIN
+    (SELECT t2.empno, t3.empno
+      FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t2 FULL JOIN
+       (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t3
+      ON (t2.empno = t3.empno) WHERE t2.empno IS NULL OR t2.empno IS NOT NULL) ss(a, b)
+  ON (TRUE)
+  ORDER BY t1.deptno, ss.a, ss.b
+  FOR UPDATE OF t1;
+                                                                                                                                                                                                                                                                                                             QUERY PLAN                                                                                                                                                                                                                                                                                                              
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ LockRows
+   Output: local_dept.deptno, emp.empno, jobhist.empno, local_dept.ctid, emp.*, jobhist.*
+   ->  Sort
+         Output: local_dept.deptno, emp.empno, jobhist.empno, local_dept.ctid, emp.*, jobhist.*
+         Sort Key: emp.empno, jobhist.empno
+         ->  Nested Loop
+               Output: local_dept.deptno, emp.empno, jobhist.empno, local_dept.ctid, emp.*, jobhist.*
+               ->  Foreign Scan
+                     Output: emp.empno, emp.*, jobhist.empno, jobhist.*
+                     Relations: (fdw_db.emp) FULL JOIN (fdw_db.jobhist)
+                     Remote SQL: SELECT s8.c1, s8.c2, s8.c3, s8.c4, s8.c5, s8.c6, s8.c7, s8.c8, s9.c1, s9.c2, s9.c3, s9.c4, s9.c5, s9.c6, s9.c7, s9.c8 FROM ((SELECT `empno` c1, `ename` c2, `job` c3, `mgr` c4, `hiredate` c5, `sal` c6, `comm` c7, `deptno` c8 FROM `fdw_db`.`emp` r8 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s8 FULL JOIN (SELECT `empno` c1, `startdate` c2, `enddate` c3, `job` c4, `sal` c5, `comm` c6, `deptno` c7, `chgdesc` c8 FROM `fdw_db`.`jobhist` r9 WHERE ((`empno` >= '7500')) AND ((`empno` <= '7800'))) s9 ON (((s8.c1 = s9.c1)))) WHERE (((s8.c1 IS NULL) OR (s8.c1 IS NOT NULL)))
+               ->  Materialize
+                     Output: local_dept.deptno, local_dept.ctid
+                     ->  Seq Scan on public.local_dept
+                           Output: local_dept.deptno, local_dept.ctid
+                           Filter: (local_dept.deptno = 10)
+(16 rows)
+
+SELECT t1.deptno, ss.a, ss.b
+  FROM (SELECT deptno FROM local_dept WHERE deptno = 10) t1 INNER JOIN
+    (SELECT t2.empno, t3.empno
+      FROM (SELECT empno FROM emp WHERE empno BETWEEN 7500 AND 7800) t2 FULL JOIN
+       (SELECT empno FROM jobhist WHERE empno BETWEEN 7500 AND 7800) t3
+      ON (t2.empno = t3.empno) WHERE t2.empno IS NULL OR t2.empno IS NOT NULL) ss(a, b)
+  ON (TRUE)
+  ORDER BY t1.deptno, ss.a, ss.b
+  FOR UPDATE OF t1;
+ deptno |  a   |  b   
+--------+------+------
+     10 | 7521 | 7521
+     10 | 7566 | 7566
+     10 | 7654 | 7654
+     10 | 7698 | 7698
+     10 | 7782 | 7782
+     10 | 7788 | 7788
+     10 | 7788 | 7788
+     10 | 7788 | 7788
+(8 rows)
+
+-- Test a three table join, all are foreign tables, should be pushed.
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT jh.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist jh ON (jh.empno = e.empno)
+  ORDER BY 1, 2, 3;
+                                                                                                         QUERY PLAN                                                                                                          
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: jh.empno, e.ename, d.dname
+   Sort Key: jh.empno, e.ename, d.dname
+   ->  Foreign Scan
+         Output: jh.empno, e.ename, d.dname
+         Relations: ((fdw_db.emp e) INNER JOIN (fdw_db.dept d)) INNER JOIN (fdw_db.jobhist jh)
+         Remote SQL: SELECT r4.`empno`, r1.`ename`, r2.`dname` FROM ((`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) INNER JOIN `fdw_db`.`jobhist` r4 ON (((r1.`empno` = r4.`empno`))))
+(7 rows)
+
+SELECT jh.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist jh ON (jh.empno = e.empno)
+  ORDER BY 1, 2, 3;
+ empno | ename  |   dname    
+-------+--------+------------
+  7369 | SMITH  | RESEARCH
+  7499 | ALLEN  | SALES
+  7521 | WARD   | SALES
+  7566 | JONES  | RESEARCH
+  7654 | MARTIN | SALES
+  7698 | BLAKE  | SALES
+  7782 | CLARK  | ACCOUNTING
+  7788 | SCOTT  | RESEARCH
+  7788 | SCOTT  | RESEARCH
+  7788 | SCOTT  | RESEARCH
+  7839 | KING   | ACCOUNTING
+  7844 | TURNER | SALES
+  7876 | ADAMS  | RESEARCH
+  7900 | JAMES  | SALES
+  7900 | JAMES  | SALES
+  7902 | FORD   | RESEARCH
+  7934 | MILLER | ACCOUNTING
+(17 rows)
+
+EXPLAIN (COSTS false, VERBOSE)
+SELECT jh.empno, e.ename, d.dname
+  FROM emp e, dept d, jobhist jh WHERE e.deptno = 10 AND d.deptno = 20 AND jh.deptno = 30
+  ORDER BY 1, 2, 3 LIMIT 10;
+                                                                                                                              QUERY PLAN                                                                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: jh.empno, e.ename, d.dname
+   ->  Sort
+         Output: jh.empno, e.ename, d.dname
+         Sort Key: jh.empno, e.ename, d.dname
+         ->  Foreign Scan
+               Output: jh.empno, e.ename, d.dname
+               Relations: ((fdw_db.emp e) INNER JOIN (fdw_db.dept d)) INNER JOIN (fdw_db.jobhist jh)
+               Remote SQL: SELECT r3.`empno`, r1.`ename`, r2.`dname` FROM ((`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE)) INNER JOIN `fdw_db`.`jobhist` r3 ON (TRUE)) WHERE ((r3.`deptno` = '30')) AND ((r2.`deptno` = '20')) AND ((r1.`deptno` = '10'))
+(9 rows)
+
+SELECT jh.empno, e.ename, d.dname
+  FROM emp e, dept d, jobhist jh WHERE e.deptno = 10 AND d.deptno = 20 AND jh.deptno = 30
+  ORDER BY 1, 2, 3 LIMIT 10;
+ empno | ename  |  dname   
+-------+--------+----------
+  7499 | CLARK  | RESEARCH
+  7499 | KING   | RESEARCH
+  7499 | MILLER | RESEARCH
+  7521 | CLARK  | RESEARCH
+  7521 | KING   | RESEARCH
+  7521 | MILLER | RESEARCH
+  7654 | CLARK  | RESEARCH
+  7654 | KING   | RESEARCH
+  7654 | MILLER | RESEARCH
+  7698 | CLARK  | RESEARCH
+(10 rows)
+
+-- Clauses within the nullable side are not pulled up, but the top level clause
+-- on nullable side is not pushed down into nullable side
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno, e.ename, d.dname, d.loc
+  FROM emp e LEFT JOIN (SELECT * FROM dept WHERE deptno > 20) d ON (e.deptno = d.deptno)
+  WHERE (d.deptno < 50 OR d.deptno IS NULL) AND e.deptno > 20
+  ORDER BY 1, 2, 3, 4;
+                                                                                                                                   QUERY PLAN                                                                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, dept.dname, dept.loc
+   Sort Key: e.empno, e.ename, dept.dname, dept.loc
+   ->  Foreign Scan
+         Output: e.empno, e.ename, dept.dname, dept.loc
+         Relations: (fdw_db.emp e) LEFT JOIN (fdw_db.dept)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r4.`dname`, r4.`loc` FROM (`fdw_db`.`emp` r1 LEFT JOIN `fdw_db`.`dept` r4 ON (((r1.`deptno` = r4.`deptno`)) AND ((r4.`deptno` > '20')))) WHERE (((r4.`deptno` < '50') OR (r4.`deptno` IS NULL))) AND ((r1.`deptno` > '20'))
+(7 rows)
+
+SELECT e.empno, e.ename, d.dname, d.loc
+  FROM emp e LEFT JOIN (SELECT * FROM dept WHERE deptno > 20) d ON (e.deptno = d.deptno)
+  WHERE (d.deptno < 50 OR d.deptno IS NULL) AND e.deptno > 20
+  ORDER BY 1, 2, 3, 4;
+ empno | ename  | dname |   loc   
+-------+--------+-------+---------
+  7499 | ALLEN  | SALES | CHICAGO
+  7521 | WARD   | SALES | CHICAGO
+  7654 | MARTIN | SALES | CHICAGO
+  7698 | BLAKE  | SALES | CHICAGO
+  7844 | TURNER | SALES | CHICAGO
+  7900 | JAMES  | SALES | CHICAGO
+(6 rows)
+
+-- Test multiple joins in a single statement
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.ename, jh.empno, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) RIGHT JOIN jobhist jh ON (e.empno = jh.empno)
+  ORDER BY 1, 2, 3;
+                                                                                                                                QUERY PLAN                                                                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.ename, jh.empno, d.dname
+   Sort Key: e.ename, jh.empno, d.dname
+   ->  Foreign Scan
+         Output: e.ename, jh.empno, d.dname
+         Relations: (fdw_db.jobhist jh) LEFT JOIN ((fdw_db.emp e) INNER JOIN (fdw_db.dept d))
+         Remote SQL: SELECT s6.c1, r4.`empno`, s6.c3 FROM (`fdw_db`.`jobhist` r4 LEFT JOIN (SELECT r1.`ename` c1, r1.`empno` c2, r2.`dname` c3 FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))) s6 ON (((s6.c2 = r4.`empno`))))
+(7 rows)
+
+SELECT e.ename, jh.empno, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) RIGHT JOIN jobhist jh ON (e.empno = jh.empno)
+  ORDER BY 1, 2, 3;
+ ename  | empno |   dname    
+--------+-------+------------
+ ADAMS  |  7876 | RESEARCH
+ ALLEN  |  7499 | SALES
+ BLAKE  |  7698 | SALES
+ CLARK  |  7782 | ACCOUNTING
+ FORD   |  7902 | RESEARCH
+ JAMES  |  7900 | SALES
+ JAMES  |  7900 | SALES
+ JONES  |  7566 | RESEARCH
+ KING   |  7839 | ACCOUNTING
+ MARTIN |  7654 | SALES
+ MILLER |  7934 | ACCOUNTING
+ SCOTT  |  7788 | RESEARCH
+ SCOTT  |  7788 | RESEARCH
+ SCOTT  |  7788 | RESEARCH
+ SMITH  |  7369 | RESEARCH
+ TURNER |  7844 | SALES
+ WARD   |  7521 | SALES
+(17 rows)
+
+-- Join two tables with FOR UPDATE clause
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno, d.deptno
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY 1, 2 FOR UPDATE OF e;
+                                                                                                                        QUERY PLAN                                                                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ LockRows
+   Output: e.empno, d.deptno, e.*, d.*
+   ->  Sort
+         Output: e.empno, d.deptno, e.*, d.*
+         Sort Key: e.empno, d.deptno
+         ->  Foreign Scan
+               Output: e.empno, d.deptno, e.*, d.*
+               Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+               Remote SQL: SELECT r1.`empno`, r2.`deptno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(9 rows)
+
+SELECT e.empno, d.deptno
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY 1, 2 FOR UPDATE OF e;
+ empno | deptno 
+-------+--------
+  7369 |     20
+  7499 |     30
+  7521 |     30
+  7566 |     20
+  7654 |     30
+  7698 |     30
+  7782 |     10
+  7788 |     20
+  7839 |     10
+  7844 |     30
+  7876 |     20
+  7900 |     30
+  7902 |     20
+  7934 |     10
+(14 rows)
+
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno, d.deptno
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY 1, 2 FOR UPDATE;
+                                                                                                                        QUERY PLAN                                                                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ LockRows
+   Output: e.empno, d.deptno, e.*, d.*
+   ->  Sort
+         Output: e.empno, d.deptno, e.*, d.*
+         Sort Key: e.empno, d.deptno
+         ->  Foreign Scan
+               Output: e.empno, d.deptno, e.*, d.*
+               Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+               Remote SQL: SELECT r1.`empno`, r2.`deptno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(9 rows)
+
+SELECT e.empno, d.deptno
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY 1, 2 FOR UPDATE;
+ empno | deptno 
+-------+--------
+  7369 |     20
+  7499 |     30
+  7521 |     30
+  7566 |     20
+  7654 |     30
+  7698 |     30
+  7782 |     10
+  7788 |     20
+  7839 |     10
+  7844 |     30
+  7876 |     20
+  7900 |     30
+  7902 |     20
+  7934 |     10
+(14 rows)
+
+-- Test join between a table and a resultset of a subquery.
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno, e.ename, d.dname, d.loc
+  FROM emp e LEFT JOIN (SELECT * FROM dept WHERE deptno > 20) d ON (e.deptno = d.deptno)
+  WHERE e.deptno > 20
+  ORDER BY 1, 2, 3, 4;
+                                                                                                        QUERY PLAN                                                                                                        
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, dept.dname, dept.loc
+   Sort Key: e.empno, e.ename, dept.dname, dept.loc
+   ->  Foreign Scan
+         Output: e.empno, e.ename, dept.dname, dept.loc
+         Relations: (fdw_db.emp e) LEFT JOIN (fdw_db.dept)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r4.`dname`, r4.`loc` FROM (`fdw_db`.`emp` r1 LEFT JOIN `fdw_db`.`dept` r4 ON (((r1.`deptno` = r4.`deptno`)) AND ((r4.`deptno` > '20')))) WHERE ((r1.`deptno` > '20'))
+(7 rows)
+
+SELECT e.empno, e.ename, d.dname, d.loc
+  FROM emp e LEFT JOIN (SELECT * FROM dept WHERE deptno > 20) d ON (e.deptno = d.deptno)
+  WHERE e.deptno > 20
+  ORDER BY 1, 2, 3, 4;
+ empno | ename  | dname |   loc   
+-------+--------+-------+---------
+  7499 | ALLEN  | SALES | CHICAGO
+  7521 | WARD   | SALES | CHICAGO
+  7654 | MARTIN | SALES | CHICAGO
+  7698 | BLAKE  | SALES | CHICAGO
+  7844 | TURNER | SALES | CHICAGO
+  7900 | JAMES  | SALES | CHICAGO
+(6 rows)
+
+-- Join with CTE
+EXPLAIN (COSTS false, VERBOSE)
+WITH t (c1, c2, c3) AS (
+  SELECT e.empno, e.ename, d.deptno
+    FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+) SELECT c1, c3 FROM t ORDER BY 1, 2;
+                                                                  QUERY PLAN                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, d.deptno
+   Sort Key: e.empno, d.deptno
+   ->  Foreign Scan
+         Output: e.empno, d.deptno
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r2.`empno`, r3.`deptno` FROM (`fdw_db`.`emp` r2 INNER JOIN `fdw_db`.`dept` r3 ON (((r2.`deptno` = r3.`deptno`))))
+(7 rows)
+
+WITH t (c1, c2, c3) AS (
+  SELECT e.empno, e.ename, d.deptno
+    FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+) SELECT c1, c3 FROM t ORDER BY 1, 2;
+  c1  | c3 
+------+----
+ 7369 | 20
+ 7499 | 30
+ 7521 | 30
+ 7566 | 20
+ 7654 | 30
+ 7698 | 30
+ 7782 | 10
+ 7788 | 20
+ 7839 | 10
+ 7844 | 30
+ 7876 | 20
+ 7900 | 30
+ 7902 | 20
+ 7934 | 10
+(14 rows)
+
+-- Test JOIN between a foreign table and a local table, should not be pushed
+-- down.
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN local_dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Seq Scan on public.local_dept d
+                     Output: d.dname, d.deptno
+(13 rows)
+
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN local_dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+ empno | ename  |   dname    
+-------+--------+------------
+  7369 | SMITH  | RESEARCH
+  7566 | JONES  | RESEARCH
+  7782 | CLARK  | ACCOUNTING
+  7788 | SCOTT  | RESEARCH
+  7839 | KING   | ACCOUNTING
+  7876 | ADAMS  | RESEARCH
+  7902 | FORD   | RESEARCH
+  7934 | MILLER | ACCOUNTING
+(8 rows)
+
+-- Test whole-row reference
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e, d
+  FROM emp e FULL JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                                                                     QUERY PLAN                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.*, d.*, e.empno
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.*, d.*, e.empno
+         Relations: (fdw_db.emp e) FULL JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 FULL JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT e, d
+  FROM emp e FULL JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                          e                          |             d              
+-----------------------------------------------------+----------------------------
+ (7369,SMITH,CLERK,7902,12-17-1980,800,,20)          | (20,RESEARCH,DALLAS)
+ (7499,ALLEN,SALESMAN,7698,02-20-1981,1600,300,30)   | (30,SALES,CHICAGO)
+ (7521,WARD,SALESMAN,7698,02-22-1981,1250,500,30)    | (30,SALES,CHICAGO)
+ (7566,JONES,MANAGER,7839,04-02-1981,2975,,20)       | (20,RESEARCH,DALLAS)
+ (7654,MARTIN,SALESMAN,7698,09-28-1981,1250,1400,30) | (30,SALES,CHICAGO)
+ (7698,BLAKE,MANAGER,7839,05-01-1981,2850,,30)       | (30,SALES,CHICAGO)
+ (7782,CLARK,MANAGER,7839,06-09-1981,2450,,10)       | (10,ACCOUNTING,"NEW YORK")
+ (7788,SCOTT,ANALYST,7566,04-19-1987,3000,,20)       | (20,RESEARCH,DALLAS)
+ (7839,KING,PRESIDENT,,11-17-1981,5000,,10)          | (10,ACCOUNTING,"NEW YORK")
+ (7844,TURNER,SALESMAN,7698,09-08-1980,1500,0,30)    | (30,SALES,CHICAGO)
+ (7876,ADAMS,CLERK,7788,05-23-1987,1100,,20)         | (20,RESEARCH,DALLAS)
+ (7900,JAMES,CLERK,7698,12-03-1981,950,,30)          | (30,SALES,CHICAGO)
+ (7902,FORD,ANALYST,7566,12-03-1981,3000,,20)        | (20,RESEARCH,DALLAS)
+ (7934,MILLER,CLERK,7782,01-23-1982,1300,,10)        | (10,ACCOUNTING,"NEW YORK")
+                                                     | 
+(15 rows)
+
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e, d, e.ename
+  FROM emp e FULL JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                                                                     QUERY PLAN                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.*, d.*, e.ename, e.empno
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.*, d.*, e.ename, e.empno
+         Relations: (fdw_db.emp e) FULL JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 FULL JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT e, d, e.ename
+  FROM emp e FULL JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                          e                          |             d              | ename  
+-----------------------------------------------------+----------------------------+--------
+ (7369,SMITH,CLERK,7902,12-17-1980,800,,20)          | (20,RESEARCH,DALLAS)       | SMITH
+ (7499,ALLEN,SALESMAN,7698,02-20-1981,1600,300,30)   | (30,SALES,CHICAGO)         | ALLEN
+ (7521,WARD,SALESMAN,7698,02-22-1981,1250,500,30)    | (30,SALES,CHICAGO)         | WARD
+ (7566,JONES,MANAGER,7839,04-02-1981,2975,,20)       | (20,RESEARCH,DALLAS)       | JONES
+ (7654,MARTIN,SALESMAN,7698,09-28-1981,1250,1400,30) | (30,SALES,CHICAGO)         | MARTIN
+ (7698,BLAKE,MANAGER,7839,05-01-1981,2850,,30)       | (30,SALES,CHICAGO)         | BLAKE
+ (7782,CLARK,MANAGER,7839,06-09-1981,2450,,10)       | (10,ACCOUNTING,"NEW YORK") | CLARK
+ (7788,SCOTT,ANALYST,7566,04-19-1987,3000,,20)       | (20,RESEARCH,DALLAS)       | SCOTT
+ (7839,KING,PRESIDENT,,11-17-1981,5000,,10)          | (10,ACCOUNTING,"NEW YORK") | KING
+ (7844,TURNER,SALESMAN,7698,09-08-1980,1500,0,30)    | (30,SALES,CHICAGO)         | TURNER
+ (7876,ADAMS,CLERK,7788,05-23-1987,1100,,20)         | (20,RESEARCH,DALLAS)       | ADAMS
+ (7900,JAMES,CLERK,7698,12-03-1981,950,,30)          | (30,SALES,CHICAGO)         | JAMES
+ (7902,FORD,ANALYST,7566,12-03-1981,3000,,20)        | (20,RESEARCH,DALLAS)       | FORD
+ (7934,MILLER,CLERK,7782,01-23-1982,1300,,10)        | (10,ACCOUNTING,"NEW YORK") | MILLER
+                                                     |                            | 
+(15 rows)
+
+-- SEMI JOIN, not pushed down
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno
+  FROM emp e WHERE EXISTS (SELECT 1 FROM dept d WHERE e.deptno = d.deptno)
+  ORDER BY 1;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno
+   Sort Key: e.empno
+   ->  Nested Loop Semi Join
+         Output: e.empno
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(14 rows)
+
+SELECT e.empno
+  FROM emp e WHERE EXISTS (SELECT 1 FROM dept d WHERE e.deptno = d.deptno)
+  ORDER BY 1;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+-- ANTI JOIN, not pushed down
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno
+  FROM emp e WHERE NOT EXISTS (SELECT 1 FROM dept d WHERE e.deptno = d.deptno)
+  ORDER BY 1;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno
+   Sort Key: e.empno
+   ->  Nested Loop Anti Join
+         Output: e.empno
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(14 rows)
+
+SELECT e.empno
+  FROM emp e WHERE NOT EXISTS (SELECT 1 FROM dept d WHERE e.deptno = d.deptno)
+  ORDER BY 1;
+ empno 
+-------
+(0 rows)
+
+-- CROSS JOIN can be pushed down
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.empno, d.deptno
+  FROM emp e CROSS JOIN dept d
+  ORDER BY 1, 2 LIMIT 10;
+                                                        QUERY PLAN                                                         
+---------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: e.empno, d.deptno
+   ->  Sort
+         Output: e.empno, d.deptno
+         Sort Key: e.empno, d.deptno
+         ->  Foreign Scan
+               Output: e.empno, d.deptno
+               Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+               Remote SQL: SELECT r1.`empno`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE))
+(9 rows)
+
+SELECT e.empno, d.deptno
+  FROM emp e CROSS JOIN dept d
+  ORDER BY 1, 2 LIMIT 10;
+ empno | deptno 
+-------+--------
+  7369 |     10
+  7369 |     20
+  7369 |     30
+  7369 |     40
+  7499 |     10
+  7499 |     20
+  7499 |     30
+  7499 |     40
+  7521 |     10
+  7521 |     20
+(10 rows)
+
+-- CROSS JOIN of two foreign tables again cross joined with a local table.
+-- CROSS JOIN of foreign tables should be pushed down, and local table should
+-- be joined locally.
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.ename, d.deptno, ld.dname
+  FROM emp e CROSS JOIN dept d CROSS JOIN local_dept ld
+  ORDER BY 1, 2 LIMIT 10;
+                                                           QUERY PLAN                                                            
+---------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: e.ename, d.deptno, ld.dname
+   ->  Sort
+         Output: e.ename, d.deptno, ld.dname
+         Sort Key: e.ename, d.deptno
+         ->  Nested Loop
+               Output: e.ename, d.deptno, ld.dname
+               ->  Seq Scan on public.local_dept ld
+                     Output: ld.deptno, ld.dname, ld.loc
+               ->  Foreign Scan
+                     Output: e.ename, d.deptno
+                     Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+                     Remote SQL: SELECT r1.`ename`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE))
+(13 rows)
+
+SELECT e.ename, d.deptno, ld.dname
+  FROM emp e CROSS JOIN dept d CROSS JOIN local_dept ld
+  ORDER BY 1, 2 LIMIT 10;
+ ename | deptno |   dname    
+-------+--------+------------
+ ADAMS |     10 | ACCOUNTING
+ ADAMS |     10 | RESEARCH
+ ADAMS |     20 | ACCOUNTING
+ ADAMS |     20 | RESEARCH
+ ADAMS |     30 | RESEARCH
+ ADAMS |     30 | ACCOUNTING
+ ADAMS |     40 | ACCOUNTING
+ ADAMS |     40 | RESEARCH
+ ALLEN |     10 | ACCOUNTING
+ ALLEN |     10 | RESEARCH
+(10 rows)
+
+-- Join two tables from two different foreign servers
+EXPLAIN (COSTS false, VERBOSE)
+SELECT e.deptno, d.deptno
+  FROM emp e JOIN dept_1 d ON (e.deptno = d.deptno)
+  ORDER BY 1, 2;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.deptno, d.deptno
+   Sort Key: e.deptno
+   ->  Nested Loop
+         Output: e.deptno, d.deptno
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.deptno
+               ->  Foreign Scan on public.dept_1 d
+                     Output: d.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(14 rows)
+
+SELECT e.deptno, d.deptno
+  FROM emp e JOIN dept_1 d ON (e.deptno = d.deptno)
+  ORDER BY 1, 2;
+ deptno | deptno 
+--------+--------
+     10 |     10
+     10 |     10
+     10 |     10
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     30 |     30
+     30 |     30
+     30 |     30
+     30 |     30
+     30 |     30
+     30 |     30
+(14 rows)
+
+-- Check join pushdown in situations where multiple userids are involved
+CREATE ROLE regress_view_owner SUPERUSER;
+CREATE USER MAPPING FOR regress_view_owner SERVER hdfs_server
+  OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+GRANT SELECT ON emp TO regress_view_owner;
+GRANT SELECT ON dept TO regress_view_owner;
+CREATE VIEW v1 AS SELECT * FROM emp;
+CREATE VIEW v2 AS SELECT * FROM dept;
+ALTER VIEW v2 OWNER TO regress_view_owner;
+-- Can't be pushed down, different view owners
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN v2 t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: emp.deptno, dept.deptno
+   ->  Sort
+         Output: emp.deptno, dept.deptno
+         Sort Key: emp.deptno, dept.deptno
+         ->  Nested Loop Left Join
+               Output: emp.deptno, dept.deptno
+               Join Filter: (emp.deptno = dept.deptno)
+               ->  Foreign Scan on public.emp
+                     Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`emp`
+               ->  Materialize
+                     Output: dept.deptno
+                     ->  Foreign Scan on public.dept
+                           Output: dept.deptno
+                           Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(16 rows)
+
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN v2 t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+ deptno | deptno 
+--------+--------
+     10 |     10
+     10 |     10
+     10 |     10
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     30 |     30
+     30 |     30
+(10 rows)
+
+-- Same user for the views, can be pushed down.
+ALTER VIEW v1 OWNER TO regress_view_owner;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN v2 t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+                                                                     QUERY PLAN                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: emp.deptno, dept.deptno
+   ->  Sort
+         Output: emp.deptno, dept.deptno
+         Sort Key: emp.deptno, dept.deptno
+         ->  Foreign Scan
+               Output: emp.deptno, dept.deptno
+               Relations: (fdw_db.emp) LEFT JOIN (fdw_db.dept)
+               Remote SQL: SELECT r6.`deptno`, r9.`deptno` FROM (`fdw_db`.`emp` r6 LEFT JOIN `fdw_db`.`dept` r9 ON (((r6.`deptno` = r9.`deptno`))))
+(9 rows)
+
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN v2 t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+ deptno | deptno 
+--------+--------
+     10 |     10
+     10 |     10
+     10 |     10
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     30 |     30
+     30 |     30
+(10 rows)
+
+-- Can't be pushed down, view owner not current user
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN dept t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: emp.deptno, t2.deptno
+   ->  Sort
+         Output: emp.deptno, t2.deptno
+         Sort Key: emp.deptno, t2.deptno
+         ->  Nested Loop Left Join
+               Output: emp.deptno, t2.deptno
+               Join Filter: (emp.deptno = t2.deptno)
+               ->  Foreign Scan on public.emp
+                     Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`emp`
+               ->  Materialize
+                     Output: t2.deptno
+                     ->  Foreign Scan on public.dept t2
+                           Output: t2.deptno
+                           Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(16 rows)
+
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN dept t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+ deptno | deptno 
+--------+--------
+     10 |     10
+     10 |     10
+     10 |     10
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     30 |     30
+     30 |     30
+(10 rows)
+
+ALTER VIEW v1 OWNER TO CURRENT_USER;
+-- Can be pushed down
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN dept t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+                                                                     QUERY PLAN                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: emp.deptno, t2.deptno
+   ->  Sort
+         Output: emp.deptno, t2.deptno
+         Sort Key: emp.deptno, t2.deptno
+         ->  Foreign Scan
+               Output: emp.deptno, t2.deptno
+               Relations: (fdw_db.emp) LEFT JOIN (fdw_db.dept t2)
+               Remote SQL: SELECT r6.`deptno`, r2.`deptno` FROM (`fdw_db`.`emp` r6 LEFT JOIN `fdw_db`.`dept` r2 ON (((r6.`deptno` = r2.`deptno`))))
+(9 rows)
+
+SELECT t1.deptno, t2.deptno
+  FROM v1 t1 LEFT JOIN dept t2 ON (t1.deptno = t2.deptno)
+  ORDER BY t1.deptno, t2.deptno LIMIT 10;
+ deptno | deptno 
+--------+--------
+     10 |     10
+     10 |     10
+     10 |     10
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     20 |     20
+     30 |     30
+     30 |     30
+(10 rows)
+
+ALTER VIEW v1 OWNER TO regress_view_owner;
+-- Non-Var items in targetlist of the nullable rel of a join preventing
+-- push-down in some cases
+-- Unable to push {emp, dept}
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT q.a, dept.deptno
+  FROM (SELECT 20 FROM emp WHERE deptno = 20) q(a) RIGHT JOIN dept ON (q.a = dept.deptno)
+  WHERE dept.deptno BETWEEN 10 AND 30
+  ORDER BY 1, 2;
+                                                     QUERY PLAN                                                     
+--------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (20), dept.deptno
+   Sort Key: (20), dept.deptno
+   ->  Nested Loop Left Join
+         Output: (20), dept.deptno
+         Join Filter: (20 = dept.deptno)
+         ->  Foreign Scan on public.dept
+               Output: dept.deptno, dept.dname, dept.loc
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept` WHERE ((`deptno` >= '10')) AND ((`deptno` <= '30'))
+         ->  Materialize
+               Output: (20)
+               ->  Foreign Scan on public.emp
+                     Output: 20
+                     Remote SQL: SELECT NULL FROM `fdw_db`.`emp` WHERE ((`deptno` = '20'))
+(14 rows)
+
+SELECT q.a, dept.deptno
+  FROM (SELECT 20 FROM emp WHERE deptno = 20) q(a) RIGHT JOIN dept ON (q.a = dept.deptno)
+  WHERE dept.deptno BETWEEN 10 AND 30
+  ORDER BY 1, 2;
+ a  | deptno 
+----+--------
+ 20 |     20
+ 20 |     20
+ 20 |     20
+ 20 |     20
+ 20 |     20
+    |     10
+    |     30
+(7 rows)
+
+-- Ok to push {emp, dept} but not {emp, dept, jobhist}
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT jobhist.deptno, q.*
+  FROM jobhist LEFT JOIN
+    (SELECT 13, emp.deptno, dept.deptno
+       FROM emp RIGHT JOIN dept ON (emp.deptno = dept.deptno)
+       WHERE emp.deptno = 10) q(a, b, c)
+  ON (jobhist.deptno = q.b)
+  WHERE jobhist.deptno BETWEEN 10 AND 20
+  ORDER BY 1, 2;
+                                                                                     QUERY PLAN                                                                                     
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: jobhist.deptno, (13), emp.deptno, dept.deptno
+   Sort Key: jobhist.deptno, (13)
+   ->  Nested Loop Left Join
+         Output: jobhist.deptno, (13), emp.deptno, dept.deptno
+         Join Filter: (jobhist.deptno = emp.deptno)
+         ->  Foreign Scan on public.jobhist
+               Output: jobhist.empno, jobhist.startdate, jobhist.enddate, jobhist.job, jobhist.sal, jobhist.comm, jobhist.deptno, jobhist.chgdesc
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`jobhist` WHERE ((`deptno` >= '10')) AND ((`deptno` <= '20'))
+         ->  Foreign Scan
+               Output: emp.deptno, dept.deptno, 13
+               Relations: (fdw_db.emp) INNER JOIN (fdw_db.dept)
+               Remote SQL: SELECT r4.`deptno`, r5.`deptno` FROM (`fdw_db`.`emp` r4 INNER JOIN `fdw_db`.`dept` r5 ON (TRUE)) WHERE ((r5.`deptno` = '10')) AND ((r4.`deptno` = '10'))
+(13 rows)
+
+SELECT jobhist.deptno, q.*
+  FROM jobhist LEFT JOIN
+    (SELECT 13, emp.deptno, dept.deptno
+       FROM emp RIGHT JOIN dept ON (emp.deptno = dept.deptno)
+       WHERE emp.deptno = 10) q(a, b, c)
+  ON (jobhist.deptno = q.b)
+  WHERE jobhist.deptno BETWEEN 10 AND 20
+  ORDER BY 1, 2;
+ deptno | a  | b  | c  
+--------+----+----+----
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     10 | 13 | 10 | 10
+     20 |    |    |   
+     20 |    |    |   
+     20 |    |    |   
+     20 |    |    |   
+     20 |    |    |   
+     20 |    |    |   
+     20 |    |    |   
+(19 rows)
+
+-- Test partition-wise join
+SET enable_partitionwise_join TO on;
+-- Create the partition table in plpgsql block as those are failing with
+-- different error messages on back-branches.
+-- All test cases related to partition-wise join gives an error on v96 and v95
+-- as partition syntax is not supported there.
+DO
+$$
+BEGIN
+  EXECUTE 'CREATE TABLE fprt1 (c1 int, c2 int, c3 varchar) PARTITION BY RANGE(c1)';
+EXCEPTION WHEN others THEN
+  RAISE NOTICE 'syntax error';
+END;
+$$
+LANGUAGE plpgsql;
+CREATE FOREIGN TABLE ftprt1_p1 PARTITION OF fprt1 FOR VALUES FROM (1) TO (4)
+  SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test1');
+CREATE FOREIGN TABLE ftprt1_p2 PARTITION OF fprt1 FOR VALUES FROM (5) TO (8)
+  SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test2');
+DO
+$$
+BEGIN
+  EXECUTE 'CREATE TABLE fprt2 (c1 int, c2 int, c3 varchar) PARTITION BY RANGE(c2)';
+EXCEPTION WHEN syntax_error THEN
+  RAISE NOTICE 'syntax error';
+END;
+$$
+LANGUAGE plpgsql;
+CREATE FOREIGN TABLE ftprt2_p1 PARTITION OF fprt2 FOR VALUES FROM (1) TO (4)
+  SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test3');
+CREATE FOREIGN TABLE ftprt2_p2 PARTITION OF fprt2 FOR VALUES FROM (5) TO (8)
+  SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test4');
+-- Inner join three tables
+-- Different explain plan on v10 as partition-wise join is not supported there.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c1,t2.c2,t3.c3
+  FROM fprt1 t1 INNER JOIN fprt2 t2 ON (t1.c1 = t2.c2) INNER JOIN fprt1 t3 ON (t2.c2 = t3.c1)
+  WHERE t1.c1 % 2 =0 ORDER BY 1,2,3;
+                                                                                                                   QUERY PLAN                                                                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: t1.c1, t2.c2, t3.c3
+   Sort Key: t1.c1, t3.c3
+   ->  Append
+         ->  Foreign Scan
+               Output: t1.c1, t2.c2, t3.c3
+               Relations: ((fdw_db.ftprt1_p1 t1) INNER JOIN (fdw_db.ftprt2_p1 t2)) INNER JOIN (fdw_db.ftprt1_p1 t3)
+               Remote SQL: SELECT r6.`c1`, r8.`c2`, r10.`c3` FROM ((`fdw_db`.`test1` r6 INNER JOIN `fdw_db`.`test3` r8 ON (((r6.`c1` = r8.`c2`)))) INNER JOIN `fdw_db`.`test1` r10 ON (((r6.`c1` = r10.`c1`)))) WHERE (((r6.`c1` % '2') = '0'))
+         ->  Foreign Scan
+               Output: t1_1.c1, t2_1.c2, t3_1.c3
+               Relations: ((fdw_db.ftprt1_p2 t1) INNER JOIN (fdw_db.ftprt2_p2 t2)) INNER JOIN (fdw_db.ftprt1_p2 t3)
+               Remote SQL: SELECT r7.`c1`, r9.`c2`, r11.`c3` FROM ((`fdw_db`.`test2` r7 INNER JOIN `fdw_db`.`test4` r9 ON (((r7.`c1` = r9.`c2`)))) INNER JOIN `fdw_db`.`test2` r11 ON (((r7.`c1` = r11.`c1`)))) WHERE (((r7.`c1` % '2') = '0'))
+(12 rows)
+
+SELECT t1.c1,t2.c2,t3.c3
+  FROM fprt1 t1 INNER JOIN fprt2 t2 ON (t1.c1 = t2.c2) INNER JOIN fprt1 t3 ON (t2.c2 = t3.c1)
+  WHERE t1.c1 % 2 =0 ORDER BY 1,2,3;
+ c1 | c2 |  c3   
+----+----+-------
+  2 |  2 | AAA2
+  4 |  4 | AAA12
+  6 |  6 | BBB2
+  8 |  8 | BBB12
+(4 rows)
+
+-- With whole-row reference; partitionwise join does not apply
+-- Table alias in foreign scan is different for v12, v11 and v10.
+EXPLAIN (VERBOSE, COSTS false)
+SELECT t1, t2, t1.c1
+  FROM fprt1 t1 JOIN fprt2 t2 ON (t1.c1 = t2.c2)
+  ORDER BY t1.c3, t1.c1;
+                              QUERY PLAN                              
+----------------------------------------------------------------------
+ Sort
+   Output: ((t1.*)::fprt1), ((t2.*)::fprt2), t1.c1, t1.c3
+   Sort Key: t1.c3, t1.c1
+   ->  Nested Loop
+         Output: ((t1.*)::fprt1), ((t2.*)::fprt2), t1.c1, t1.c3
+         Join Filter: (t1.c1 = t2.c2)
+         ->  Append
+               ->  Foreign Scan on public.ftprt1_p1 t1
+                     Output: t1.*, t1.c1, t1.c3
+                     Remote SQL: SELECT * FROM `fdw_db`.`test1`
+               ->  Foreign Scan on public.ftprt1_p2 t1_1
+                     Output: t1_1.*, t1_1.c1, t1_1.c3
+                     Remote SQL: SELECT * FROM `fdw_db`.`test2`
+         ->  Materialize
+               Output: ((t2.*)::fprt2), t2.c2
+               ->  Append
+                     ->  Foreign Scan on public.ftprt2_p1 t2
+                           Output: t2.*, t2.c2
+                           Remote SQL: SELECT * FROM `fdw_db`.`test3`
+                     ->  Foreign Scan on public.ftprt2_p2 t2_1
+                           Output: t2_1.*, t2_1.c2
+                           Remote SQL: SELECT * FROM `fdw_db`.`test4`
+(22 rows)
+
+SELECT t1, t2, t1.c1
+  FROM fprt1 t1 JOIN fprt2 t2 ON (t1.c1 = t2.c2)
+  ORDER BY t1.c3, t1.c1;
+     t1      |     t2      | c1 
+-------------+-------------+----
+ (1,1,AAA1)  | (1,1,CCC1)  |  1
+ (3,3,AAA11) | (3,3,CCC13) |  3
+ (4,4,AAA12) | (4,4,CCC14) |  4
+ (2,2,AAA2)  | (2,2,CCC2)  |  2
+ (5,5,BBB1)  | (5,5,CCC1)  |  5
+ (7,7,BBB11) | (7,7,CCC13) |  7
+ (8,8,BBB12) | (8,8,CCC13) |  8
+ (6,6,BBB2)  | (6,6,CCC2)  |  6
+(8 rows)
+
+-- Join with lateral reference
+-- Different explain plan on v10 as partition-wise join is not supported there.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c1,t1.c2
+  FROM fprt1 t1, LATERAL (SELECT t2.c1, t2.c2 FROM fprt2 t2
+  WHERE t1.c1 = t2.c2 AND t1.c2 = t2.c1) q WHERE t1.c1 % 2 = 0 ORDER BY 1,2;
+                                                                                            QUERY PLAN                                                                                            
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: t1.c1, t1.c2
+   Sort Key: t1.c1, t1.c2
+   ->  Append
+         ->  Foreign Scan
+               Output: t1.c1, t1.c2
+               Relations: (fdw_db.ftprt1_p1 t1) INNER JOIN (fdw_db.ftprt2_p1 t2)
+               Remote SQL: SELECT r4.`c1`, r4.`c2` FROM (`fdw_db`.`test1` r4 INNER JOIN `fdw_db`.`test3` r6 ON (((r4.`c1` = r6.`c2`)) AND ((r4.`c2` = r6.`c1`)))) WHERE (((r4.`c1` % '2') = '0'))
+         ->  Foreign Scan
+               Output: t1_1.c1, t1_1.c2
+               Relations: (fdw_db.ftprt1_p2 t1) INNER JOIN (fdw_db.ftprt2_p2 t2)
+               Remote SQL: SELECT r5.`c1`, r5.`c2` FROM (`fdw_db`.`test2` r5 INNER JOIN `fdw_db`.`test4` r7 ON (((r5.`c1` = r7.`c2`)) AND ((r5.`c2` = r7.`c1`)))) WHERE (((r5.`c1` % '2') = '0'))
+(12 rows)
+
+SELECT t1.c1,t1.c2
+  FROM fprt1 t1, LATERAL (SELECT t2.c1, t2.c2 FROM fprt2 t2
+  WHERE t1.c1 = t2.c2 AND t1.c2 = t2.c1) q WHERE t1.c1 % 2 = 0 ORDER BY 1,2;
+ c1 | c2 
+----+----
+  2 |  2
+  4 |  4
+  6 |  6
+  8 |  8
+(4 rows)
+
+-- With PHVs, partitionwise join selected but no join pushdown
+-- Table alias in foreign scan is different for v12, v11 and v10.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c1, t1.phv, t2.c2, t2.phv
+  FROM (SELECT 't1_phv' phv, * FROM fprt1 WHERE c1 % 2 = 0) t1 LEFT JOIN
+    (SELECT 't2_phv' phv, * FROM fprt2 WHERE c2 % 2 = 0) t2 ON (t1.c1 = t2.c2)
+  ORDER BY t1.c1, t2.c2;
+                                              QUERY PLAN                                              
+------------------------------------------------------------------------------------------------------
+ Sort
+   Output: ftprt1_p1.c1, 't1_phv'::text, ftprt2_p1.c2, ('t2_phv'::text)
+   Sort Key: ftprt1_p1.c1, ftprt2_p1.c2
+   ->  Append
+         ->  Nested Loop Left Join
+               Output: ftprt1_p1.c1, 't1_phv'::text, ftprt2_p1.c2, ('t2_phv'::text)
+               Join Filter: (ftprt1_p1.c1 = ftprt2_p1.c2)
+               ->  Foreign Scan on public.ftprt1_p1
+                     Output: ftprt1_p1.c1
+                     Remote SQL: SELECT `c1` FROM `fdw_db`.`test1` WHERE (((`c1` % '2') = '0'))
+               ->  Materialize
+                     Output: ftprt2_p1.c2, ('t2_phv'::text)
+                     ->  Foreign Scan on public.ftprt2_p1
+                           Output: ftprt2_p1.c2, 't2_phv'::text
+                           Remote SQL: SELECT `c2` FROM `fdw_db`.`test3` WHERE (((`c2` % '2') = '0'))
+         ->  Nested Loop Left Join
+               Output: ftprt1_p2.c1, 't1_phv'::text, ftprt2_p2.c2, ('t2_phv'::text)
+               Join Filter: (ftprt1_p2.c1 = ftprt2_p2.c2)
+               ->  Foreign Scan on public.ftprt1_p2
+                     Output: ftprt1_p2.c1
+                     Remote SQL: SELECT `c1` FROM `fdw_db`.`test2` WHERE (((`c1` % '2') = '0'))
+               ->  Materialize
+                     Output: ftprt2_p2.c2, ('t2_phv'::text)
+                     ->  Foreign Scan on public.ftprt2_p2
+                           Output: ftprt2_p2.c2, 't2_phv'::text
+                           Remote SQL: SELECT `c2` FROM `fdw_db`.`test4` WHERE (((`c2` % '2') = '0'))
+(26 rows)
+
+SELECT t1.c1, t1.phv, t2.c2, t2.phv
+  FROM (SELECT 't1_phv' phv, * FROM fprt1 WHERE c1 % 2 = 0) t1 LEFT JOIN
+    (SELECT 't2_phv' phv, * FROM fprt2 WHERE c2 % 2 = 0) t2 ON (t1.c1 = t2.c2)
+  ORDER BY t1.c1, t2.c2;
+ c1 |  phv   | c2 |  phv   
+----+--------+----+--------
+  2 | t1_phv |  2 | t2_phv
+  4 | t1_phv |  4 | t2_phv
+  6 | t1_phv |  6 | t2_phv
+  8 | t1_phv |  8 | t2_phv
+(4 rows)
+
+SET enable_partitionwise_join TO off;
+-- Cleanup
+DROP TABLE local_dept;
+DROP OWNED BY regress_view_owner;
+DROP ROLE regress_view_owner;
+DROP FOREIGN TABLE emp;
+DROP FOREIGN TABLE dept;
+DROP FOREIGN TABLE jobhist;
+DROP FOREIGN TABLE dept_1;
+DROP TABLE IF EXISTS fprt1;
+DROP TABLE IF EXISTS fprt2;
+DROP FOREIGN TABLE test1;
+DROP FOREIGN TABLE test2;
+DROP FOREIGN TABLE test3;
+DROP FOREIGN TABLE test4;
+DROP USER MAPPING FOR public SERVER hdfs_server;
+DROP USER MAPPING FOR public SERVER hdfs_server1;
+DROP SERVER hdfs_server;
+DROP SERVER hdfs_server1;
+DROP EXTENSION hdfs_fdw;

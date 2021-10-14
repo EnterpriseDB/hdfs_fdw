@@ -197,6 +197,34 @@ CREATE TABLE emp2 (
 )
 row format delimited fields terminated by ',';
 
+CREATE TABLE test1 (
+	c1 INT,
+	c2 INT,
+	c3 VARCHAR(10)
+)
+row format delimited fields terminated by ',';
+
+CREATE TABLE test2 (
+	c1 INT,
+	c2 INT,
+	c3 VARCHAR(10)
+)
+row format delimited fields terminated by ',';
+
+CREATE TABLE test3 (
+	c1 INT,
+	c2 INT,
+	c3 VARCHAR(10)
+)
+row format delimited fields terminated by ',';
+
+CREATE TABLE test4 (
+	c1 INT,
+	c2 INT,
+	c3 VARCHAR(10)
+)
+row format delimited fields terminated by ',';
+
 --Load data in the Tables.
 
 LOAD DATA INPATH 'emp_table.txt' OVERWRITE INTO TABLE emp;
@@ -225,3 +253,7 @@ LOAD DATA INPATH 'str_dt_table2.txt' OVERWRITE INTO TABLE var_date;
 LOAD DATA INPATH 'num_dt_table1.txt' OVERWRITE INTO TABLE str_int;
 LOAD DATA INPATH 'emp_1_table1.txt' OVERWRITE INTO TABLE emp_dt_mp2;
 LOAD DATA INPATH 'emp_1_table2.txt' OVERWRITE INTO TABLE binary_data;
+LOAD DATA INPATH 'test1.txt' OVERWRITE INTO TABLE test1;
+LOAD DATA INPATH 'test2.txt' OVERWRITE INTO TABLE test2;
+LOAD DATA INPATH 'test3.txt' OVERWRITE INTO TABLE test3;
+LOAD DATA INPATH 'test4.txt' OVERWRITE INTO TABLE test4;

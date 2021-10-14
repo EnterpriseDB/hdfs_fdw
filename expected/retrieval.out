@@ -1231,31 +1231,25 @@ SELECT ename FROM emp WHERE empno >= 7788
 EXPLAIN (COSTS OFF)
 SELECT dept.dname, emp.ename FROM dept CROSS JOIN emp
  ORDER BY dept.deptno;
-              QUERY PLAN               
----------------------------------------
+                        QUERY PLAN                        
+----------------------------------------------------------
  Sort
    Sort Key: dept.deptno
-   ->  Nested Loop
-         ->  Foreign Scan on dept
-         ->  Materialize
-               ->  Foreign Scan on emp
-(6 rows)
+   ->  Foreign Scan
+         Relations: (fdw_db.dept) INNER JOIN (fdw_db.emp)
+(4 rows)
 
 EXPLAIN (COSTS OFF)
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d INNER JOIN emp e ON d.deptno=e.deptno
  ORDER BY d.deptno;
-             QUERY PLAN              
--------------------------------------
- Merge Join
-   Merge Cond: (d.deptno = e.deptno)
-   ->  Sort
-         Sort Key: d.deptno
-         ->  Foreign Scan on dept d
-   ->  Sort
-         Sort Key: e.deptno
-         ->  Foreign Scan on emp e
-(8 rows)
+                          QUERY PLAN                          
+--------------------------------------------------------------
+ Sort
+   Sort Key: d.deptno
+   ->  Foreign Scan
+         Relations: (fdw_db.dept d) INNER JOIN (fdw_db.emp e)
+(4 rows)
 
 EXPLAIN (COSTS OFF)
 SELECT ename FROM emp
@@ -1278,17 +1272,13 @@ SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d LEFT OUTER JOIN emp e
  ON d.deptno = e.deptno
  ORDER BY d.deptno;
-             QUERY PLAN              
--------------------------------------
- Merge Left Join
-   Merge Cond: (d.deptno = e.deptno)
-   ->  Sort
-         Sort Key: d.deptno
-         ->  Foreign Scan on dept d
-   ->  Sort
-         Sort Key: e.deptno
-         ->  Foreign Scan on emp e
-(8 rows)
+                         QUERY PLAN                          
+-------------------------------------------------------------
+ Sort
+   Sort Key: d.deptno
+   ->  Foreign Scan
+         Relations: (fdw_db.dept d) LEFT JOIN (fdw_db.emp e)
+(4 rows)
 
 -- Retrieve Data from Foreign Table using Query Optimizer.
 CREATE TABLE dept_lcl (
