@@ -52,9 +52,9 @@ PG_MODULE_MAGIC;
 
 /*
  * In PG 9.5.1 the number will be 90501,
- * our version is 2.0.9 so number will be 20009
+ * our version is 2.1.0 so number will be 20100
  */
-#define CODE_VERSION   20009
+#define CODE_VERSION   20100
 
 /*
  * Indexes of FDW-private information stored in fdw_private lists.
