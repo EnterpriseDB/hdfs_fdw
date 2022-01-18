@@ -445,7 +445,7 @@ also support hdfs_fdw.
 
 Copyright Information
 ---------------------
-Copyright (c) 2011-2021, EnterpriseDB Corporation.
+Copyright (c) 2011-2022, EnterpriseDB Corporation.
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose, without fee, and without a written

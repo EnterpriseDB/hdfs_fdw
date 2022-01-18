@@ -4,7 +4,7 @@
  * 		Foreign-data wrapper for remote Hadoop servers
  *
  * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
- * Portions Copyright (c) 2004-2021, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2022, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_fdw.h
