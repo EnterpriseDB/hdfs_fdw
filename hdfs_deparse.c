@@ -1473,34 +1473,8 @@ hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context)
 	HeapTuple	proctup;
 	Form_pg_proc procform;
 	const char *proname;
-	bool		use_variadic;
 	bool		first;
 	ListCell   *arg;
-
-	/*
-	 * If the function call came from an implicit coercion, then just show the
-	 * first argument.
-	 */
-	if (node->funcformat == COERCE_IMPLICIT_CAST)
-	{
-		hdfs_deparse_expr((Expr *) linitial(node->args), context);
-		return;
-	}
-
-	/*
-	 * If the function call came from a cast, then show the first argument
-	 * plus an explicit cast operation.
-	 */
-	if (node->funcformat == COERCE_EXPLICIT_CAST)
-	{
-		int32		coercedTypmod;
-
-		/* Get the typmod if this is a length-coercion function */
-		(void) exprIsLengthCoercion((Node *) node, &coercedTypmod);
-
-		hdfs_deparse_expr((Expr *) linitial(node->args), context);
-		return;
-	}
 
 	/*
 	 * Normal function: display as proname(args).
@@ -1508,19 +1482,8 @@ hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context)
 	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(node->funcid));
 	if (!HeapTupleIsValid(proctup))
 		elog(ERROR, "cache lookup failed for function %u", node->funcid);
+
 	procform = (Form_pg_proc) GETSTRUCT(proctup);
-
-	/* Check if need to print VARIADIC (cf. ruleutils.c) */
-	use_variadic = node->funcvariadic;
-
-	/* Print schema name only if it's not pg_catalog */
-	if (procform->pronamespace != PG_CATALOG_NAMESPACE)
-	{
-		const char *schemaname;
-
-		schemaname = get_namespace_name(procform->pronamespace);
-		appendStringInfo(buf, "%s.", quote_identifier(schemaname));
-	}
 
 	/* Deparse the function name ... */
 	proname = NameStr(procform->proname);
@@ -1532,12 +1495,7 @@ hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context)
 	{
 		if (!first)
 			appendStringInfoString(buf, ", ");
-#if PG_VERSION_NUM < 130000
-		if (use_variadic && lnext(arg) == NULL)
-#else
-		if (use_variadic && lnext(node->args, arg) == NULL)
-#endif
-			appendStringInfoString(buf, "VARIADIC ");
+
 		hdfs_deparse_expr((Expr *) lfirst(arg), context);
 		first = false;
 	}
