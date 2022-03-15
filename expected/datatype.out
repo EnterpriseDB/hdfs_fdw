@@ -108,16 +108,16 @@ CREATE FOREIGN TABLE datatype_test_tbl (
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- Test Non supported data-types: MONEY, NUMERIC, DECIMAL, INTERVAL
 -- should errorout.
-SELECT empno FROM datatype_test_tbl ORDER BY empno;
+SELECT empno FROM datatype_test_tbl;
 ERROR:  unsupported PostgreSQL data type
 HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
-SELECT mgr FROM datatype_test_tbl ORDER BY empno;
+SELECT mgr FROM datatype_test_tbl;
 ERROR:  unsupported PostgreSQL data type
 HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
-SELECT deptno FROM datatype_test_tbl ORDER BY empno;
+SELECT deptno FROM datatype_test_tbl;
 ERROR:  unsupported PostgreSQL data type
 HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
-SELECT hiredate FROM datatype_test_tbl ORDER BY empno;
+SELECT hiredate FROM datatype_test_tbl;
 ERROR:  unsupported PostgreSQL data type
 HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
 DROP FOREIGN TABLE datatype_test_tbl;

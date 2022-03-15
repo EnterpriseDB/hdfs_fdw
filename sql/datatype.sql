@@ -76,10 +76,10 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
 -- Test Non supported data-types: MONEY, NUMERIC, DECIMAL, INTERVAL
 -- should errorout.
-SELECT empno FROM datatype_test_tbl ORDER BY empno;
-SELECT mgr FROM datatype_test_tbl ORDER BY empno;
-SELECT deptno FROM datatype_test_tbl ORDER BY empno;
-SELECT hiredate FROM datatype_test_tbl ORDER BY empno;
+SELECT empno FROM datatype_test_tbl;
+SELECT mgr FROM datatype_test_tbl;
+SELECT deptno FROM datatype_test_tbl;
+SELECT hiredate FROM datatype_test_tbl;
 DROP FOREIGN TABLE datatype_test_tbl;
 
 CREATE FOREIGN TABLE datatype_test_tbl (
