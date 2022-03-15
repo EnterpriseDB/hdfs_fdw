@@ -38,15 +38,15 @@ CREATE FOREIGN TABLE datatype_test_tbl (
     job             CHAR,
     mgr             INTEGER,
     hiredate        TIMESTAMP WITH TIME ZONE,
-    sal             BIGINT,
+    sal             NUMERIC,
     comm            VARCHAR,
-    deptno          DOUBLE PRECISION
+    deptno          DECIMAL
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
 -- Test data-types: BYTEA, VARCHAR, INTEGER, CHAR, TEXT, TIMESTAMP WITH TIME
--- ZONE. Should pass.
-SELECT empno, hiredate, comm, mgr, job, ename FROM datatype_test_tbl ORDER BY 1, 2, 3, 4, 5, 6;
+-- ZONE, NUMERIC, DECIMAL. Should pass.
+SELECT empno, hiredate, comm, mgr, job, ename, sal, deptno FROM datatype_test_tbl ORDER BY 1, 2, 3, 4, 5, 6, 7, 8;
 DROP FOREIGN TABLE datatype_test_tbl;
 
 CREATE FOREIGN TABLE datatype_test_tbl (
@@ -74,11 +74,8 @@ CREATE FOREIGN TABLE datatype_test_tbl (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 
--- Test Non supported data-types: MONEY, NUMERIC, DECIMAL, INTERVAL
--- should errorout.
+-- Test Non supported data-types: MONEY, INTERVAL. Should errorout.
 SELECT empno FROM datatype_test_tbl;
-SELECT mgr FROM datatype_test_tbl;
-SELECT deptno FROM datatype_test_tbl;
 SELECT hiredate FROM datatype_test_tbl;
 DROP FOREIGN TABLE datatype_test_tbl;
 

@@ -671,7 +671,7 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'bool_test');
 -- Error will be displayed as JSON Not supported.
 SELECT bol1 FROM json_test;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 DROP FOREIGN TABLE json_test;
 -- TIMEOID --> TIME
 CREATE FOREIGN TABLE time_test (

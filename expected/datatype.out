@@ -52,30 +52,30 @@ CREATE FOREIGN TABLE datatype_test_tbl (
     job             CHAR,
     mgr             INTEGER,
     hiredate        TIMESTAMP WITH TIME ZONE,
-    sal             BIGINT,
+    sal             NUMERIC,
     comm            VARCHAR,
-    deptno          DOUBLE PRECISION
+    deptno          DECIMAL
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- Test data-types: BYTEA, VARCHAR, INTEGER, CHAR, TEXT, TIMESTAMP WITH TIME
--- ZONE. Should pass.
-SELECT empno, hiredate, comm, mgr, job, ename FROM datatype_test_tbl ORDER BY 1, 2, 3, 4, 5, 6;
-   empno    |           hiredate           | comm | mgr  |    job    | ename  
-------------+------------------------------+------+------+-----------+--------
- \x37333639 | Wed Dec 17 00:00:00 1980 PST |      | 7902 | CLERK     | SMITH
- \x37343939 | Fri Feb 20 00:00:00 1981 PST | 300  | 7698 | SALESMAN  | ALLEN
- \x37353231 | Sun Feb 22 00:00:00 1981 PST | 500  | 7698 | SALESMAN  | WARD
- \x37353636 | Thu Apr 02 00:00:00 1981 PST |      | 7839 | MANAGER   | JONES
- \x37363534 | Mon Sep 28 00:00:00 1981 PDT | 1400 | 7698 | SALESMAN  | MARTIN
- \x37363938 | Fri May 01 00:00:00 1981 PDT |      | 7839 | MANAGER   | BLAKE
- \x37373832 | Tue Jun 09 00:00:00 1981 PDT |      | 7839 | MANAGER   | CLARK
- \x37373838 | Sun Apr 19 00:00:00 1987 PDT |      | 7566 | ANALYST   | SCOTT
- \x37383339 | Tue Nov 17 00:00:00 1981 PST |      |      | PRESIDENT | KING
- \x37383434 | Mon Sep 08 00:00:00 1980 PDT | 0    | 7698 | SALESMAN  | TURNER
- \x37383736 | Sat May 23 00:00:00 1987 PDT |      | 7788 | CLERK     | ADAMS
- \x37393030 | Thu Dec 03 00:00:00 1981 PST |      | 7698 | CLERK     | JAMES
- \x37393032 | Thu Dec 03 00:00:00 1981 PST |      | 7566 | ANALYST   | FORD
- \x37393334 | Sat Jan 23 00:00:00 1982 PST |      | 7782 | CLERK     | MILLER
+-- ZONE, NUMERIC, DECIMAL. Should pass.
+SELECT empno, hiredate, comm, mgr, job, ename, sal, deptno FROM datatype_test_tbl ORDER BY 1, 2, 3, 4, 5, 6, 7, 8;
+   empno    |           hiredate           | comm | mgr  |    job    | ename  | sal  | deptno 
+------------+------------------------------+------+------+-----------+--------+------+--------
+ \x37333639 | Wed Dec 17 00:00:00 1980 PST |      | 7902 | CLERK     | SMITH  |  800 |     20
+ \x37343939 | Fri Feb 20 00:00:00 1981 PST | 300  | 7698 | SALESMAN  | ALLEN  | 1600 |     30
+ \x37353231 | Sun Feb 22 00:00:00 1981 PST | 500  | 7698 | SALESMAN  | WARD   | 1250 |     30
+ \x37353636 | Thu Apr 02 00:00:00 1981 PST |      | 7839 | MANAGER   | JONES  | 2975 |     20
+ \x37363534 | Mon Sep 28 00:00:00 1981 PDT | 1400 | 7698 | SALESMAN  | MARTIN | 1250 |     30
+ \x37363938 | Fri May 01 00:00:00 1981 PDT |      | 7839 | MANAGER   | BLAKE  | 2850 |     30
+ \x37373832 | Tue Jun 09 00:00:00 1981 PDT |      | 7839 | MANAGER   | CLARK  | 2450 |     10
+ \x37373838 | Sun Apr 19 00:00:00 1987 PDT |      | 7566 | ANALYST   | SCOTT  | 3000 |     20
+ \x37383339 | Tue Nov 17 00:00:00 1981 PST |      |      | PRESIDENT | KING   | 5000 |     10
+ \x37383434 | Mon Sep 08 00:00:00 1980 PDT | 0    | 7698 | SALESMAN  | TURNER | 1500 |     30
+ \x37383736 | Sat May 23 00:00:00 1987 PDT |      | 7788 | CLERK     | ADAMS  | 1100 |     20
+ \x37393030 | Thu Dec 03 00:00:00 1981 PST |      | 7698 | CLERK     | JAMES  |  950 |     30
+ \x37393032 | Thu Dec 03 00:00:00 1981 PST |      | 7566 | ANALYST   | FORD   | 3000 |     20
+ \x37393334 | Sat Jan 23 00:00:00 1982 PST |      | 7782 | CLERK     | MILLER | 1300 |     10
 (14 rows)
 
 DROP FOREIGN TABLE datatype_test_tbl;
@@ -106,20 +106,13 @@ CREATE FOREIGN TABLE datatype_test_tbl (
     deptno          DECIMAL
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
--- Test Non supported data-types: MONEY, NUMERIC, DECIMAL, INTERVAL
--- should errorout.
+-- Test Non supported data-types: MONEY, INTERVAL. Should errorout.
 SELECT empno FROM datatype_test_tbl;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
-SELECT mgr FROM datatype_test_tbl;
-ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
-SELECT deptno FROM datatype_test_tbl;
-ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT hiredate FROM datatype_test_tbl;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 DROP FOREIGN TABLE datatype_test_tbl;
 CREATE FOREIGN TABLE datatype_test_tbl (
     empno           CIDR,
@@ -136,28 +129,28 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- LINE, LSEG, BOX, PATH. Should errorout.
 SELECT empno FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT ename FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT job FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT mgr FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT hiredate FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT sal FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT comm FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT deptno FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 DROP FOREIGN TABLE datatype_test_tbl;
 CREATE TYPE deptnotype AS ENUM ('10', '20', '30', '40');
 CREATE TYPE dnametype AS ENUM ('ACCOUNTING', 'RESEARCH','OPERATIONS','SALES');
@@ -176,22 +169,22 @@ SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
 -- should errorout.
 SELECT ename FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT job FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT mgr FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT hiredate FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT comm FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 SELECT deptno FROM datatype_test_tbl ORDER BY empno;
 ERROR:  unsupported PostgreSQL data type
-HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING and VARCHAR.
+HINT:  Supported data types are BOOL, INT, DATE, TIME, TIMESTAMP, FLOAT, BYTEA, SERIAL, REAL, DOUBLE, CHAR, TEXT, STRING, NUMERIC, DECIMAL and VARCHAR.
 DROP FOREIGN TABLE datatype_test_tbl;
 DROP TYPE dnametype;
 DROP TYPE deptnotype;
