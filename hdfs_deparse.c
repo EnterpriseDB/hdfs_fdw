@@ -248,6 +248,7 @@ hdfs_foreign_expr_walker(Node *node,
 						 foreign_glob_cxt *glob_cxt,
 						 foreign_loc_cxt *outer_cxt)
 {
+	bool		check_type = true;
 	foreign_loc_cxt inner_cxt;
 	FDWCollateState state;
 
@@ -484,6 +485,9 @@ hdfs_foreign_expr_walker(Node *node,
 												  glob_cxt, &inner_cxt))
 						return false;
 				}
+
+				/* Don't apply exprType() to the list. */
+				check_type = false;
 			}
 			break;
 		default:
@@ -494,6 +498,13 @@ hdfs_foreign_expr_walker(Node *node,
 			 */
 			return false;
 	}
+
+	/*
+	 * If result type of given expression is not built-in, it can't be sent to
+	 * remote because it might have incompatible semantics on remote side.
+	 */
+	if (check_type && !hdfs_is_builtin(exprType(node)))
+		return false;
 
 	/* It looks OK */
 	return true;
