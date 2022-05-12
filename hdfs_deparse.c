@@ -596,13 +596,7 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 	deparse_expr_cxt context;
 
 	/* We handle relations for foreign tables and joins between those */
-#if PG_VERSION_NUM >= 100000
 	Assert(IS_JOIN_REL(rel) || IS_SIMPLE_REL(rel));
-#else
-	Assert(rel->reloptkind == RELOPT_JOINREL ||
-		   rel->reloptkind == RELOPT_BASEREL ||
-		   rel->reloptkind == RELOPT_OTHER_MEMBER_REL);
-#endif
 
 	/* Fill portions of context common to base relation */
 	context.buf = buf;
@@ -659,11 +653,7 @@ hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
 		hdfs_deparse_from_expr(buf, root, foreignrel, true,
 							   context->params_list);
 	}
-#if PG_VERSION_NUM >= 100000
 	else if (IS_JOIN_REL(foreignrel))
-#else
-	else if (foreignrel->reloptkind == RELOPT_JOINREL)
-#endif
 	{
 		/* For a join relation use the input tlist */
 		hdfs_deparse_explicit_target_list(tlist, retrieved_attrs, context);
@@ -763,13 +753,7 @@ hdfs_deparse_subquery_target_list(deparse_expr_cxt *context)
 
 
 	/* Should only be called in these cases. */
-#if PG_VERSION_NUM >= 100000
 	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
-#else
-	Assert(foreignrel->reloptkind == RELOPT_JOINREL ||
-		   foreignrel->reloptkind == RELOPT_BASEREL ||
-		   foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
-#endif
 
 	scan_var_list = pull_var_clause((Node *) foreignrel->reltarget->exprs,
 									PVC_RECURSE_PLACEHOLDERS);
@@ -989,11 +973,7 @@ hdfs_deparse_from_expr(StringInfo buf, PlannerInfo *root,
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
 
-#if PG_VERSION_NUM >= 100000
 	if (IS_JOIN_REL(foreignrel))
-#else
-	if (foreignrel->reloptkind == RELOPT_JOINREL)
-#endif
 	{
 		RelOptInfo *rel_o = fpinfo->outerrel;
 		RelOptInfo *rel_i = fpinfo->innerrel;
@@ -1086,13 +1066,7 @@ hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
 
 	/* Should only be called in these cases. */
-#if PG_VERSION_NUM >= 100000
 	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
-#else
-	Assert(foreignrel->reloptkind == RELOPT_JOINREL ||
-		   foreignrel->reloptkind == RELOPT_BASEREL ||
-		   foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
-#endif
 
 	Assert(fpinfo->local_conds == NIL);
 
@@ -1892,23 +1866,13 @@ hdfs_is_subquery_var(Var *node, RelOptInfo *foreignrel, int *relno, int *colno,
 	RelOptInfo *innerrel = fpinfo->innerrel;
 
 	/* Should only be called in these cases. */
-#if PG_VERSION_NUM >= 100000
 	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
-#else
-	Assert(foreignrel->reloptkind == RELOPT_JOINREL ||
-		   foreignrel->reloptkind == RELOPT_BASEREL ||
-		   foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
-#endif
 
 	/*
 	 * If the given relation isn't a join relation, it doesn't have any lower
 	 * subqueries, so the Var isn't a subquery output column.
 	 */
-#if PG_VERSION_NUM >= 100000
 	if (!IS_JOIN_REL(foreignrel))
-#else
-	if (foreignrel->reloptkind != RELOPT_JOINREL)
-#endif
 		return false;
 
 	/*

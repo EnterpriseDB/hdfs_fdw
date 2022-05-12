@@ -170,17 +170,10 @@ static void hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 								  Oid foreigntableid);
 static void hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel,
 								Oid foreigntableid);
-#if PG_VERSION_NUM >= 90500
 static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
 									   Oid foreigntableid,
 									   ForeignPath *best_path, List *tlist,
 									   List *scan_clauses, Plan *outer_plan);
-#else
-static ForeignScan *hdfsGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel,
-									   Oid foreigntableid,
-									   ForeignPath *best_path, List *tlist,
-									   List *scan_clauses);
-#endif
 static void hdfsBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *hdfsIterateForeignScan(ForeignScanState *node);
 static void hdfsReScanForeignScan(ForeignScanState *node);
@@ -259,9 +252,7 @@ _PG_init(void)
 							   "",
 							   PGC_SUSET,
 							   0,
-#if PG_VERSION_NUM >= 90100
 							   NULL,
-#endif
 							   NULL,
 							   NULL);
 
@@ -272,9 +263,7 @@ _PG_init(void)
 							   "",
 							   PGC_SUSET,
 							   0,
-#if PG_VERSION_NUM >= 90100
 							   NULL,
-#endif
 							   NULL,
 							   NULL);
 
@@ -421,13 +410,8 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 	 */
 	fpinfo->attrs_used = NULL;
 
-#if PG_VERSION_NUM >= 90600
 	pull_varattnos((Node *) baserel->reltarget->exprs, baserel->relid,
 				   &fpinfo->attrs_used);
-#else
-	pull_varattnos((Node *) baserel->reltargetlist, baserel->relid,
-				   &fpinfo->attrs_used);
-#endif
 
 	foreach(lc, fpinfo->local_conds)
 	{
@@ -509,17 +493,13 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 	 * to estimate cost and size of this path.
 	 */
 	path = create_foreignscan_path(root, baserel,
-#if PG_VERSION_NUM >= 90600
 								   NULL,	/* default pathtarget */
-#endif
 								   fpinfo->rows,
 								   fpinfo->fdw_startup_cost,
 								   total_cost,
 								   NIL, 	/* no pathkeys */
 								   baserel->lateral_relids,
-#if PG_VERSION_NUM >= 90500
 								   NULL,	/* no extra plan */
-#endif
 								   NIL);	/* no fdw_private data */
 
 	add_path(baserel, (Path *) path);
@@ -530,7 +510,6 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
  * hdfsGetForeignPlan
  * 		Create ForeignScan plan node which implements selected best path
  */
-#if PG_VERSION_NUM >= 90500
 static ForeignScan *
 hdfsGetForeignPlan(PlannerInfo *root,
 				   RelOptInfo *foreignrel,
@@ -539,15 +518,6 @@ hdfsGetForeignPlan(PlannerInfo *root,
 				   List *tlist,
 				   List *scan_clauses,
 				   Plan *outer_plan)
-#else
-static ForeignScan *
-hdfsGetForeignPlan(PlannerInfo *root,
-				   RelOptInfo *foreignrel,
-				   Oid foreigntableid,
-				   ForeignPath *best_path,
-				   List *tlist,
-				   List *scan_clauses)
-#endif
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
 	Index		scan_relid;
@@ -615,11 +585,7 @@ hdfsGetForeignPlan(PlannerInfo *root,
 			local_exprs = lappend(local_exprs, rinfo->clause);
 	}
 
-#if PG_VERSION_NUM >= 100000
 	if (IS_JOIN_REL(foreignrel))
-#else
-	if (foreignrel->reloptkind == RELOPT_JOINREL)
-#endif
 	{
 		/* Build the list of columns to be fetched from the foreign server. */
 		scan_var_list = pull_var_clause((Node *) foreignrel->reltarget->exprs,
@@ -701,11 +667,7 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	 */
 	fdw_private = list_make2(makeString(sql.data),
 							 retrieved_attrs);
-#if PG_VERSION_NUM >= 100000
 	if (IS_JOIN_REL(foreignrel))
-#else
-	if (foreignrel->reloptkind == RELOPT_JOINREL)
-#endif
 	{
 		fdw_private = lappend(fdw_private,
 							  makeString(fpinfo->relation_name->data));
@@ -740,11 +702,9 @@ hdfsGetForeignPlan(PlannerInfo *root,
 							scan_relid,
 							params_list,
 							fdw_private
-#if PG_VERSION_NUM >= 90500
 							,fdw_scan_tlist
 							,remote_exprs
 							,outer_plan
-#endif
 		);
 }
 
@@ -1081,11 +1041,7 @@ prepare_query_params(PlanState *node,
 	 * benefit, and it'd require fdw to know more than is desirable about
 	 * Param evaluation.)
 	 */
-#if PG_VERSION_NUM >= 100000
 	*param_exprs = ExecInitExprList(fdw_exprs, node);
-#else
-	*param_exprs = (List *) ExecInitExpr((Expr *) fdw_exprs, node);
-#endif
 }
 
 static void
@@ -1105,11 +1061,7 @@ process_query_params(int con_index,
 		bool		isNull;
 
 		/* Evaluate the parameter expression */
-#if PG_VERSION_NUM >= 100000
 		expr_value = ExecEvalExpr(expr_state, econtext, &isNull);
-#else
-		expr_value = ExecEvalExpr(expr_state, econtext, &isNull, NULL);
-#endif
 
 		hdfs_bind_var(con_index, param_index + 1, param_types[param_index],
 					  expr_value, &isNull);
@@ -1222,15 +1174,8 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	fpinfo_i = (HDFSFdwRelationInfo *) innerrel->fdw_private;
 
 	/* If join pushdown is not enabled, honor it. */
-#if PG_VERSION_NUM >= 100000
 	if ((!IS_JOIN_REL(outerrel) && !fpinfo_o->options->enable_join_pushdown) ||
 		(!IS_JOIN_REL(innerrel) && !fpinfo_i->options->enable_join_pushdown))
-#else
-	if ((outerrel->reloptkind != RELOPT_JOINREL &&
-		 !fpinfo_o->options->enable_join_pushdown) ||
-		(innerrel->reloptkind != RELOPT_JOINREL &&
-		 !fpinfo_i->options->enable_join_pushdown))
-#endif
 		return false;
 
 	/*
@@ -1318,12 +1263,8 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 		Relids		relids;
 
 		/* PlaceHolderInfo refers to parent relids, not child relids. */
-#if PG_VERSION_NUM >= 100000
 		relids = IS_OTHER_REL(joinrel) ?
 			joinrel->top_parent_relids : joinrel->relids;
-#else
-		relids = joinrel->relids;
-#endif			/* PG_VERSION_NUM >= 100000 */
 
 		if (bms_is_subset(phinfo->ph_eval_at, relids) &&
 			bms_nonempty_difference(relids, phinfo->ph_eval_at))
@@ -1353,11 +1294,7 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	 * e.g. "(A JOIN B) JOIN C", this syntax is supported, so here we decide
 	 * to deparse only the innerrels that are joinrels to subquery.
 	 */
-#if PG_VERSION_NUM >= 100000
 	if (IS_JOIN_REL(innerrel))
-#else
-	if (innerrel->reloptkind == RELOPT_JOINREL)
-#endif
 	{
 		fpinfo->make_innerrel_subquery = true;
 		fpinfo->lower_subquery_rels =
@@ -1785,11 +1722,7 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 
 			Assert(IsA(var, Var) &&var->varno == cnt_rt);
 
-#if PG_VERSION_NUM >= 100000
 			tle_sl = tlist_member((Expr *) var, scan_tlist);
-#else
-			tle_sl = tlist_member((Node *) var, scan_tlist);
-#endif
 			Assert(tle_sl);
 
 			wr_state->attr_pos[cnt_attr++] = tle_sl->resno - 1;
@@ -1825,11 +1758,7 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 			fs_attr_pos[cnt_attr] = -var->varno;
 		else
 		{
-#if PG_VERSION_NUM >= 100000
 			TargetEntry *tle_sl = tlist_member((Expr *) var, scan_tlist);
-#else
-			TargetEntry *tle_sl = tlist_member((Node *) var, scan_tlist);
-#endif
 
 			Assert(tle_sl);
 			fs_attr_pos[cnt_attr] = tle_sl->resno - 1;
