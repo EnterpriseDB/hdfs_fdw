@@ -18,6 +18,7 @@
 #include "access/htup_details.h"
 #include "access/sysattr.h"
 #include "access/transam.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
@@ -27,6 +28,7 @@
 #include "nodes/nodeFuncs.h"
 #if PG_VERSION_NUM < 120000
 #include "optimizer/clauses.h"
+#include "optimizer/tlist.h"
 #include "optimizer/var.h"
 #else
 #include "optimizer/optimizer.h"
@@ -48,9 +50,12 @@ typedef struct foreign_glob_cxt
 	/*
 	 * For join pushdown, only a limited set of operators are allowed to be
 	 * pushed.  This flag helps us identify if we are walking through the list
-	 * of join conditions.
+	 * of join conditions.  Also true for aggregate relations to restrict
+	 * aggregates for specified list.
 	 */
-	bool		is_remote_cond;	/* true for join relations */
+	bool		is_remote_cond;	/* true for join or aggregate relations */
+	Relids		relids;			/* relids of base relations in the underlying
+								 * scan */
 } foreign_glob_cxt;
 
 /*
@@ -77,6 +82,9 @@ typedef struct deparse_expr_cxt
 {
 	PlannerInfo *root;			/* global planner state */
 	RelOptInfo *foreignrel;		/* the foreign relation we are planning for */
+	RelOptInfo *scanrel;		/* the underlying scan relation. Same as
+								 * foreignrel, when that represents a join or
+								 * a base relation. */
 	StringInfo	buf;			/* output buffer to append to */
 	List	  **params_list;	/* exprs that will become remote Params */
 } deparse_expr_cxt;
@@ -154,6 +162,10 @@ static void hdfs_deparse_explicit_target_list(List *tlist,
 											  deparse_expr_cxt *context);
 static void hdfs_deparse_subquery_target_list(deparse_expr_cxt *context);
 static void hdfs_append_function_name(Oid funcid, deparse_expr_cxt *context);
+static void hdfs_deparse_aggref(Aggref *node, deparse_expr_cxt *context);
+static void hdfs_append_groupby_clause(List *tlist, deparse_expr_cxt *context);
+static Node *hdfs_deparse_sort_group_clause(Index ref, List *tlist,
+											deparse_expr_cxt *context);
 
 /*
  * Helper functions
@@ -203,6 +215,7 @@ hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr,
 {
 	foreign_glob_cxt glob_cxt;
 	foreign_loc_cxt loc_cxt;
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) (baserel->fdw_private);
 
 	/*
 	 * Check that the expression consists of nodes that are safe to execute
@@ -211,6 +224,17 @@ hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr,
 	glob_cxt.root = root;
 	glob_cxt.foreignrel = baserel;
 	glob_cxt.is_remote_cond = is_remote_cond;
+
+	/*
+	 * For an upper relation, use relids from its underneath scan relation,
+	 * because the upperrel's own relids currently aren't set to anything
+	 * meaningful by the core code.  For other relation, use their own relids.
+	 */
+	if (IS_UPPER_REL(baserel))
+		glob_cxt.relids = fpinfo->outerrel->relids;
+	else
+		glob_cxt.relids = baserel->relids;
+
 	loc_cxt.collation = InvalidOid;
 	loc_cxt.state = FDW_COLLATE_NONE;
 	if (!hdfs_foreign_expr_walker((Node *) expr, &glob_cxt, &loc_cxt))
@@ -268,7 +292,7 @@ hdfs_foreign_expr_walker(Node *node,
 			{
 				Var		   *var = (Var *) node;
 
-				if (bms_is_member(var->varno, glob_cxt->foreignrel->relids) &&
+				if (bms_is_member(var->varno, glob_cxt->relids) &&
 					var->varlevelsup == 0)
 				{
 					/* Var belongs to foreign table */
@@ -492,6 +516,66 @@ hdfs_foreign_expr_walker(Node *node,
 				check_type = false;
 			}
 			break;
+		case T_Aggref:
+			{
+				Aggref	   *agg = (Aggref *) node;
+				ListCell   *lc;
+				const char *func_name;
+
+				/* Not safe to pushdown when not in grouping context */
+				if (!IS_UPPER_REL(glob_cxt->foreignrel))
+					return false;
+
+				/* Only non-split aggregates are pushable. */
+				if (agg->aggsplit != AGGSPLIT_SIMPLE)
+					return false;
+
+				/* Aggregates with order are not supported on hive/spark. */
+				if (agg->aggorder)
+					return false;
+
+				/* FILTER clause is not supported on hive/spark. */
+				if (agg->aggfilter)
+					return false;
+
+				/* VARIADIC not supported on hive/spark. */
+				if (agg->aggvariadic)
+					return false;
+
+				/* As usual, it must be shippable. */
+				if (!hdfs_is_builtin(agg->aggfnoid))
+					return false;
+
+				func_name = get_func_name(agg->aggfnoid);
+				if (!(strcmp(func_name, "min") == 0 ||
+					strcmp(func_name, "max") == 0 ||
+					strcmp(func_name, "sum") == 0 ||
+					strcmp(func_name, "avg") == 0 ||
+					strcmp(func_name, "count") == 0))
+					return false;
+
+				/*
+				 * Recurse to input args. aggdirectargs, aggorder and
+				 * aggdistinct are all present in args, so no need to check
+				 * their shippability explicitly.
+				 */
+				foreach(lc, agg->args)
+				{
+					Node	   *n = (Node *) lfirst(lc);
+
+					/* If TargetEntry, extract the expression from it */
+					if (IsA(n, TargetEntry))
+					{
+						TargetEntry *tle = (TargetEntry *) n;
+
+						n = (Node *) tle->expr;
+					}
+
+					if (!hdfs_foreign_expr_walker(n, glob_cxt, &inner_cxt))
+						return false;
+				}
+			}
+			break;
 		default:
 
 			/*
@@ -596,21 +680,55 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 								 List **params_list)
 {
 	deparse_expr_cxt context;
+	List	   *quals;
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) rel->fdw_private;
 
-	/* We handle relations for foreign tables and joins between those */
-	Assert(IS_JOIN_REL(rel) || IS_SIMPLE_REL(rel));
+	/*
+	 * We handle relations for foreign tables and joins between those and upper
+	 * relations
+	 */
+	Assert(IS_JOIN_REL(rel) || IS_SIMPLE_REL(rel) || IS_UPPER_REL(rel));
 
 	/* Fill portions of context common to base relation */
 	context.buf = buf;
 	context.root = root;
 	context.foreignrel = rel;
 	context.params_list = params_list;
+	context.scanrel = IS_UPPER_REL(rel) ? fpinfo->outerrel : rel;
 
 	/* Construct SELECT clause */
 	hdfs_deparse_select_sql(tlist, is_subquery, retrieved_attrs, &context);
 
+	/*
+	 * For upper relations, the WHERE clause is built from the remote
+	 * conditions of the underlying scan relation; otherwise, we can use the
+	 * supplied list of remote conditions directly.
+	 */
+	if (IS_UPPER_REL(rel))
+	{
+		HDFSFdwRelationInfo *ofpinfo;
+
+		ofpinfo = (HDFSFdwRelationInfo *) fpinfo->outerrel->fdw_private;
+		quals = ofpinfo->remote_conds;
+	}
+	else
+		quals = remote_conds;
+
 	/* Construct FROM and WHERE clauses */
-	hdfs_deparse_from_expr(remote_conds, &context, is_subquery);
+	hdfs_deparse_from_expr(quals, &context, is_subquery);
+
+	if (IS_UPPER_REL(rel))
+	{
+		/* Append GROUP BY clause */
+		hdfs_append_groupby_clause(fpinfo->grouped_tlist, &context);
+
+		/* Append HAVING clause */
+		if (remote_conds)
+		{
+			appendStringInfoString(buf, " HAVING ");
+			hdfs_append_conditions(remote_conds, &context);
+		}
+	}
 }
 
 /*
@@ -647,9 +765,12 @@ hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
 		hdfs_deparse_subquery_target_list(context);
 
 	}
-	else if (IS_JOIN_REL(foreignrel))
+	else if (IS_JOIN_REL(foreignrel) || IS_UPPER_REL(foreignrel))
 	{
-		/* For a join relation use the input tlist */
+		/*
+		 * For a join or upper relation the input tlist gives the list of
+		 * columns required to be fetched from the foreign server.
+		 */
 		hdfs_deparse_explicit_target_list(tlist, retrieved_attrs, context);
 	}
 	else
@@ -691,16 +812,16 @@ static void
 hdfs_deparse_from_expr(List *quals, deparse_expr_cxt *context, bool use_alias)
 {
 	StringInfo	buf = context->buf;
+	RelOptInfo *scanrel = context->scanrel;
 
-#if PG_VERSION_NUM >= 100000
-	use_alias |= IS_JOIN_REL(context->foreignrel);
-#else
-	use_alias |= (context->foreignrel->reloptkind == RELOPT_JOINREL);
-#endif
+	Assert(!IS_UPPER_REL(context->foreignrel) ||
+		   IS_JOIN_REL(scanrel) || IS_SIMPLE_REL(scanrel));
+
+	use_alias |= (bms_membership(scanrel->relids) == BMS_MULTIPLE);
 
 	/* Construct FROM clause */
 	appendStringInfoString(buf, " FROM ");
-	hdfs_deparse_from_expr_for_rel(buf, context->root, context->foreignrel,
+	hdfs_deparse_from_expr_for_rel(buf, context->root, scanrel,
 								   use_alias, context->params_list);
 
 	/* Construct WHERE clause */
@@ -730,18 +851,11 @@ hdfs_deparse_explicit_target_list(List *tlist, List **retrieved_attrs,
 
 	foreach(lc, tlist)
 	{
-		Var		   *var;
-
-		var = (Var *) lfirst(lc);
-		/* We expect only Var nodes here */
-		Assert(IsA(var, Var));
-
 		if (i > 0)
 			appendStringInfoString(buf, ", ");
-		hdfs_deparse_var(var, context);
 
+		hdfs_deparse_expr((Expr *) lfirst(lc), context);
 		*retrieved_attrs = lappend_int(*retrieved_attrs, i + 1);
-
 		i++;
 	}
 
@@ -805,7 +919,7 @@ hdfs_deparse_subquery_target_list(deparse_expr_cxt *context)
  * 		Deparse conditions from the provided list and append them to buf.
  *
  * The conditions in the list are assumed to be ANDed.  This function is used
- * to deparse WHERE clauses, JOIN .. ON clauses.
+ * to deparse WHERE clauses, JOIN .. ON clauses and HAVING clauses.
  *
  * Depending on the caller, the list elements might be either RestrictInfos
  * or bare clauses.
@@ -1026,6 +1140,7 @@ hdfs_deparse_from_expr_for_rel(StringInfo buf, PlannerInfo *root,
 
 			context.buf = buf;
 			context.foreignrel = foreignrel;
+			context.scanrel = foreignrel;
 			context.root = root;
 			context.params_list = params_list;
 
@@ -1274,6 +1389,9 @@ hdfs_deparse_expr(Expr *node, deparse_expr_cxt *context)
 		case T_ArrayExpr:
 			hdfs_deparse_array_expr((ArrayExpr *) node, context);
 			break;
+		case T_Aggref:
+			hdfs_deparse_aggref((Aggref *) node, context);
+			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -1294,7 +1412,7 @@ hdfs_deparse_expr(Expr *node, deparse_expr_cxt *context)
 static void
 hdfs_deparse_var(Var *node, deparse_expr_cxt *context)
 {
-	Relids		relids = context->foreignrel->relids;
+	Relids		relids = context->scanrel->relids;
 	bool		qualify_col;
 	int			relno;
 	int			colno;
@@ -1902,7 +2020,8 @@ hdfs_is_subquery_var(Var *node, RelOptInfo *foreignrel, int *relno, int *colno,
 	RelOptInfo *innerrel = fpinfo->innerrel;
 
 	/* Should only be called in these cases. */
-	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel));
+	Assert(IS_SIMPLE_REL(foreignrel) || IS_JOIN_REL(foreignrel) ||
+		   IS_UPPER_REL(foreignrel));
 
 	/*
 	 * If the given relation isn't a join relation, it doesn't have any lower
@@ -1994,4 +2113,174 @@ hdfs_get_relation_column_alias_ids(Var *node, RelOptInfo *foreignrel,
 
 	/* Shouldn't get here */
 	elog(ERROR, "unexpected expression in subquery output");
+}
+
+/*
+ * hdfs_deparse_aggref
+ *		Deparse an Aggref node.
+ */
+static void
+hdfs_deparse_aggref(Aggref *node, deparse_expr_cxt *context)
+{
+	StringInfo	buf = context->buf;
+	bool		use_variadic;
+
+	/* Only basic, non-split aggregation accepted. */
+	Assert(node->aggsplit == AGGSPLIT_SIMPLE);
+
+	/* Find aggregate name from aggfnoid which is a pg_proc entry. */
+	hdfs_append_function_name(node->aggfnoid, context);
+	appendStringInfoChar(buf, '(');
+
+	/* Add DISTINCT */
+	appendStringInfoString(buf, (node->aggdistinct != NIL) ? "DISTINCT " : "");
+
+	/* aggstar can be set only in zero-argument aggregates. */
+	if (node->aggstar)
+		appendStringInfoChar(buf, '*');
+	else
+	{
+		ListCell   *arg;
+		bool		first = true;
+
+		/* Add all the arguments. */
+		foreach(arg, node->args)
+		{
+			TargetEntry *tle = (TargetEntry *) lfirst(arg);
+			Node	   *n = (Node *) tle->expr;
+
+			if (tle->resjunk)
+				continue;
+
+			if (!first)
+				appendStringInfoString(buf, ", ");
+			first = false;
+
+			hdfs_deparse_expr((Expr *) n, context);
+		}
+	}
+
+	appendStringInfoChar(buf, ')');
+}
+
+/*
+ * hdfs_append_groupby_clause
+ * 		Deparse GROUP BY clause.
+ */
+static void
+hdfs_append_groupby_clause(List *tlist, deparse_expr_cxt *context)
+{
+	StringInfo	buf = context->buf;
+	Query	   *query = context->root->parse;
+	ListCell   *lc;
+	bool		first = true;
+
+	/* Nothing to be done, if there's no GROUP BY clause in the query. */
+	if (!query->groupClause)
+		return;
+
+	appendStringInfoString(buf, " GROUP BY ");
+
+	/*
+	 * Queries with grouping sets are not pushed down, so we don't expect
+	 * grouping sets here.
+	 */
+	Assert(!query->groupingSets);
+
+	foreach(lc, query->groupClause)
+	{
+		SortGroupClause *grp = (SortGroupClause *) lfirst(lc);
+
+		if (!first)
+			appendStringInfoString(buf, ", ");
+		first = false;
+
+		hdfs_deparse_sort_group_clause(grp->tleSortGroupRef, tlist,
+									   context);
+	}
+}
+
+/*
+ * hdfs_deparse_sort_group_clause
+ * 		Appends a sort or group clause.
+ */
+static Node *
+hdfs_deparse_sort_group_clause(Index ref, List *tlist,
+							   deparse_expr_cxt *context)
+{
+	StringInfo	buf = context->buf;
+	TargetEntry *tle;
+	Expr	   *expr;
+
+	tle = get_sortgroupref_tle(ref, tlist);
+	expr = tle->expr;
+
+	if (expr && IsA(expr, Const))
+	{
+		/*
+		 * Force a typecast here so that we don't emit something like "GROUP
+		 * BY 2", which will be misconstrued as a column position rather than
+		 * a constant.
+		 */
+		hdfs_deparse_const((Const *) expr, context);
+	}
+	else if (!expr || IsA(expr, Var))
+		hdfs_deparse_expr(expr, context);
+	else
+	{
+		/* Always parenthesize the expression. */
+		appendStringInfoChar(buf, '(');
+		hdfs_deparse_expr(expr, context);
+		appendStringInfoChar(buf, ')');
+	}
+
+	return (Node *) expr;
+}
+
+/*
+ * hdfs_is_foreign_param
+ * 		Returns true if given expr is something we'd have to send the
+ * 		value of to the foreign server.
+ *
+ * This should return true when the expression is a shippable node that
+ * hdfs_deparse_expr would add to context->params_list. Note that we don't care
+ * if the expression *contains* such a node, only whether one appears at top
+ * level.  We need this to detect cases where setrefs.c would recognize a
+ * false match between an fdw_exprs item (which came from the params_list)
+ * and an entry in fdw_scan_tlist (which we're considering putting the given
+ * expression into).
+ */
+bool
+hdfs_is_foreign_param(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
+{
+	if (expr == NULL)
+		return false;
+
+	switch (nodeTag(expr))
+	{
+		case T_Var:
+			{
+				/* It would have to be sent unless it's a foreign Var. */
+				Var		   *var = (Var *) expr;
+				Relids		relids;
+				HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) (baserel->fdw_private);
+
+				if (IS_UPPER_REL(baserel))
+					relids = fpinfo->outerrel->relids;
+				else
+					relids = baserel->relids;
+
+				if (bms_is_member(var->varno, relids) && var->varlevelsup == 0)
+					return false;	/* foreign Var, so not a param. */
+				else
+					return true;	/* it'd have to be a param. */
+				break;
+			}
+		case T_Param:
+			/* Params always have to be sent to the foreign server. */
+			return true;
+		default:
+			break;
+	}
+	return false;
 }

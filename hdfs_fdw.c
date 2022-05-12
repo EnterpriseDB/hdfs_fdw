@@ -41,6 +41,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
+#include "utils/selfuncs.h"
 
 PG_MODULE_MAGIC;
 
@@ -189,6 +190,19 @@ static void hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 static bool hdfsRecheckForeignScan(ForeignScanState *node,
 								   TupleTableSlot *slot);
 
+#if PG_VERSION_NUM >= 110000
+static void hdfsGetForeignUpperPaths(PlannerInfo *root,
+									 UpperRelationKind stage,
+									 RelOptInfo *input_rel,
+									 RelOptInfo *output_rel,
+									 void *extra);
+#elif PG_VERSION_NUM >= 100000
+static void hdfsGetForeignUpperPaths(PlannerInfo *root,
+									 UpperRelationKind stage,
+									 RelOptInfo *input_rel,
+									 RelOptInfo *output_rel);
+#endif
+
 /*
  * Helper functions
  */
@@ -206,6 +220,22 @@ static bool hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 								 JoinType jointype, RelOptInfo *outerrel,
 								 RelOptInfo *innerrel,
 								 JoinPathExtraData *extra);
+
+#if PG_VERSION_NUM >= 110000
+static bool hdfs_foreign_grouping_ok(PlannerInfo *root,
+									 RelOptInfo *grouped_rel,
+									 Node *havingQual);
+static void hdfs_add_foreign_grouping_paths(PlannerInfo *root,
+											RelOptInfo *input_rel,
+											RelOptInfo *grouped_rel,
+											GroupPathExtraData *extra);
+#elif PG_VERSION_NUM >= 100000
+static bool hdfs_foreign_grouping_ok(PlannerInfo *root,
+									 RelOptInfo *grouped_rel);
+static void hdfs_add_foreign_grouping_paths(PlannerInfo *root,
+											RelOptInfo *input_rel,
+											RelOptInfo *grouped_rel);
+#endif
 
 #ifdef EDB_NATIVE_LANG
 #if PG_VERSION_NUM >= 90300 && PG_VERSION_NUM < 110000
@@ -337,6 +367,9 @@ hdfs_fdw_handler(PG_FUNCTION_ARGS)
 
 	/* Support functions for join push-down */
 	routine->GetForeignJoinPaths = hdfsGetForeignJoinPaths;
+
+	/* Support functions for upper relation push-down */
+	routine->GetForeignUpperPaths = hdfsGetForeignUpperPaths;
 
 	RegisterXactCallback(hdfs_fdw_xact_callback, NULL);
 
@@ -626,6 +659,13 @@ hdfsGetForeignPlan(PlannerInfo *root,
 		{
 			ListCell   *lc;
 
+			/*
+			 * Right now, we only consider grouping and aggregation beyond
+			 * joins.  Queries involving aggregates or grouping do not require
+			 * EPQ mechanism, hence should not have an outer plan here.
+			 */
+			Assert(!IS_UPPER_REL(foreignrel));
+
 			foreach(lc, local_exprs)
 			{
 				Node	   *qual = lfirst(lc);
@@ -651,6 +691,24 @@ hdfsGetForeignPlan(PlannerInfo *root,
 			}
 		}
 	}
+	else if (IS_UPPER_REL(foreignrel))
+	{
+		/*
+		 * scan_var_list should have expressions and not TargetEntry nodes.
+		 * However grouped_tlist created has TLEs, thus retrieve them into
+		 * scan_var_list.
+		 */
+		scan_var_list = list_concat_unique(NIL,
+										   get_tlist_exprs(fpinfo->grouped_tlist,
+														   false));
+
+		/*
+		 * The targetlist computed while assessing push-down safety represents
+		 * the result we expect from the foreign server.
+		 */
+		fdw_scan_tlist = fpinfo->grouped_tlist;
+		local_exprs = extract_actual_clauses(fpinfo->local_conds, false);
+	}
 
 	/*
 	 * Build the query string to be sent for execution, and identify
@@ -667,7 +725,7 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	 */
 	fdw_private = list_make2(makeString(sql.data),
 							 retrieved_attrs);
-	if (IS_JOIN_REL(foreignrel))
+	if (IS_JOIN_REL(foreignrel) || IS_UPPER_REL(foreignrel))
 	{
 		fdw_private = lappend(fdw_private,
 							  makeString(fpinfo->relation_name->data));
@@ -1851,4 +1909,397 @@ hdfs_form_whole_row(hdfsWRState *wr_state, Datum *values, bool *nulls)
 	}
 	return heap_form_tuple(wr_state->tupdesc, wr_state->values,
 						   wr_state->nulls);
+}
+
+/*
+ * hdfs_foreign_grouping_ok
+ * 		Assess whether the aggregation, grouping and having operations can
+ * 		be pushed down to the foreign server.  As a side effect, save
+ * 		information we obtain in this function to HDFSFdwRelationInfo of
+ * 		the input relation.
+ */
+#if PG_VERSION_NUM >= 110000
+static bool
+hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel,
+						  Node *havingQual)
+#elif PG_VERSION_NUM >= 100000
+static bool
+hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
+#endif
+{
+	Query	   *query = root->parse;
+#if PG_VERSION_NUM >= 110000
+	PathTarget *grouping_target =  grouped_rel->reltarget;
+#elif PG_VERSION_NUM >= 100000
+	PathTarget *grouping_target = root->upper_targets[UPPERREL_GROUP_AGG];
+#endif
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) grouped_rel->fdw_private;
+	HDFSFdwRelationInfo *ofpinfo;
+	ListCell   *lc;
+	int			i;
+	List	   *tlist = NIL;
+
+	/* Grouping Sets are not pushable */
+	if (query->groupingSets)
+		return false;
+
+	/* Get the fpinfo of the underlying scan relation. */
+	ofpinfo = (HDFSFdwRelationInfo *) fpinfo->outerrel->fdw_private;
+
+	/*
+	 * If underneath input relation has any local conditions, those conditions
+	 * are required to be applied before performing aggregation.  Hence the
+	 * aggregate cannot be pushed down.
+	 */
+	if (ofpinfo->local_conds)
+		return false;
+
+	/*
+	 * Evaluate grouping targets and check whether they are safe to push down
+	 * to the foreign side.  All GROUP BY expressions will be part of the
+	 * grouping target and thus there is no need to evaluate it separately.
+	 * While doing so, add required expressions into target list which can
+	 * then be used to pass to foreign server.
+	 */
+	i = 0;
+	foreach(lc, grouping_target->exprs)
+	{
+		Expr	   *expr = (Expr *) lfirst(lc);
+		Index		sgref = get_pathtarget_sortgroupref(grouping_target, i);
+		ListCell   *l;
+
+		/* Check whether this expression is part of GROUP BY clause */
+		if (sgref && get_sortgroupref_clause_noerr(sgref, query->groupClause))
+		{
+			TargetEntry *tle;
+
+			/*
+			 * If any of the GROUP BY expression is not shippable we can not
+			 * push down aggregation to the foreign server.
+			 */
+			if (!hdfs_is_foreign_expr(root, grouped_rel, expr, true))
+				return false;
+
+			/*
+			 * If it would be a foreign param, we can't put it into the tlist,
+			 * so we have to fail.
+			 */
+			if (hdfs_is_foreign_param(root, grouped_rel, expr))
+				return false;
+
+			/*
+			 * Pushable, so add to tlist.  We need to create a TLE for this
+			 * expression and apply the sortgroupref to it.  We cannot use
+			 * add_to_flat_tlist() here because that avoids making duplicate
+			 * entries in the tlist.  If there are duplicate entries with
+			 * distinct sortgrouprefs, we have to duplicate that situation in
+			 * the output tlist.
+			 */
+			tle = makeTargetEntry(expr, list_length(tlist) + 1, NULL, false);
+			tle->ressortgroupref = sgref;
+			tlist = lappend(tlist, tle);
+		}
+		else
+		{
+			/* Check entire expression whether it is pushable or not */
+			if (hdfs_is_foreign_expr(root, grouped_rel, expr, true) &&
+				!hdfs_is_foreign_param(root, grouped_rel, expr))
+			{
+				/* Pushable, add to tlist */
+				tlist = add_to_flat_tlist(tlist, list_make1(expr));
+			}
+			else
+			{
+				List	   *aggvars;
+
+				/* Not matched exactly, pull the var with aggregates then */
+				aggvars = pull_var_clause((Node *) expr,
+										  PVC_INCLUDE_AGGREGATES);
+
+				/*
+				 * If any aggregate expression is not shippable, then we
+				 * cannot push down aggregation to the foreign server.  (We
+				 * don't have to check is_foreign_param, since that certainly
+				 * won't return true for any such expression.)
+				 */
+				if (!hdfs_is_foreign_expr(root, grouped_rel, (Expr *) aggvars, true))
+					return false;
+
+				/*
+				 * Add aggregates, if any, into the targetlist.  Plain var
+				 * nodes should be either same as some GROUP BY expression or
+				 * part of some GROUP BY expression. In later case, the query
+				 * cannot refer plain var nodes without the surrounding
+				 * expression.  In both the cases, they are already part of
+				 * the targetlist and thus no need to add them again.  In fact
+				 * adding pulled plain var nodes in SELECT clause will cause
+				 * an error on the foreign server if they are not same as some
+				 * GROUP BY expression.
+				 */
+				foreach(l, aggvars)
+				{
+					Expr	   *expr = (Expr *) lfirst(l);
+
+					if (IsA(expr, Aggref))
+						tlist = add_to_flat_tlist(tlist, list_make1(expr));
+				}
+			}
+		}
+
+		i++;
+	}
+
+	/*
+	 * Classify the pushable and non-pushable having clauses and save them in
+	 * remote_conds and local_conds of the grouped rel's fpinfo.
+	 */
+#if PG_VERSION_NUM >= 110000
+	if (havingQual)
+	{
+		ListCell   *lc;
+
+		foreach(lc, (List *) havingQual)
+#elif PG_VERSION_NUM >= 100000
+	if (root->hasHavingQual && query->havingQual)
+	{
+		ListCell	*lc;
+		foreach(lc, (List *) query->havingQual)
+#endif
+		{
+			Expr	   *expr = (Expr *) lfirst(lc);
+			RestrictInfo *rinfo;
+
+			/*
+			 * Currently, the core code doesn't wrap havingQuals in
+			 * RestrictInfos, so we must make our own.
+			 */
+			Assert(!IsA(expr, RestrictInfo));
+#if PG_VERSION_NUM >= 140000
+			rinfo = make_restrictinfo(root,
+									  expr,
+									  true,
+									  false,
+									  false,
+									  root->qual_security_level,
+									  grouped_rel->relids,
+									  NULL,
+									  NULL);
+#else
+			rinfo = make_restrictinfo(expr,
+									  true,
+									  false,
+									  false,
+									  root->qual_security_level,
+									  grouped_rel->relids,
+									  NULL,
+									  NULL);
+#endif
+
+			if (!hdfs_is_foreign_expr(root, grouped_rel, expr, true))
+				fpinfo->local_conds = lappend(fpinfo->local_conds, rinfo);
+			else
+				fpinfo->remote_conds = lappend(fpinfo->remote_conds, rinfo);
+		}
+	}
+
+	/*
+	 * If there are any local conditions, pull Vars and aggregates from it and
+	 * check whether they are safe to pushdown or not.
+	 */
+	if (fpinfo->local_conds)
+	{
+		List	   *aggvars = NIL;
+		ListCell   *lc;
+
+		foreach(lc, fpinfo->local_conds)
+		{
+			RestrictInfo *rinfo = lfirst_node(RestrictInfo, lc);
+
+			aggvars = list_concat(aggvars,
+								  pull_var_clause((Node *) rinfo->clause,
+												  PVC_INCLUDE_AGGREGATES));
+		}
+
+		foreach(lc, aggvars)
+		{
+			Expr	   *expr = (Expr *) lfirst(lc);
+
+			/*
+			 * If aggregates within local conditions are not safe to push
+			 * down, then we cannot push down the query.  Vars are already
+			 * part of GROUP BY clause which are checked above, so no need to
+			 * access them again here.  Again, we need not check
+			 * is_foreign_param for a foreign aggregate.
+			 */
+			if (IsA(expr, Aggref))
+			{
+				if (!hdfs_is_foreign_expr(root, grouped_rel, expr, true))
+					return false;
+
+				tlist = add_to_flat_tlist(tlist, list_make1(expr));
+			}
+		}
+	}
+
+	/* Store generated targetlist */
+	fpinfo->grouped_tlist = tlist;
+
+	/* Safe to pushdown */
+	fpinfo->pushdown_safe = true;
+
+	/*
+	 * Set the string describing this grouped relation to be used in EXPLAIN
+	 * output of corresponding ForeignScan.
+	 */
+	fpinfo->relation_name = makeStringInfo();
+	appendStringInfo(fpinfo->relation_name, "Aggregate on (%s)",
+					 ofpinfo->relation_name->data);
+
+	return true;
+}
+
+/*
+ * hdfsGetForeignUpperPaths
+ *		Add paths for post-join operations like aggregation, grouping etc. if
+ *		corresponding operations are safe to push down.
+ *
+ * Right now, we only support aggregate, grouping and having clause pushdown.
+ */
+#if PG_VERSION_NUM >= 110000
+static void
+hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
+						 RelOptInfo *input_rel, RelOptInfo *output_rel,
+						 void *extra)
+#elif PG_VERSION_NUM >= 100000
+static void
+hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
+						 RelOptInfo *input_rel, RelOptInfo *output_rel)
+#endif
+{
+	HDFSFdwRelationInfo *fpinfo;
+
+	/*
+	 * If input rel is not safe to pushdown, then simply return as we cannot
+	 * perform any post-join operations on the foreign server.
+	 */
+	if (!input_rel->fdw_private ||
+		!((HDFSFdwRelationInfo *) input_rel->fdw_private)->pushdown_safe)
+		return;
+
+	/* Ignore stages we don't support; and skip any duplicate calls. */
+	if (stage != UPPERREL_GROUP_AGG || output_rel->fdw_private)
+		return;
+
+	fpinfo = (HDFSFdwRelationInfo *) palloc0(sizeof(HDFSFdwRelationInfo));
+	fpinfo->pushdown_safe = false;
+	output_rel->fdw_private = fpinfo;
+
+#if PG_VERSION_NUM >= 110000
+	hdfs_add_foreign_grouping_paths(root, input_rel, output_rel,
+									(GroupPathExtraData *) extra);
+#elif PG_VERSION_NUM >= 100000
+	hdfs_add_foreign_grouping_paths(root, input_rel, output_rel);
+#endif
+}
+
+/*
+ * hdfs_add_foreign_grouping_paths
+ *		Add foreign path for grouping and/or aggregation.
+ *
+ * Given input_rel represents the underlying scan.  The paths are added to the
+ * given grouped_rel.
+ */
+#if PG_VERSION_NUM >= 110000
+static void
+hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
+								RelOptInfo *grouped_rel,
+								GroupPathExtraData *extra)
+#elif PG_VERSION_NUM >= 100000
+static void
+hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
+								RelOptInfo *grouped_rel)
+#endif
+{
+	Query	   *parse = root->parse;
+	HDFSFdwRelationInfo *fpinfo = grouped_rel->fdw_private;
+	ForeignPath *grouppath;
+	Cost		startup_cost;
+	Cost		total_cost;
+	double		num_groups;
+
+	/* Nothing to be done, if there is no grouping or aggregation required. */
+	if (!parse->groupClause && !parse->groupingSets && !parse->hasAggs &&
+		!root->hasHavingQual)
+		return;
+
+	/* save the input_rel as outerrel in fpinfo */
+	fpinfo->outerrel = input_rel;
+
+	/* Assess if it is safe to push down aggregation and grouping. */
+#if PG_VERSION_NUM >= 110000
+	if (!hdfs_foreign_grouping_ok(root, grouped_rel, extra->havingQual))
+#elif PG_VERSION_NUM >= 100000
+	if (!hdfs_foreign_grouping_ok(root, grouped_rel))
+#endif
+		return;
+
+	/*
+	 * TODO: Put accurate estimates here.
+	 *
+	 * Cost used here is minimum of the cost estimated for base and join
+	 * relation.
+	 */
+	startup_cost = 15;
+	total_cost = 10 + startup_cost;
+
+	/* Estimate output tuples which should be same as number of groups */
+#if PG_VERSION_NUM >= 140000
+	num_groups = estimate_num_groups(root,
+									 get_sortgrouplist_exprs(root->parse->groupClause,
+															 fpinfo->grouped_tlist),
+									 input_rel->rows, NULL, NULL);
+#else
+	num_groups = estimate_num_groups(root,
+									 get_sortgrouplist_exprs(root->parse->groupClause,
+															 fpinfo->grouped_tlist),
+									 input_rel->rows, NULL);
+#endif
+
+	/* Create and add foreign path to the grouping relation. */
+#if PG_VERSION_NUM >= 120000
+	grouppath = create_foreign_upper_path(root,
+										  grouped_rel,
+										  grouped_rel->reltarget,
+										  num_groups,
+										  startup_cost,
+										  total_cost,
+										  NIL,	/* no pathkeys */
+										  NULL,
+										  NIL); /* no fdw_private */
+#elif PG_VERSION_NUM >= 110000
+	grouppath = create_foreignscan_path(root,
+										grouped_rel,
+										grouped_rel->reltarget,
+										num_groups,
+										startup_cost,
+										total_cost,
+										NIL,	/* no pathkeys */
+										grouped_rel->lateral_relids,
+										NULL,
+										NIL);	/* no fdw_private */
+#else
+	grouppath = create_foreignscan_path(root,
+										grouped_rel,
+										root->upper_targets[UPPERREL_GROUP_AGG],
+										num_groups,
+										startup_cost,
+										total_cost,
+										NIL,	/* no pathkeys */
+										grouped_rel->lateral_relids,
+										NULL,
+										NIL);	/* no fdw_private */
+#endif
+
+	/* Add generated path into grouped_rel by add_path(). */
+	add_path(grouped_rel, (Path *) grouppath);
 }

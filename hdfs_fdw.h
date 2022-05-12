@@ -114,6 +114,10 @@ typedef struct HDFSFdwRelationInfo
 										 * subquery? */
 	Relids		lower_subquery_rels;	/* all relids appearing in lower
 										 * subqueries */
+
+	/* Grouping information */
+	List       *grouped_tlist;
+
 	/*
 	 * Index of the relation.  It is used to create an alias to a subquery
 	 * representing the relation.
@@ -145,6 +149,8 @@ extern bool hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel,
 extern void hdfs_deparse_describe(StringInfo buf, Relation rel);
 extern void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf);
 extern void hdfs_deparse_analyze(StringInfo buf, Relation rel);
+extern bool hdfs_is_foreign_param(PlannerInfo *root, RelOptInfo *baserel,
+								  Expr *expr);
 
 /* hdfs_query.c headers */
 extern double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
