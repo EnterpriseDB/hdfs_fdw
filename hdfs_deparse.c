@@ -50,7 +50,7 @@ typedef struct foreign_glob_cxt
 	 * pushed.  This flag helps us identify if we are walking through the list
 	 * of join conditions.
 	 */
-	bool		is_join_cond;	/* true for join relations */
+	bool		is_remote_cond;	/* true for join relations */
 } foreign_glob_cxt;
 
 /*
@@ -141,9 +141,11 @@ static void hdfs_append_conditions(List *exprs, deparse_expr_cxt *context);
 static void hdfs_deparse_select_sql(List *tlist, bool is_subquery,
 									List **retrieved_attrs,
 									deparse_expr_cxt *context);
-static void hdfs_deparse_from_expr(StringInfo buf, PlannerInfo *root,
-								   RelOptInfo *foreignrel, bool use_alias,
-								   List **params_list);
+static void hdfs_deparse_from_expr_for_rel(StringInfo buf, PlannerInfo *root,
+										   RelOptInfo *foreignrel,
+										   bool use_alias, List **params_list);
+static void hdfs_deparse_from_expr(List *quals, deparse_expr_cxt *context,
+								   bool use_alias);
 static void hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
 									 RelOptInfo *foreignrel, bool make_subquery,
 									 List **params_list);
@@ -151,6 +153,7 @@ static void hdfs_deparse_explicit_target_list(List *tlist,
 											  List **retrieved_attrs,
 											  deparse_expr_cxt *context);
 static void hdfs_deparse_subquery_target_list(deparse_expr_cxt *context);
+static void hdfs_append_function_name(Oid funcid, deparse_expr_cxt *context);
 
 /*
  * Helper functions
@@ -196,7 +199,7 @@ hdfs_classify_conditions(PlannerInfo *root,
  */
 bool
 hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr,
-					 bool is_join_cond)
+					 bool is_remote_cond)
 {
 	foreign_glob_cxt glob_cxt;
 	foreign_loc_cxt loc_cxt;
@@ -207,7 +210,7 @@ hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr,
 	 */
 	glob_cxt.root = root;
 	glob_cxt.foreignrel = baserel;
-	glob_cxt.is_join_cond = is_join_cond;
+	glob_cxt.is_remote_cond = is_remote_cond;
 	loc_cxt.collation = InvalidOid;
 	loc_cxt.state = FDW_COLLATE_NONE;
 	if (!hdfs_foreign_expr_walker((Node *) expr, &glob_cxt, &loc_cxt))
@@ -250,7 +253,6 @@ hdfs_foreign_expr_walker(Node *node,
 {
 	bool		check_type = true;
 	foreign_loc_cxt inner_cxt;
-	FDWCollateState state;
 
 	/* Need do nothing for empty subexpressions */
 	if (node == NULL)
@@ -310,7 +312,7 @@ hdfs_foreign_expr_walker(Node *node,
 				SubscriptingRef *sbref = (SubscriptingRef *) node;;
 
 				/* Should not be in the join clauses of the Join-pushdown */
-				if (glob_cxt->is_join_cond)
+				if (glob_cxt->is_remote_cond)
 					return false;
 
 				/* Assignment should not be in restrictions. */
@@ -339,7 +341,7 @@ hdfs_foreign_expr_walker(Node *node,
 				FuncExpr   *fe = (FuncExpr *) node;
 
 				/* Should not be in the join clauses of the Join-pushdown */
-				if (glob_cxt->is_join_cond)
+				if (glob_cxt->is_remote_cond)
 					return false;
 
 				/*
@@ -367,7 +369,7 @@ hdfs_foreign_expr_walker(Node *node,
 				/*
 				 * Join-pushdown allows only a few operators to be pushed down.
 				 */
-				if (glob_cxt->is_join_cond &&
+				if (glob_cxt->is_remote_cond &&
 					(!(strcmp(operatorName, "<") == 0 ||
 					   strcmp(operatorName, ">") == 0 ||
 					   strcmp(operatorName, "<=") == 0 ||
@@ -402,7 +404,7 @@ hdfs_foreign_expr_walker(Node *node,
 				ScalarArrayOpExpr *oe = (ScalarArrayOpExpr *) node;
 
 				/* Should not be in the join clauses of the Join-pushdown */
-				if (glob_cxt->is_join_cond)
+				if (glob_cxt->is_remote_cond)
 					return false;
 
 				/*
@@ -460,7 +462,7 @@ hdfs_foreign_expr_walker(Node *node,
 				ArrayExpr  *a = (ArrayExpr *) node;
 
 				/* Should not be in the join clauses of the Join-pushdown */
-				if (glob_cxt->is_join_cond)
+				if (glob_cxt->is_remote_cond)
 					return false;
 
 				/*
@@ -604,22 +606,18 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 	context.foreignrel = rel;
 	context.params_list = params_list;
 
-	/* Construct SELECT clause and FROM clause */
+	/* Construct SELECT clause */
 	hdfs_deparse_select_sql(tlist, is_subquery, retrieved_attrs, &context);
 
-	/* Construct WHERE clause */
-	if (remote_conds != NIL)
-	{
-		appendStringInfoString(buf, " WHERE ");
-		hdfs_append_conditions(remote_conds, &context);
-	}
+	/* Construct FROM and WHERE clauses */
+	hdfs_deparse_from_expr(remote_conds, &context, is_subquery);
 }
 
 /*
  * hdfs_deparse_select_sql
  * 			Construct a simple SELECT statement that retrieves desired columns
  * 			of the specified foreign table, and append it to "buf".  The output
- * 			contains just "SELECT ... FROM tablename".
+ * 			contains just "SELECT ...".
  *
  * We also create an integer List of the columns being retrieved, which is
  * returned to *retrieved_attrs, unless we deparse the specified relation
@@ -648,20 +646,11 @@ hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
 		 */
 		hdfs_deparse_subquery_target_list(context);
 
-		appendStringInfoString(buf, " FROM ");
-
-		hdfs_deparse_from_expr(buf, root, foreignrel, true,
-							   context->params_list);
 	}
 	else if (IS_JOIN_REL(foreignrel))
 	{
 		/* For a join relation use the input tlist */
 		hdfs_deparse_explicit_target_list(tlist, retrieved_attrs, context);
-
-		/* Construct FROM clause */
-		appendStringInfoString(buf, " FROM ");
-		hdfs_deparse_from_expr(buf, root, foreignrel, true,
-							   context->params_list);
 	}
 	else
 	{
@@ -683,15 +672,42 @@ hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
 		hdfs_deparse_target_list(buf, root, foreignrel->relid, rel,
 								 fpinfo->attrs_used, retrieved_attrs);
 
-		/* Construct FROM clause */
-		appendStringInfoString(buf, " FROM ");
-		hdfs_deparse_relation(buf, rel);
-
 #if PG_VERSION_NUM < 130000
 		heap_close(rel, NoLock);
 #else
 		table_close(rel, NoLock);
 #endif
+	}
+}
+
+/*
+ * hdfs_deparse_from_expr
+ * 		Construct a FROM clause and, if needed, a WHERE clause, and
+ * 		append those to "buf".
+ *
+ * quals is the list of clauses to be included in the WHERE clause.
+ */
+static void
+hdfs_deparse_from_expr(List *quals, deparse_expr_cxt *context, bool use_alias)
+{
+	StringInfo	buf = context->buf;
+
+#if PG_VERSION_NUM >= 100000
+	use_alias |= IS_JOIN_REL(context->foreignrel);
+#else
+	use_alias |= (context->foreignrel->reloptkind == RELOPT_JOINREL);
+#endif
+
+	/* Construct FROM clause */
+	appendStringInfoString(buf, " FROM ");
+	hdfs_deparse_from_expr_for_rel(buf, context->root, context->foreignrel,
+								   use_alias, context->params_list);
+
+	/* Construct WHERE clause */
+	if (quals != NIL)
+	{
+		appendStringInfoString(buf, " WHERE ");
+		hdfs_append_conditions(quals, context);
 	}
 }
 
@@ -788,7 +804,8 @@ hdfs_deparse_subquery_target_list(deparse_expr_cxt *context)
  * hdfs_append_conditions
  * 		Deparse conditions from the provided list and append them to buf.
  *
- * The conditions in the list are assumed to be ANDed.
+ * The conditions in the list are assumed to be ANDed.  This function is used
+ * to deparse WHERE clauses, JOIN .. ON clauses.
  *
  * Depending on the caller, the list elements might be either RestrictInfos
  * or bare clauses.
@@ -963,13 +980,16 @@ hdfs_deparse_column_ref(StringInfo buf, int varno, int varattno,
 }
 
 /*
- * hdfs_deparse_from_expr
- * 		Construct a FROM clause
+ * hdfs_deparse_from_expr_for_rel
+ * 		Construct a FROM clause and, if needed, a WHERE clause, and append
+ * 		those to "buf".
+ *
+ *  quals is the list of clauses to be included in the WHERE clause.
  */
 static void
-hdfs_deparse_from_expr(StringInfo buf, PlannerInfo *root,
-					   RelOptInfo *foreignrel, bool use_alias,
-					   List **params_list)
+hdfs_deparse_from_expr_for_rel(StringInfo buf, PlannerInfo *root,
+							   RelOptInfo *foreignrel, bool use_alias,
+							   List **params_list)
 {
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) foreignrel->fdw_private;
 
@@ -1088,7 +1108,8 @@ hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
 						 fpinfo->relation_index);
 	}
 	else
-		hdfs_deparse_from_expr(buf, root, foreignrel, true, params_list);
+		hdfs_deparse_from_expr_for_rel(buf, root, foreignrel, true,
+									   params_list);
 }
 
 /*
@@ -1461,18 +1482,10 @@ hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context)
 	bool		first;
 	ListCell   *arg;
 
-	/*
-	 * Normal function: display as proname(args).
-	 */
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(node->funcid));
-	if (!HeapTupleIsValid(proctup))
-		elog(ERROR, "cache lookup failed for function %u", node->funcid);
+	/* Normal function: display as proname(args) */
+	hdfs_append_function_name(node->funcid, context);
 
-	procform = (Form_pg_proc) GETSTRUCT(proctup);
-
-	/* Deparse the function name ... */
-	proname = NameStr(procform->proname);
-	appendStringInfo(buf, "%s(", quote_identifier(proname));
+	appendStringInfoChar(buf, '(');
 
 	/* Deparse all the arguments */
 	first = true;
@@ -1486,6 +1499,29 @@ hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context)
 	}
 
 	appendStringInfoChar(buf, ')');
+}
+
+/*
+ * hdfs_append_function_name
+ *		Deparses function name from given function oid.
+ */
+static void
+hdfs_append_function_name(Oid funcid, deparse_expr_cxt *context)
+{
+	StringInfo	buf = context->buf;
+	HeapTuple	proctup;
+	Form_pg_proc procform;
+	const char *proname;
+
+	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
+	if (!HeapTupleIsValid(proctup))
+		elog(ERROR, "cache lookup failed for function %u", funcid);
+
+	procform = (Form_pg_proc) GETSTRUCT(proctup);
+
+	/* Deparse the function name ... */
+	proname = NameStr(procform->proname);
+	appendStringInfoString(buf, proname);
 
 	ReleaseSysCache(proctup);
 }

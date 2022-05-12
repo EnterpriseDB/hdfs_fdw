@@ -141,7 +141,7 @@ extern void hdfs_classify_conditions(PlannerInfo *root, RelOptInfo *baserel,
 									 List *input_conds, List **remote_conds,
 									 List **local_conds);
 extern bool hdfs_is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel,
-								 Expr *expr, bool is_join_cond);
+								 Expr *expr, bool is_remote_cond);
 extern void hdfs_deparse_describe(StringInfo buf, Relation rel);
 extern void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf);
 extern void hdfs_deparse_analyze(StringInfo buf, Relation rel);
