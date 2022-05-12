@@ -1,6 +1,6 @@
 -- Connection Settings.
 \set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
-\set HIVE_CLIENT_TYPE           '\'hiveserver2\''
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
 \set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
 \set HIVE_USER           `echo \'"$HIVE_USER"\'`
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
