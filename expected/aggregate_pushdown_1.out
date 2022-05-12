@@ -1,0 +1,1195 @@
+-- Connection Settings.
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
+\c contrib_regression
+CREATE EXTENSION hdfs_fdw;
+-- Create Hadoop FDW Server. log_remote_sql 'true' is required to setup logging
+-- for Remote SQL Sent to Hive Server.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', auth_type :AUTH_TYPE);
+-- Create Hadoop USER MAPPING.
+CREATE USER MAPPING FOR public SERVER hdfs_server
+  OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+-- Create Foreign Table
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        pg_catalog.DATE,
+    sal             INTEGER,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+CREATE FOREIGN TABLE dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+-- Simple aggregates
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno), avg(empno), min(sal), max(empno), sum(empno) * (random() <= 1)::int AS sum2 FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1, 2;
+                                                                        QUERY PLAN                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Result
+   Output: (sum(empno)), (avg(empno)), (min(sal)), (max(empno)), ((sum(empno)) * ((random() <= '1'::double precision))::integer), sal
+   ->  Sort
+         Output: (sum(empno)), (avg(empno)), (min(sal)), (max(empno)), sal
+         Sort Key: (sum(emp.empno)), (avg(emp.empno))
+         ->  Foreign Scan
+               Output: (sum(empno)), (avg(empno)), (min(sal)), (max(empno)), sal
+               Relations: Aggregate on (fdw_db.emp)
+               Remote SQL: SELECT sum(`empno`), avg(`empno`), min(`sal`), max(`empno`), `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(9 rows)
+
+SELECT sum(empno), avg(empno), min(sal), max(empno), sum(empno) * (random() <= 1)::int AS sum2 FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1, 2;
+  sum  |  avg   | min  | max  | sum2  
+-------+--------+------+------+-------
+  7499 | 7499.0 | 1600 | 7499 |  7499
+  7566 | 7566.0 | 2975 | 7566 |  7566
+  7698 | 7698.0 | 2850 | 7698 |  7698
+  7782 | 7782.0 | 2450 | 7782 |  7782
+  7839 | 7839.0 | 5000 | 7839 |  7839
+  7844 | 7844.0 | 1500 | 7844 |  7844
+  7876 | 7876.0 | 1100 | 7876 |  7876
+  7934 | 7934.0 | 1300 | 7934 |  7934
+ 15175 | 7587.5 | 1250 | 7654 | 15175
+ 15690 | 7845.0 | 3000 | 7902 | 15690
+(10 rows)
+
+-- Aggregate is not pushed down as aggregation contains random()
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno * (random() <= 1)::int) AS sum, avg(empno) FROM emp;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum((empno * ((random() <= '1'::double precision))::integer)), avg(empno)
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp`
+(5 rows)
+
+SELECT sum(empno * (random() <= 1)::int) AS sum, avg(empno) FROM emp;
+  sum   |          avg          
+--------+-----------------------
+ 108172 | 7726.5714285714285714
+(1 row)
+
+-- Aggregate over join query
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT count(*), sum(t1.empno), avg(t2.deptno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+                                                                                        QUERY PLAN                                                                                        
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: (count(*)), (sum(t1.empno)), (avg(t2.deptno))
+   Relations: Aggregate on ((fdw_db.emp t1) INNER JOIN (fdw_db.dept t2))
+   Remote SQL: SELECT count(*), sum(r1.`empno`), avg(r2.`deptno`) FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) WHERE ((r1.`empno` = '7654'))
+(4 rows)
+
+SELECT count(*), sum(t1.empno), avg(t2.deptno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+ count | sum  | avg  
+-------+------+------
+     1 | 7654 | 30.0
+(1 row)
+
+-- Not pushed down due to local conditions present in underneath input rel
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.deptno), count(t2.deptno) FROM emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE ((t1.deptno * t2.deptno)/(t1.deptno * t2.deptno)) * random() <= 1;
+                                                                  QUERY PLAN                                                                   
+-----------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum(t1.deptno), count(t2.deptno)
+   ->  Foreign Scan
+         Output: t1.deptno, t2.deptno
+         Filter: (((((t1.deptno * t2.deptno) / (t1.deptno * t2.deptno)))::double precision * random()) <= '1'::double precision)
+         Relations: (fdw_db.emp t1) INNER JOIN (fdw_db.dept t2)
+         Remote SQL: SELECT r1.`deptno`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+SELECT sum(t1.deptno), count(t2.deptno) FROM emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE ((t1.deptno * t2.deptno)/(t1.deptno * t2.deptno)) * random() <= 1;
+ sum | count 
+-----+-------
+ 310 |    14
+(1 row)
+
+-- GROUP BY clause HAVING expressions
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal+20, sum(sal) * (sal+20) FROM emp GROUP BY sal+20 ORDER BY sal+20;
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: ((sal + 20)), ((sum(sal) * (sal + 20)))
+   Sort Key: ((emp.sal + 20))
+   ->  Foreign Scan
+         Output: ((sal + 20)), ((sum(sal) * (sal + 20)))
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT (`sal` + '20'), (sum(`sal`) * (`sal` + '20')) FROM `fdw_db`.`emp` GROUP BY ((`sal` + '20'))
+(7 rows)
+
+-- Aggregates in subquery are pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT count(x.a), sum(x.a) FROM (SELECT sal a, sum(sal) b FROM emp GROUP BY sal ORDER BY 1, 2) x;
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
+ Aggregate
+   Output: count(emp.sal), sum(emp.sal)
+   ->  Sort
+         Output: emp.sal, (sum(emp.sal))
+         Sort Key: emp.sal, (sum(emp.sal))
+         ->  Foreign Scan
+               Output: emp.sal, (sum(emp.sal))
+               Relations: Aggregate on (fdw_db.emp)
+               Remote SQL: SELECT `sal`, sum(`sal`) FROM `fdw_db`.`emp` GROUP BY `sal`
+(9 rows)
+
+SELECT count(x.a), sum(x.a) FROM (SELECT sal a, sum(sal) b FROM emp GROUP BY sal ORDER BY 1, 2) x;
+ count |  sum  
+-------+-------
+    12 | 24775
+(1 row)
+
+-- Aggregate is still pushed down by taking unshippable expression out
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal * (random() <= 1)::int AS sum1, sum(empno) * sal AS sum2 FROM emp GROUP BY sal ORDER BY 1, 2;
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
+ Sort
+   Output: ((sal * ((random() <= '1'::double precision))::integer)), ((sum(empno) * sal)), sal
+   Sort Key: ((emp.sal * ((random() <= '1'::double precision))::integer)), ((sum(emp.empno) * emp.sal))
+   ->  Foreign Scan
+         Output: (sal * ((random() <= '1'::double precision))::integer), ((sum(empno) * sal)), sal
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT (sum(`empno`) * `sal`), `sal` FROM `fdw_db`.`emp` GROUP BY `sal`
+(7 rows)
+
+SELECT sal * (random() <= 1)::int AS sum1, sum(empno) * sal AS sum2 FROM emp GROUP BY sal ORDER BY 1, 2;
+ sum1 |   sum2   
+------+----------
+  800 |  5895200
+  950 |  7505000
+ 1100 |  8663600
+ 1250 | 18968750
+ 1300 | 10314200
+ 1500 | 11766000
+ 1600 | 11998400
+ 2450 | 19065900
+ 2850 | 21939300
+ 2975 | 22508850
+ 3000 | 47070000
+ 5000 | 39195000
+(12 rows)
+
+-- Aggregate with unshippable GROUP BY clause are not pushed
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal * (random() <= 1)::int AS c2 FROM emp GROUP BY sal * (random() <= 1)::int ORDER BY 1;
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
+ Group
+   Output: ((sal * ((random() <= '1'::double precision))::integer))
+   Group Key: ((emp.sal * ((random() <= '1'::double precision))::integer))
+   ->  Sort
+         Output: ((sal * ((random() <= '1'::double precision))::integer))
+         Sort Key: ((emp.sal * ((random() <= '1'::double precision))::integer))
+         ->  Foreign Scan on public.emp
+               Output: (sal * ((random() <= '1'::double precision))::integer)
+               Remote SQL: SELECT `sal` FROM `fdw_db`.`emp`
+(9 rows)
+
+SELECT sal * (random() <= 1)::int AS c2 FROM emp GROUP BY sal * (random() <= 1)::int ORDER BY 1;
+  c2  
+------
+  800
+  950
+ 1100
+ 1250
+ 1300
+ 1500
+ 1600
+ 2450
+ 2850
+ 2975
+ 3000
+ 5000
+(12 rows)
+
+-- GROUP BY clause in various forms, cardinal, alias and constant expression
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT count(sal) w, sal x, 5 y, 7.0 z FROM emp GROUP BY 2, y, 9.0::int ORDER BY 2;
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (count(sal)), sal, 5, 7.0, 9
+   Sort Key: emp.sal
+   ->  Foreign Scan
+         Output: (count(sal)), sal, 5, 7.0, 9
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT count(`sal`), `sal`, '5', '7.0', '9' FROM `fdw_db`.`emp` GROUP BY `sal`, '5', '9'
+(7 rows)
+
+SELECT count(sal) w, sal x, 5 y, 7.0 z FROM emp GROUP BY 2, y, 9.0::int ORDER BY 2;
+ w |  x   | y |  z  
+---+------+---+-----
+ 1 |  800 | 5 | 7.0
+ 1 |  950 | 5 | 7.0
+ 1 | 1100 | 5 | 7.0
+ 2 | 1250 | 5 | 7.0
+ 1 | 1300 | 5 | 7.0
+ 1 | 1500 | 5 | 7.0
+ 1 | 1600 | 5 | 7.0
+ 1 | 2450 | 5 | 7.0
+ 1 | 2850 | 5 | 7.0
+ 1 | 2975 | 5 | 7.0
+ 2 | 3000 | 5 | 7.0
+ 1 | 5000 | 5 | 7.0
+(12 rows)
+
+-- Testing HAVING clause shippability
+SET enable_sort TO ON;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, sum(empno) FROM emp GROUP BY sal HAVING avg(empno) > 500 and sum(empno) > 4980 ORDER BY sal;
+                                                                   QUERY PLAN                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: sal, (sum(empno))
+   Sort Key: emp.sal
+   ->  Foreign Scan
+         Output: sal, (sum(empno))
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT `sal`, sum(`empno`) FROM `fdw_db`.`emp` GROUP BY `sal` HAVING ((avg(`empno`) > '500')) AND ((sum(`empno`) > '4980'))
+(7 rows)
+
+SELECT sal, sum(empno) FROM emp GROUP BY sal HAVING avg(empno) > 500 and sum(empno) > 4980 ORDER BY sal;
+ sal  |  sum  
+------+-------
+  800 |  7369
+  950 |  7900
+ 1100 |  7876
+ 1250 | 15175
+ 1300 |  7934
+ 1500 |  7844
+ 1600 |  7499
+ 2450 |  7782
+ 2850 |  7698
+ 2975 |  7566
+ 3000 | 15690
+ 5000 |  7839
+(12 rows)
+
+-- Using expressions in HAVING clause
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT ename, count(empno) FROM emp GROUP BY ename HAVING sqrt(max(empno)) = sqrt(7900) ORDER BY 1, 2;
+                                              QUERY PLAN                                               
+-------------------------------------------------------------------------------------------------------
+ Sort
+   Output: ename, (count(empno))
+   Sort Key: emp.ename, (count(emp.empno))
+   ->  Foreign Scan
+         Output: ename, (count(empno))
+         Filter: (sqrt(((max(emp.empno)))::double precision) = '88.88194417315589'::double precision)
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT `ename`, count(`empno`), max(`empno`) FROM `fdw_db`.`emp` GROUP BY `ename`
+(8 rows)
+
+SELECT ename, count(empno) FROM emp GROUP BY ename HAVING sqrt(max(empno)) = sqrt(7900) ORDER BY 1, 2;
+ ename | count 
+-------+-------
+ JAMES |     1
+(1 row)
+
+SET enable_sort TO off;
+-- Unshippable HAVING clause will be evaluated locally, and other qual in HAVING clause is pushed down
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT count(*) FROM (SELECT ename, count(empno) FROM emp GROUP BY ename HAVING (avg(empno) / avg(empno)) * random() <= 1 and avg(empno) < 500) x;
+                                                         QUERY PLAN                                                          
+-----------------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: count(*)
+   ->  Foreign Scan
+         Output: emp.ename, NULL::bigint
+         Filter: (((((avg(emp.empno)) / (avg(emp.empno))))::double precision * random()) <= '1'::double precision)
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT `ename`, NULL, avg(`empno`) FROM `fdw_db`.`emp` GROUP BY `ename` HAVING ((avg(`empno`) < '500'))
+(7 rows)
+
+SELECT count(*) FROM (SELECT ename, count(empno) FROM emp GROUP BY ename HAVING (avg(empno) / avg(empno)) * random() <= 1 and avg(empno) < 500) x;
+ count 
+-------
+     0
+(1 row)
+
+-- Aggregate in HAVING clause is not pushable, and thus aggregation is not pushed down
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(sal) FROM emp GROUP BY empno HAVING avg(sal * (random() <= 1)::int) > 1 ORDER BY 1;
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(sal)), empno
+   Sort Key: (sum(emp.sal))
+   ->  HashAggregate
+         Output: sum(sal), empno
+         Group Key: emp.empno
+         Filter: (avg((emp.sal * ((random() <= '1'::double precision))::integer)) > '1'::numeric)
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp`
+(10 rows)
+
+SELECT sum(sal) FROM emp GROUP BY empno HAVING avg(sal * (random() <= 1)::int) > 1 ORDER BY 1;
+ sum  
+------
+  800
+  950
+ 1100
+ 1250
+ 1250
+ 1300
+ 1500
+ 1600
+ 2450
+ 2850
+ 2975
+ 3000
+ 3000
+ 5000
+(14 rows)
+
+-- Testing ORDER BY, DISTINCT, FILTER, Ordered-sets and VARIADIC within aggregates
+-- ORDER BY within aggregates (same column used to order) are not pushed
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(sal ORDER BY sal) FROM emp WHERE sal < 1000 GROUP BY empno ORDER BY 1;
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(sal ORDER BY sal)), empno
+   Sort Key: (sum(emp.sal ORDER BY emp.sal))
+   ->  GroupAggregate
+         Output: sum(sal ORDER BY sal), empno
+         Group Key: emp.empno
+         ->  Sort
+               Output: empno, sal
+               Sort Key: emp.empno
+               ->  Foreign Scan on public.emp
+                     Output: empno, sal
+                     Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` < '1000'))
+(12 rows)
+
+SELECT sum(sal ORDER BY sal) FROM emp WHERE sal < 1000 GROUP BY empno ORDER BY 1;
+ sum 
+-----
+ 800
+ 950
+(2 rows)
+
+-- ORDER BY within aggregate (different column used to order also using DESC)
+-- are not pushed.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(sal ORDER BY empno desc) FROM emp WHERE empno > 5000 and sal > 1000;
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum(sal ORDER BY empno DESC)
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`empno` > '5000')) AND ((`sal` > '1000'))
+(5 rows)
+
+SELECT sum(sal ORDER BY empno desc) FROM emp WHERE empno > 5000 and sal > 1000;
+  sum  
+-------
+ 27275
+(1 row)
+
+-- DISTINCT within aggregate
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(DISTINCT (sal)) FROM emp WHERE empno = 7654  and sal < 2000;
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: (sum(DISTINCT sal))
+   Relations: Aggregate on (fdw_db.emp)
+   Remote SQL: SELECT sum(DISTINCT `sal`) FROM `fdw_db`.`emp` WHERE ((`sal` < '2000')) AND ((`empno` = '7654'))
+(4 rows)
+
+SELECT sum(DISTINCT (sal)) FROM emp WHERE empno = 7654  and sal < 2000;
+ sum  
+------
+ 1250
+(1 row)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(DISTINCT (t1.sal)) FROM emp t1 join dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno < 8000 or (t1.empno is null and t2.deptno < 30) GROUP BY (t2.deptno) ORDER BY 1;
+                                                                                                                                                       QUERY PLAN                                                                                                                                                       
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(DISTINCT t1.sal)), t2.deptno
+   Sort Key: (sum(DISTINCT t1.sal))
+   ->  Foreign Scan
+         Output: (sum(DISTINCT t1.sal)), t2.deptno
+         Relations: Aggregate on ((fdw_db.emp t1) INNER JOIN (fdw_db.dept t2))
+         Remote SQL: SELECT sum(DISTINCT r1.`sal`), r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON ((((r1.`empno` < '8000') OR ((r1.`empno` IS NULL) AND (r2.`deptno` < '30')))) AND ((r1.`deptno` = r2.`deptno`)))) WHERE (((r1.`empno` < '8000') OR (r1.`empno` IS NULL))) GROUP BY r2.`deptno`
+(7 rows)
+
+SELECT sum(DISTINCT (t1.sal)) FROM emp t1 join dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno < 8000 or (t1.empno is null and t2.deptno < 30) GROUP BY (t2.deptno) ORDER BY 1;
+ sum  
+------
+ 7875
+ 8150
+ 8750
+(3 rows)
+
+-- DISTINCT with aggregate within aggregate
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(DISTINCT sal) FROM emp WHERE empno = 7654 and sal < 2000;
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: (sum(DISTINCT sal))
+   Relations: Aggregate on (fdw_db.emp)
+   Remote SQL: SELECT sum(DISTINCT `sal`) FROM `fdw_db`.`emp` WHERE ((`sal` < '2000')) AND ((`empno` = '7654'))
+(4 rows)
+
+SELECT sum(DISTINCT sal) FROM emp WHERE empno = 7654 and sal < 2000;
+ sum  
+------
+ 1250
+(1 row)
+
+-- DISTINCT, ORDER BY and FILTER within aggregate, not pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(sal%3), sum(DISTINCT sal%3 ORDER BY sal%3) filter (WHERE sal%3 < 2), empno FROM emp WHERE empno = 7654 GROUP BY empno;
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: sum((sal % 3)), sum(DISTINCT (sal % 3) ORDER BY (sal % 3)) FILTER (WHERE ((sal % 3) < 2)), empno
+   Group Key: emp.empno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`empno` = '7654'))
+(6 rows)
+
+SELECT sum(sal%3), sum(DISTINCT sal%3 ORDER BY sal%3) filter (WHERE sal%3 < 2), empno FROM emp WHERE empno = 7654 GROUP BY empno;
+ sum | sum | empno 
+-----+-----+-------
+   2 |     |  7654
+(1 row)
+
+-- FILTER within aggregate, not pushed
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(sal) filter (WHERE sal < 2000 and empno > 1000) FROM emp GROUP BY empno ORDER BY 1 nulls last;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(sal) FILTER (WHERE ((sal < 2000) AND (empno > 1000)))), empno
+   Sort Key: (sum(emp.sal) FILTER (WHERE ((emp.sal < 2000) AND (emp.empno > 1000))))
+   ->  HashAggregate
+         Output: sum(sal) FILTER (WHERE ((sal < 2000) AND (empno > 1000))), empno
+         Group Key: emp.empno
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp`
+(9 rows)
+
+SELECT sum(sal) filter (WHERE sal < 2000 and empno > 1000) FROM emp GROUP BY empno ORDER BY 1 nulls last;
+ sum  
+------
+  800
+  950
+ 1100
+ 1250
+ 1250
+ 1300
+ 1500
+ 1600
+     
+     
+     
+     
+     
+     
+(14 rows)
+
+-- Outer query is aggregation query
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT DISTINCT (SELECT count(*) filter (WHERE t2.deptno = 20 and t1.empno < 8000) FROM emp t1 WHERE t1.empno = 7654) FROM dept t2 ORDER BY 1;
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Unique
+   Output: ((SubPlan 1))
+   ->  Sort
+         Output: ((SubPlan 1))
+         Sort Key: ((SubPlan 1))
+         ->  Foreign Scan on public.dept t2
+               Output: (SubPlan 1)
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+               SubPlan 1
+                 ->  Aggregate
+                       Output: count(*) FILTER (WHERE ((t2.deptno = 20) AND (t1.empno < 8000)))
+                       ->  Foreign Scan on public.emp t1
+                             Output: t1.empno, t1.ename, t1.job, t1.mgr, t1.hiredate, t1.sal, t1.comm, t1.deptno
+                             Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` WHERE ((`empno` = '7654'))
+(14 rows)
+
+SELECT DISTINCT (SELECT count(*) filter (WHERE t2.deptno = 20 and t1.empno < 8000) FROM emp t1 WHERE t1.empno = 7654) FROM dept t2 ORDER BY 1;
+ count 
+-------
+     0
+     1
+(2 rows)
+
+-- Inner query is aggregation query
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT DISTINCT (SELECT count(t1.empno) filter (WHERE t2.deptno = 20) FROM emp t1 WHERE t1.empno = 7654) FROM dept t2 ORDER BY 1;
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Unique
+   Output: ((SubPlan 1))
+   ->  Sort
+         Output: ((SubPlan 1))
+         Sort Key: ((SubPlan 1))
+         ->  Foreign Scan on public.dept t2
+               Output: (SubPlan 1)
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+               SubPlan 1
+                 ->  Aggregate
+                       Output: count(t1.empno) FILTER (WHERE (t2.deptno = 20))
+                       ->  Foreign Scan on public.emp t1
+                             Output: t1.empno, t1.ename, t1.job, t1.mgr, t1.hiredate, t1.sal, t1.comm, t1.deptno
+                             Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` WHERE ((`empno` = '7654'))
+(14 rows)
+
+SELECT DISTINCT (SELECT count(t1.empno) filter (WHERE t2.deptno = 20) FROM emp t1 WHERE t1.empno = 7654) FROM dept t2 ORDER BY 1;
+ count 
+-------
+     0
+     1
+(2 rows)
+
+-- Ordered-sets within aggregate, not pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, rank('10'::varchar) within group (ORDER BY ename), percentile_cont(sal/5000::numeric) within group (ORDER BY empno) FROM emp GROUP BY sal HAVING percentile_cont(sal/200::numeric) within group (ORDER BY empno) < 8000 ORDER BY sal;
+                                                                                               QUERY PLAN                                                                                                
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: sal, rank('10'::character varying) WITHIN GROUP (ORDER BY ename), percentile_cont((((sal)::numeric / '5000'::numeric))::double precision) WITHIN GROUP (ORDER BY ((empno)::double precision))
+   Group Key: emp.sal
+   Filter: (percentile_cont((((emp.sal)::numeric / '200'::numeric))::double precision) WITHIN GROUP (ORDER BY ((emp.empno)::double precision)) < '8000'::double precision)
+   ->  Sort
+         Output: sal, ename, empno
+         Sort Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: sal, ename, empno
+               Remote SQL: SELECT `empno`, `ename`, `sal` FROM `fdw_db`.`emp`
+(10 rows)
+
+SELECT sal, rank('10'::varchar) within group (ORDER BY ename), percentile_cont(sal/5000::numeric) within group (ORDER BY empno) FROM emp GROUP BY sal HAVING percentile_cont(sal/5000::numeric) within group (ORDER BY empno) < 8000 ORDER BY sal;
+ sal  | rank | percentile_cont 
+------+------+-----------------
+  800 |    1 |            7369
+  950 |    1 |            7900
+ 1100 |    1 |            7876
+ 1250 |    1 |         7554.25
+ 1300 |    1 |            7934
+ 1500 |    1 |            7844
+ 1600 |    1 |            7499
+ 2450 |    1 |            7782
+ 2850 |    1 |            7698
+ 2975 |    1 |            7566
+ 3000 |    1 |          7856.4
+ 5000 |    1 |            7839
+(12 rows)
+
+-- Using multiple arguments within aggregates
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno, rank(empno, sal) within group (ORDER BY empno, sal) FROM emp GROUP BY empno, sal HAVING empno = 7654 ORDER BY 1;
+                                           QUERY PLAN                                           
+------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: empno, rank(empno, sal) WITHIN GROUP (ORDER BY empno, sal), sal
+   Group Key: emp.empno, emp.sal
+   ->  Sort
+         Output: empno, sal
+         Sort Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: empno, sal
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`empno` = '7654'))
+(9 rows)
+
+SELECT empno, rank(empno, sal) within group (ORDER BY empno, sal) FROM emp GROUP BY empno, sal HAVING empno = 7654 ORDER BY 1;
+ empno | rank 
+-------+------
+  7654 |    1
+(1 row)
+
+-- Subquery in FROM clause HAVING aggregate
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT count(*), x.b FROM emp, (SELECT deptno a, sum(deptno) b FROM dept GROUP BY deptno) x WHERE emp.deptno = x.a GROUP BY x.b ORDER BY 1, 2;
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (count(*)), x.b
+   Sort Key: (count(*)), x.b
+   ->  HashAggregate
+         Output: count(*), x.b
+         Group Key: x.b
+         ->  Hash Join
+               Output: x.b
+               Inner Unique: true
+               Hash Cond: (emp.deptno = x.a)
+               ->  Foreign Scan on public.emp
+                     Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`emp`
+               ->  Hash
+                     Output: x.b, x.a
+                     ->  Subquery Scan on x
+                           Output: x.b, x.a
+                           ->  Foreign Scan
+                                 Output: dept.deptno, (sum(dept.deptno))
+                                 Relations: Aggregate on (fdw_db.dept)
+                                 Remote SQL: SELECT `deptno`, sum(`deptno`) FROM `fdw_db`.`dept` GROUP BY `deptno`
+(21 rows)
+
+SELECT count(*), x.b FROM emp, (SELECT deptno a, sum(deptno) b FROM dept GROUP BY deptno) x WHERE emp.deptno = x.a GROUP BY x.b ORDER BY 1, 2;
+ count | b  
+-------+----
+     3 | 10
+     5 | 20
+     6 | 30
+(3 rows)
+
+-- Join with IS NULL check in HAVING
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT avg(t1.empno), sum(t2.deptno) FROM emp t1 join dept t2 ON (t1.deptno = t2.deptno) GROUP BY t2.deptno HAVING (avg(t1.empno) is null and sum(t2.deptno) > 10) or sum(t2.deptno) is null ORDER BY 1 nulls last, 2;
+                                                                                                                                         QUERY PLAN                                                                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (avg(t1.empno)), (sum(t2.deptno)), t2.deptno
+   Sort Key: (avg(t1.empno)), (sum(t2.deptno))
+   ->  Foreign Scan
+         Output: (avg(t1.empno)), (sum(t2.deptno)), t2.deptno
+         Relations: Aggregate on ((fdw_db.emp t1) INNER JOIN (fdw_db.dept t2))
+         Remote SQL: SELECT avg(r1.`empno`), sum(r2.`deptno`), r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) GROUP BY r2.`deptno` HAVING ((((avg(r1.`empno`) IS NULL) AND (sum(r2.`deptno`) > '10')) OR (sum(r2.`deptno`) IS NULL)))
+(7 rows)
+
+SELECT avg(t1.empno), sum(t2.deptno) FROM emp t1 join dept t2 ON (t1.deptno = t2.deptno) GROUP BY t2.deptno HAVING (avg(t1.empno) is null and sum(t2.deptno) > 10) or sum(t2.deptno) is null ORDER BY 1 nulls last, 2;
+ avg | sum 
+-----+-----
+(0 rows)
+
+-- ORDER BY expression is part of the target list but not pushed down to
+-- foreign server.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(sal) * (random() <= 1)::int AS sum FROM emp ORDER BY 1;
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Sort
+   Output: (((sum(sal)) * ((random() <= '1'::double precision))::integer))
+   Sort Key: (((sum(emp.sal)) * ((random() <= '1'::double precision))::integer))
+   ->  Foreign Scan
+         Output: ((sum(sal)) * ((random() <= '1'::double precision))::integer)
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT sum(`sal`) FROM `fdw_db`.`emp`
+(7 rows)
+
+SELECT sum(sal) * (random() <= 1)::int AS sum FROM emp ORDER BY 1;
+  sum  
+-------
+ 29025
+(1 row)
+
+-- Check with placeHolderVars
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT q.b, count(emp.deptno), sum(q.a) FROM emp left join (SELECT min(13), avg(emp.deptno), sum(dept.deptno) FROM emp right join dept ON (emp.deptno = dept.deptno) WHERE emp.deptno = 20) q(a, b, c) ON (emp.deptno = q.b) WHERE emp.deptno between 10 and 30 GROUP BY q.b ORDER BY 1 nulls last, 2;
+                                                                                                  QUERY PLAN                                                                                                   
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: q.b, (count(emp.deptno)), (sum(q.a))
+   Sort Key: q.b, (count(emp.deptno))
+   ->  HashAggregate
+         Output: q.b, count(emp.deptno), sum(q.a)
+         Group Key: q.b
+         ->  Hash Left Join
+               Output: q.b, emp.deptno, q.a
+               Inner Unique: true
+               Hash Cond: ((emp.deptno)::numeric = q.b)
+               ->  Foreign Scan on public.emp
+                     Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`emp` WHERE ((`deptno` >= '10')) AND ((`deptno` <= '30'))
+               ->  Hash
+                     Output: q.b, q.a
+                     ->  Subquery Scan on q
+                           Output: q.b, q.a
+                           ->  Foreign Scan
+                                 Output: (min(13)), (avg(emp_1.deptno)), NULL::bigint
+                                 Relations: Aggregate on ((fdw_db.emp) INNER JOIN (fdw_db.dept))
+                                 Remote SQL: SELECT min('13'), avg(r1.`deptno`), NULL FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE)) WHERE ((r2.`deptno` = '20')) AND ((r1.`deptno` = '20'))
+(21 rows)
+
+SELECT q.b, count(emp.deptno), sum(q.a) FROM emp left join (SELECT min(13), avg(emp.deptno), sum(dept.deptno) FROM emp right join dept ON (emp.deptno = dept.deptno) WHERE emp.deptno = 20) q(a, b, c) ON (emp.deptno = q.b) WHERE emp.deptno between 10 and 30 GROUP BY q.b ORDER BY 1 nulls last, 2;
+  b   | count | sum 
+------+-------+-----
+ 20.0 |     5 |  65
+      |     9 |    
+(2 rows)
+
+-- Not supported cases
+-- Grouping sets
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, sum(empno) FROM emp WHERE sal > 1000 GROUP BY rollup(sal) ORDER BY 1 nulls last;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Sort
+   Output: sal, (sum(empno))
+   Sort Key: emp.sal
+   ->  MixedAggregate
+         Output: sal, sum(empno)
+         Hash Key: emp.sal
+         Group Key: ()
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(10 rows)
+
+SELECT sal, sum(empno) FROM emp WHERE sal > 1000 GROUP BY rollup(sal) ORDER BY 1 nulls last;
+ sal  |  sum  
+------+-------
+ 1100 |  7876
+ 1250 | 15175
+ 1300 |  7934
+ 1500 |  7844
+ 1600 |  7499
+ 2450 |  7782
+ 2850 |  7698
+ 2975 |  7566
+ 3000 | 15690
+ 5000 |  7839
+      | 92903
+(11 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, sum(empno) FROM emp WHERE sal > 1000 GROUP BY cube(sal) ORDER BY 1 nulls last;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Sort
+   Output: sal, (sum(empno))
+   Sort Key: emp.sal
+   ->  MixedAggregate
+         Output: sal, sum(empno)
+         Hash Key: emp.sal
+         Group Key: ()
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(10 rows)
+
+SELECT sal, sum(empno) FROM emp WHERE sal > 1000 GROUP BY cube(sal) ORDER BY 1 nulls last;
+ sal  |  sum  
+------+-------
+ 1100 |  7876
+ 1250 | 15175
+ 1300 |  7934
+ 1500 |  7844
+ 1600 |  7499
+ 2450 |  7782
+ 2850 |  7698
+ 2975 |  7566
+ 3000 | 15690
+ 5000 |  7839
+      | 92903
+(11 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, ename, sum(empno) FROM emp WHERE sal > 1000 GROUP BY grouping sets(sal, ename) ORDER BY 1 nulls last, 2 nulls last;
+                                              QUERY PLAN                                               
+-------------------------------------------------------------------------------------------------------
+ Sort
+   Output: sal, ename, (sum(empno))
+   Sort Key: emp.sal, emp.ename
+   ->  HashAggregate
+         Output: sal, ename, sum(empno)
+         Hash Key: emp.sal
+         Hash Key: emp.ename
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `ename`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(10 rows)
+
+SELECT sal, ename, sum(empno) FROM emp WHERE sal > 1000 GROUP BY grouping sets(sal, ename) ORDER BY 1 nulls last, 2 nulls last;
+ sal  | ename  |  sum  
+------+--------+-------
+ 1100 |        |  7876
+ 1250 |        | 15175
+ 1300 |        |  7934
+ 1500 |        |  7844
+ 1600 |        |  7499
+ 2450 |        |  7782
+ 2850 |        |  7698
+ 2975 |        |  7566
+ 3000 |        | 15690
+ 5000 |        |  7839
+      | ADAMS  |  7876
+      | ALLEN  |  7499
+      | BLAKE  |  7698
+      | CLARK  |  7782
+      | FORD   |  7902
+      | JONES  |  7566
+      | KING   |  7839
+      | MARTIN |  7654
+      | MILLER |  7934
+      | SCOTT  |  7788
+      | TURNER |  7844
+      | WARD   |  7521
+(22 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, sum(empno), grouping(sal) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1 nulls last;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Sort
+   Output: sal, (sum(empno)), (GROUPING(sal))
+   Sort Key: emp.sal
+   ->  HashAggregate
+         Output: sal, sum(empno), GROUPING(sal)
+         Group Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(9 rows)
+
+SELECT sal, sum(empno), grouping(sal) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1 nulls last;
+ sal  |  sum  | grouping 
+------+-------+----------
+ 1100 |  7876 |        0
+ 1250 | 15175 |        0
+ 1300 |  7934 |        0
+ 1500 |  7844 |        0
+ 1600 |  7499 |        0
+ 2450 |  7782 |        0
+ 2850 |  7698 |        0
+ 2975 |  7566 |        0
+ 3000 | 15690 |        0
+ 5000 |  7839 |        0
+(10 rows)
+
+-- DISTINCT itself is not pushed down, whereas underneath aggregate is pushed
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT DISTINCT sum(empno) s FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                                    QUERY PLAN                                                    
+------------------------------------------------------------------------------------------------------------------
+ Unique
+   Output: (sum(empno)), sal
+   ->  Sort
+         Output: (sum(empno)), sal
+         Sort Key: (sum(emp.empno))
+         ->  Foreign Scan
+               Output: (sum(empno)), sal
+               Relations: Aggregate on (fdw_db.emp)
+               Remote SQL: SELECT sum(`empno`), `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(9 rows)
+
+SELECT DISTINCT sum(empno) s FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+   s   
+-------
+  7499
+  7566
+  7698
+  7782
+  7839
+  7844
+  7876
+  7934
+ 15175
+ 15690
+(10 rows)
+
+-- WindowAgg
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, sum(sal), count(sal) over (partition by sal) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ WindowAgg
+   Output: sal, (sum(sal)), count(sal) OVER (?)
+   ->  Sort
+         Output: sal, (sum(sal))
+         Sort Key: emp.sal
+         ->  Foreign Scan
+               Output: sal, (sum(sal))
+               Relations: Aggregate on (fdw_db.emp)
+               Remote SQL: SELECT `sal`, sum(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(9 rows)
+
+SELECT sal, sum(sal), count(sal) over (partition by sal) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+ sal  | sum  | count 
+------+------+-------
+ 1100 | 1100 |     1
+ 1250 | 2500 |     1
+ 1300 | 1300 |     1
+ 1500 | 1500 |     1
+ 1600 | 1600 |     1
+ 2450 | 2450 |     1
+ 2850 | 2850 |     1
+ 2975 | 2975 |     1
+ 3000 | 6000 |     1
+ 5000 | 5000 |     1
+(10 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, array_agg(sal) over (partition by sal ORDER BY sal desc) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                                QUERY PLAN                                                
+----------------------------------------------------------------------------------------------------------
+ Sort
+   Output: sal, (array_agg(sal) OVER (?))
+   Sort Key: emp.sal
+   ->  WindowAgg
+         Output: sal, array_agg(sal) OVER (?)
+         ->  Sort
+               Output: sal
+               Sort Key: emp.sal DESC
+               ->  Foreign Scan
+                     Output: sal
+                     Relations: Aggregate on (fdw_db.emp)
+                     Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(12 rows)
+
+SELECT sal, array_agg(sal) over (partition by sal ORDER BY sal desc) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+ sal  | array_agg 
+------+-----------
+ 1100 | {1100}
+ 1250 | {1250}
+ 1300 | {1300}
+ 1500 | {1500}
+ 1600 | {1600}
+ 2450 | {2450}
+ 2850 | {2850}
+ 2975 | {2975}
+ 3000 | {3000}
+ 5000 | {5000}
+(10 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, array_agg(sal) over (partition by sal ORDER BY sal range between current row and unbounded following) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ WindowAgg
+   Output: sal, array_agg(sal) OVER (?)
+   ->  Sort
+         Output: sal
+         Sort Key: emp.sal
+         ->  Foreign Scan
+               Output: sal
+               Relations: Aggregate on (fdw_db.emp)
+               Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(9 rows)
+
+SELECT sal, array_agg(sal) over (partition by sal ORDER BY sal range between current row and unbounded following) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+ sal  | array_agg 
+------+-----------
+ 1100 | {1100}
+ 1250 | {1250}
+ 1300 | {1300}
+ 1500 | {1500}
+ 1600 | {1600}
+ 2450 | {2450}
+ 2850 | {2850}
+ 2975 | {2975}
+ 3000 | {3000}
+ 5000 | {5000}
+(10 rows)
+
+-- User defined function for user defined aggregate, VARIADIC
+CREATE FUNCTION least_accum(anyelement, variadic anyarray)
+returns anyelement language sql AS
+  'SELECT least($1, min($2[i])) FROM generate_subscripts($2,2) g(i)';
+CREATE aggregate least_agg(variadic items anyarray) (
+  stype = anyelement, sfunc = least_accum
+);
+-- Not pushed down due to user defined aggregate
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sal, least_agg(empno) FROM emp GROUP BY sal ORDER BY sal;
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Sort
+   Output: sal, (least_agg(VARIADIC ARRAY[empno]))
+   Sort Key: emp.sal
+   ->  HashAggregate
+         Output: sal, least_agg(VARIADIC ARRAY[empno])
+         Group Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp`
+(9 rows)
+
+SELECT sal, least_agg(empno) FROM emp GROUP BY sal ORDER BY sal;
+ sal  | least_agg 
+------+-----------
+  800 |          
+  950 |          
+ 1100 |          
+ 1250 |          
+ 1300 |          
+ 1500 |          
+ 1600 |          
+ 2450 |          
+ 2850 |          
+ 2975 |          
+ 3000 |          
+ 5000 |          
+(12 rows)
+
+-- Test partition-wise aggregates
+SET enable_partitionwise_aggregate TO on;
+-- Create the partition tables.
+CREATE TABLE fprt1 (c1 int, c2 int, c3 varchar) PARTITION BY RANGE(c1);
+CREATE FOREIGN TABLE ftprt1_p1 PARTITION OF fprt1 FOR VALUES FROM (1) TO (4)
+  SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test1');
+CREATE FOREIGN TABLE ftprt1_p2 PARTITION OF fprt1 FOR VALUES FROM (5) TO (8)
+  SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'test2');
+-- Plan with partitionwise aggregates is enabled
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT c1, sum(c1) FROM fprt1 GROUP BY c1 ORDER BY 2;
+                                      QUERY PLAN                                      
+--------------------------------------------------------------------------------------
+ Sort
+   Output: ftprt1_p1.c1, (sum(ftprt1_p1.c1))
+   Sort Key: (sum(ftprt1_p1.c1))
+   ->  Append
+         ->  Foreign Scan
+               Output: ftprt1_p1.c1, (sum(ftprt1_p1.c1))
+               Relations: Aggregate on (fdw_db.ftprt1_p1 fprt1)
+               Remote SQL: SELECT `c1`, sum(`c1`) FROM `fdw_db`.`test1` GROUP BY `c1`
+         ->  Foreign Scan
+               Output: ftprt1_p2.c1, (sum(ftprt1_p2.c1))
+               Relations: Aggregate on (fdw_db.ftprt1_p2 fprt1)
+               Remote SQL: SELECT `c1`, sum(`c1`) FROM `fdw_db`.`test2` GROUP BY `c1`
+(12 rows)
+
+SELECT c1, sum(c1) FROM fprt1 GROUP BY c1 ORDER BY 2;
+ c1 | sum 
+----+-----
+  1 |   1
+  2 |   2
+  3 |   3
+  4 |   4
+  5 |   5
+  6 |   6
+  7 |   7
+  8 |   8
+(8 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT c1, sum(c2), min(c2), count(*) FROM fprt1 GROUP BY c1 HAVING avg(c2) < 22 ORDER BY 2;
+                                                              QUERY PLAN                                                               
+---------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: ftprt1_p1.c1, (sum(ftprt1_p1.c2)), (min(ftprt1_p1.c2)), (count(*))
+   Sort Key: (sum(ftprt1_p1.c2))
+   ->  Append
+         ->  Foreign Scan
+               Output: ftprt1_p1.c1, (sum(ftprt1_p1.c2)), (min(ftprt1_p1.c2)), (count(*))
+               Relations: Aggregate on (fdw_db.ftprt1_p1 fprt1)
+               Remote SQL: SELECT `c1`, sum(`c2`), min(`c2`), count(*) FROM `fdw_db`.`test1` GROUP BY `c1` HAVING ((avg(`c2`) < '22'))
+         ->  Foreign Scan
+               Output: ftprt1_p2.c1, (sum(ftprt1_p2.c2)), (min(ftprt1_p2.c2)), (count(*))
+               Relations: Aggregate on (fdw_db.ftprt1_p2 fprt1)
+               Remote SQL: SELECT `c1`, sum(`c2`), min(`c2`), count(*) FROM `fdw_db`.`test2` GROUP BY `c1` HAVING ((avg(`c2`) < '22'))
+(12 rows)
+
+SELECT c1, sum(c2), min(c2), count(*) FROM fprt1 GROUP BY c1 HAVING avg(c2) < 22 ORDER BY 1;
+ c1 | sum | min | count 
+----+-----+-----+-------
+  1 |   1 |   1 |     1
+  2 |   2 |   2 |     1
+  3 |   3 |   3 |     1
+  4 |   4 |   4 |     1
+  5 |   5 |   5 |     1
+  6 |   6 |   6 |     1
+  7 |   7 |   7 |     1
+  8 |   8 |   8 |     1
+(8 rows)
+
+-- Check with whole-row reference
+-- Should have all the columns in the target list for the given relation
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT c1, count(t1) FROM fprt1 t1 GROUP BY c1 HAVING avg(c2) < 22 ORDER BY 1;
+                           QUERY PLAN                           
+----------------------------------------------------------------
+ GroupAggregate
+   Output: t1.c1, count(((t1.*)::fprt1))
+   Group Key: t1.c1
+   Filter: (avg(t1.c2) < '22'::numeric)
+   ->  Sort
+         Output: t1.c1, ((t1.*)::fprt1), t1.c2
+         Sort Key: t1.c1
+         ->  Append
+               ->  Foreign Scan on public.ftprt1_p1 t1
+                     Output: t1.c1, t1.*, t1.c2
+                     Remote SQL: SELECT * FROM `fdw_db`.`test1`
+               ->  Foreign Scan on public.ftprt1_p2 t1_1
+                     Output: t1_1.c1, t1_1.*, t1_1.c2
+                     Remote SQL: SELECT * FROM `fdw_db`.`test2`
+(14 rows)
+
+SELECT c1, count(t1) FROM fprt1 t1 GROUP BY c1 HAVING avg(c2) < 22 ORDER BY 1;
+ c1 | count 
+----+-------
+  1 |     1
+  2 |     1
+  3 |     1
+  4 |     1
+  5 |     1
+  6 |     1
+  7 |     1
+  8 |     1
+(8 rows)
+
+-- When GROUP BY clause does not match with PARTITION KEY.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT c2, avg(c1), max(c1), count(*) FROM fprt1 GROUP BY c2 HAVING sum(c1) < 700 ORDER BY 1;
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Sort
+   Output: ftprt1_p1.c2, (avg(ftprt1_p1.c1)), (max(ftprt1_p1.c1)), (count(*))
+   Sort Key: ftprt1_p1.c2
+   ->  HashAggregate
+         Output: ftprt1_p1.c2, avg(ftprt1_p1.c1), max(ftprt1_p1.c1), count(*)
+         Group Key: ftprt1_p1.c2
+         Filter: (sum(ftprt1_p1.c1) < 700)
+         ->  Append
+               ->  Foreign Scan on public.ftprt1_p1
+                     Output: ftprt1_p1.c2, ftprt1_p1.c1
+                     Remote SQL: SELECT `c1`, `c2` FROM `fdw_db`.`test1`
+               ->  Foreign Scan on public.ftprt1_p2
+                     Output: ftprt1_p2.c2, ftprt1_p2.c1
+                     Remote SQL: SELECT `c1`, `c2` FROM `fdw_db`.`test2`
+(14 rows)
+
+SELECT c2, avg(c1), max(c1), count(*) FROM fprt1 GROUP BY c2 HAVING sum(c1) < 700 ORDER BY 1;
+ c2 |          avg           | max | count 
+----+------------------------+-----+-------
+  1 | 1.00000000000000000000 |   1 |     1
+  2 |     2.0000000000000000 |   2 |     1
+  3 |     3.0000000000000000 |   3 |     1
+  4 |     4.0000000000000000 |   4 |     1
+  5 |     5.0000000000000000 |   5 |     1
+  6 |     6.0000000000000000 |   6 |     1
+  7 |     7.0000000000000000 |   7 |     1
+  8 |     8.0000000000000000 |   8 |     1
+(8 rows)
+
+SET enable_partitionwise_aggregate TO off;
+-- Cleanup
+DROP aggregate least_agg(variadic items anyarray);
+DROP FUNCTION least_accum(anyelement, variadic anyarray);
+DROP FOREIGN TABLE emp;
+DROP FOREIGN TABLE dept;
+DROP FOREIGN TABLE ftprt1_p1;
+DROP FOREIGN TABLE ftprt1_p2;
+DROP TABLE IF EXISTS fprt1;
+DROP USER MAPPING FOR public SERVER hdfs_server;
+DROP SERVER hdfs_server;
+DROP EXTENSION hdfs_fdw;

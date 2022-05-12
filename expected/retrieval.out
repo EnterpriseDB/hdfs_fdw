@@ -1158,10 +1158,10 @@ EXPLAIN (COSTS OFF) SELECT ename as "Employee Name" FROM emp;
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT COUNT(*) FROM jobhist;
-          QUERY PLAN           
--------------------------------
- Aggregate
-   ->  Foreign Scan on jobhist
+                 QUERY PLAN                 
+--------------------------------------------
+ Foreign Scan
+   Relations: Aggregate on (fdw_db.jobhist)
 (2 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM jobhist LIMIT 2;

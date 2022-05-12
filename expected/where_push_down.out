@@ -33,8 +33,8 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, ea.deptno FROM emp ea
 WHERE sal = (SELECT MAX(sal) FROM emp eb
   WHERE eb.deptno = ea.deptno)
 ORDER BY 1, 2, 3;
-                                                QUERY PLAN                                                 
------------------------------------------------------------------------------------------------------------
+                                        QUERY PLAN                                        
+------------------------------------------------------------------------------------------
  Sort
    Output: ea.empno, ea.ename, ea.deptno
    Sort Key: ea.empno, ea.ename, ea.deptno
@@ -43,12 +43,11 @@ ORDER BY 1, 2, 3;
          Filter: (ea.sal = (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: max(eb.sal)
-                 ->  Foreign Scan on public.emp eb
-                       Output: eb.empno, eb.ename, eb.job, eb.mgr, eb.hiredate, eb.sal, eb.comm, eb.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`deptno` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (max(eb.sal))
+                 Relations: Aggregate on (fdw_db.emp eb)
+                 Remote SQL: SELECT max(`sal`) FROM `fdw_db`.`emp` WHERE ((`deptno` = ?))
+(12 rows)
 
 SELECT empno, ename, sal, deptno FROM emp e
 WHERE  sal > (SELECT AVG(sal) FROM emp
@@ -68,8 +67,8 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal, deptno FROM emp e
 WHERE  sal > (SELECT AVG(sal) FROM emp
   WHERE  emp.deptno = e.deptno)
 ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                        QUERY PLAN                                        
+------------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -78,12 +77,11 @@ ORDER BY 1, 2, 3, 4;
          Filter: ((e.sal)::numeric > (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`deptno` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`deptno` = ?))
+(12 rows)
 
 DROP FOREIGN TABLE emp;
 -- Datatype verification with parameterized WHERE Clause.
@@ -104,8 +102,8 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  WHERE sal IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -114,20 +112,19 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (SubPlan 1)
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal NOT IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -136,20 +133,19 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (NOT (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal >
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -158,12 +154,11 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: ((e.sal)::numeric > (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 DROP FOREIGN TABLE emp;
 -- INT8OID --> bigint
@@ -183,8 +178,8 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  WHERE sal IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -193,20 +188,19 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (SubPlan 1)
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal NOT IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -215,20 +209,19 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (NOT (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal >
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -237,12 +230,11 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: ((e.sal)::numeric > (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 DROP FOREIGN TABLE emp;
 -- FLOAT4OID --> real
@@ -262,8 +254,8 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  WHERE sal IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -272,20 +264,19 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (SubPlan 1)
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal NOT IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -294,20 +285,19 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (NOT (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal >
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -316,12 +306,11 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (e.sal > (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 DROP FOREIGN TABLE emp;
 -- FLOAT8OID --> double precision
@@ -341,8 +330,8 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  WHERE sal IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -351,20 +340,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (SubPlan 1)
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal NOT IN
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -373,20 +361,19 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (NOT (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
  FROM emp e
  WHERE sal >
  (SELECT AVG(sal) FROM emp WHERE  emp.sal = e.sal)
  ORDER BY 1, 2, 3, 4;
-                                                    QUERY PLAN                                                     
--------------------------------------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
    Output: e.empno, e.ename, e.sal, e.deptno
    Sort Key: e.empno, e.ename, e.sal, e.deptno
@@ -395,12 +382,11 @@ EXPLAIN (COSTS FALSE,VERBOSE TRUE) SELECT empno, ename, sal as "salary", deptno
          Filter: (e.sal > (SubPlan 1))
          Remote SQL: SELECT `empno`, `ename`, `sal`, `deptno` FROM `fdw_db`.`emp`
          SubPlan 1
-           ->  Aggregate
-                 Output: avg(emp.sal)
-                 ->  Foreign Scan on public.emp
-                       Output: emp.empno, emp.ename, emp.job, emp.mgr, emp.hiredate, emp.sal, emp.comm, emp.deptno
-                       Remote SQL: SELECT `sal` FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
-(13 rows)
+           ->  Foreign Scan
+                 Output: (avg(emp.sal))
+                 Relations: Aggregate on (fdw_db.emp)
+                 Remote SQL: SELECT avg(`sal`) FROM `fdw_db`.`emp` WHERE ((`sal` = ?))
+(12 rows)
 
 DROP FOREIGN TABLE emp;
 -- VARCHAROID --> VARCHAR
