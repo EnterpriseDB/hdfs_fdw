@@ -32,9 +32,9 @@
 
 /* Macro for list API backporting. */
 #if PG_VERSION_NUM < 130000
-	#define hdfs_list_concat(l1, l2) list_concat(l1, list_copy(l2))
+#define hdfs_list_concat(l1, l2) list_concat(l1, list_copy(l2))
 #else
-	#define hdfs_list_concat(l1, l2) list_concat((l1), (l2))
+#define hdfs_list_concat(l1, l2) list_concat((l1), (l2))
 #endif
 
 /* Options structure to store the HDFS server information */
@@ -116,7 +116,7 @@ typedef struct HDFSFdwRelationInfo
 										 * subqueries */
 
 	/* Grouping information */
-	List       *grouped_tlist;
+	List	   *grouped_tlist;
 
 	/*
 	 * Index of the relation.  It is used to create an alias to a subquery
@@ -124,14 +124,14 @@ typedef struct HDFSFdwRelationInfo
 	 */
 	int			relation_index;
 
-	hdfs_opt   *options; /* Options applicable for this relation */
+	hdfs_opt   *options;		/* Options applicable for this relation */
 } HDFSFdwRelationInfo;
 
 /* hdfs_option.c headers */
 extern hdfs_opt *hdfs_get_options(Oid foreigntableid);
 
 /* hdfs_connection.c headers */
-extern int hdfs_get_connection(ForeignServer *server, hdfs_opt *opt);
+extern int	hdfs_get_connection(ForeignServer *server, hdfs_opt *opt);
 extern void hdfs_rel_connection(int con_index);
 
 /* hdfs_deparse.c headers */
@@ -160,8 +160,8 @@ extern void hdfs_analyze(int con_index, hdfs_opt *opt, Relation rel);
 extern const char *hdfs_get_jointype_name(JoinType jointype);
 
 /* hdfs_client.c headers */
-extern int hdfs_get_column_count(int con_index);
-extern int hdfs_fetch(int con_index);
+extern int	hdfs_get_column_count(int con_index);
+extern int	hdfs_fetch(int con_index);
 extern char *hdfs_get_field_as_cstring(int con_index, int idx, bool *is_null);
 extern Datum hdfs_get_value(int con_index, hdfs_opt *opt, Oid pgtyp,
 							int pgtypmod, int idx, bool *is_null);

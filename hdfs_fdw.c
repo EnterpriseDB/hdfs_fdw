@@ -139,9 +139,9 @@ typedef struct hdfsFdwExecutionState
 	 * Members used for constructing the ForeignScan result row when whole-row
 	 * references are involved in a pushed down join.
 	 */
-	hdfsWRState	**hdfswrstates; /* whole-row construction information for
-								   * each base relation involved in the pushed
-								   * down join. */
+	hdfsWRState **hdfswrstates; /* whole-row construction information for each
+								 * base relation involved in the pushed down
+								 * join. */
 	int		   *wr_attrs_pos;	/* Array mapping the attributes in the
 								 * ForeignScan result to those in the rows
 								 * fetched from the foreign server. The array
@@ -257,7 +257,7 @@ static void hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 											 List *scan_tlist,
 											 List *fdw_scan_tlist);
 static HeapTuple hdfs_get_tuple_with_whole_row(hdfsFdwExecutionState *festate,
-											   Datum *values,bool *nulls);
+											   Datum *values, bool *nulls);
 static HeapTuple hdfs_form_whole_row(hdfsWRState *wr_state, Datum *values,
 									 bool *nulls);
 
@@ -461,7 +461,7 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 	options = hdfs_get_options(foreigntableid);
 	if (options->use_remote_estimate)
 	{
-		int		con_index;
+		int			con_index;
 
 		/* Connect to HIVE server */
 		con_index = GetConnection(options, foreigntableid);
@@ -530,7 +530,7 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 								   fpinfo->rows,
 								   fpinfo->fdw_startup_cost,
 								   total_cost,
-								   NIL, 	/* no pathkeys */
+								   NIL, /* no pathkeys */
 								   baserel->lateral_relids,
 								   NULL,	/* no extra plan */
 								   NIL);	/* no fdw_private data */
@@ -581,8 +581,8 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	/*
 	 * Separate the scan_clauses into those that can be executed remotely and
 	 * those that can't.  baserestrictinfo clauses that were previously
-	 * determined to be safe or unsafe by hdfs_classify_conditions are shown in
-	 * fpinfo->remote_conds and fpinfo->local_conds.  Anything else in the
+	 * determined to be safe or unsafe by hdfs_classify_conditions are shown
+	 * in fpinfo->remote_conds and fpinfo->local_conds.  Anything else in the
 	 * scan_clauses list will be a join clause, which we have to check for
 	 * remote-safety.
 	 *
@@ -626,29 +626,29 @@ hdfsGetForeignPlan(PlannerInfo *root,
 		scan_var_list = list_concat_unique(NIL, scan_var_list);
 
 		scan_var_list = list_concat_unique(scan_var_list,
-									pull_var_clause((Node *) local_exprs,
-													PVC_RECURSE_PLACEHOLDERS));
+										   pull_var_clause((Node *) local_exprs,
+														   PVC_RECURSE_PLACEHOLDERS));
 
 		/*
 		 * For join relations, planner needs targetlist, which represents the
 		 * output of ForeignScan node. Prepare this before we modify
 		 * scan_var_list to include Vars required by whole row references, if
-		 * any.  Note that base foreign scan constructs the whole-row reference
-		 * at the time of projection.  Joins are required to get them from the
-		 * underlying base relations.  For a pushed down join the underlying
-		 * relations do not exist, hence the whole-row references need to be
-		 * constructed separately.
+		 * any.  Note that base foreign scan constructs the whole-row
+		 * reference at the time of projection.  Joins are required to get
+		 * them from the underlying base relations.  For a pushed down join
+		 * the underlying relations do not exist, hence the whole-row
+		 * references need to be constructed separately.
 		 */
 		fdw_scan_tlist = add_to_flat_tlist(NIL, scan_var_list);
 
 		/*
-		 * hive/spark does not allow row value constructors to be part of SELECT
-		 * list.  Hence, whole row reference in join relations need to be
-		 * constructed by combining all the attributes of required base
+		 * hive/spark does not allow row value constructors to be part of
+		 * SELECT list.  Hence, whole row reference in join relations need to
+		 * be constructed by combining all the attributes of required base
 		 * relations into a tuple after fetching the result from the foreign
 		 * server.  So adjust the targetlist to include all attributes for
-		 * required base relations.  The function also returns list of Var node
-		 * lists required to construct the whole-row references of the
+		 * required base relations.  The function also returns list of Var
+		 * node lists required to construct the whole-row references of the
 		 * involved relations.
 		 */
 		scan_var_list = hdfs_adjust_whole_row_ref(root, scan_var_list,
@@ -834,7 +834,7 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	festate->query_executed = false;
 	festate->query = strVal(list_nth(fdw_private, hdfsFdwScanPrivateSelectSql));
 	festate->retrieved_attrs = (List *) list_nth(fdw_private,
-											hdfsFdwScanPrivateRetrievedAttrs);
+												 hdfsFdwScanPrivateRetrievedAttrs);
 	festate->rescan_count = 0;
 	festate->attinmeta = TupleDescGetAttInMetadata(tupleDescriptor);
 
@@ -1174,15 +1174,15 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	 */
 #if PG_VERSION_NUM >= 120000
 	joinpath = create_foreign_join_path(root,
-									   joinrel,
-									   NULL,
-									   joinrel->rows,
-									   startup_cost,
-									   total_cost,
-									   NIL,		/* no pathkeys */
-									   joinrel->lateral_relids,
-									   NULL,
-									   NIL);	/* no fdw_private */
+										joinrel,
+										NULL,
+										joinrel->rows,
+										startup_cost,
+										total_cost,
+										NIL,	/* no pathkeys */
+										joinrel->lateral_relids,
+										NULL,
+										NIL);	/* no fdw_private */
 #else
 	joinpath = create_foreignscan_path(root,
 									   joinrel,
@@ -1194,7 +1194,7 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 									   joinrel->lateral_relids,
 									   NULL,
 									   NIL);	/* no fdw_private */
-#endif      /* PG_VERSION_NUM >= 120000 */
+#endif							/* PG_VERSION_NUM >= 120000 */
 
 	/* Add generated path into joinrel by add_path(). */
 	add_path(joinrel, (Path *) joinpath);
@@ -1213,8 +1213,8 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
  */
 static bool
 hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
-					  JoinType jointype, RelOptInfo *outerrel,
-					  RelOptInfo *innerrel, JoinPathExtraData *extra)
+					 JoinType jointype, RelOptInfo *outerrel,
+					 RelOptInfo *innerrel, JoinPathExtraData *extra)
 {
 	HDFSFdwRelationInfo *fpinfo;
 	HDFSFdwRelationInfo *fpinfo_o;
@@ -1246,8 +1246,8 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 
 	/*
 	 * If joining relations have local conditions, those conditions are
-	 * required to be applied before joining the relations.  Hence the join can
-	 * not be pushed down.
+	 * required to be applied before joining the relations.  Hence the join
+	 * can not be pushed down.
 	 */
 	if (fpinfo_o->local_conds || fpinfo_i->local_conds)
 		return false;
@@ -1272,7 +1272,7 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	{
 		RestrictInfo *rinfo = lfirst_node(RestrictInfo, lc);
 		bool		is_remote_clause = hdfs_is_foreign_expr(root, joinrel,
-														rinfo->clause, true);
+															rinfo->clause, true);
 
 		if (IS_OUTER_JOIN(jointype) &&
 			!RINFO_IS_PUSHED_DOWN(rinfo, joinrel->relids))
@@ -1290,8 +1290,8 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 				 * remote_conds, instead keep the join clauses separate.
 				 * Currently, we are providing limited operator pushability
 				 * support for join pushdown, hence we keep those clauses
-				 * separate to avoid INNER JOIN not getting pushdown if any
-				 * of the WHERE clause is not shippable as per join pushdown
+				 * separate to avoid INNER JOIN not getting pushdown if any of
+				 * the WHERE clause is not shippable as per join pushdown
 				 * shippability.
 				 */
 				if (jointype == JOIN_INNER)
@@ -1305,15 +1305,15 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	}
 
 	/*
-	 * hdfs_deparse_explicit_target_list() isn't smart enough to handle anything
-	 * other than a Var.  In particular, if there's some PlaceHolderVar that
-	 * would need to be evaluated within this join tree (because there's an
-	 * upper reference to a quantity that may go to NULL as a result of an
-	 * outer join), then we can't try to push the join down because we'll fail
-	 * when we get to hdfs_deparse_explicit_target_list().  However, a
-	 * PlaceHolderVar that needs to be evaluated *at the top* of this join tree
-	 * is OK, because we can do that locally after fetching the results from
-	 * the remote side.
+	 * hdfs_deparse_explicit_target_list() isn't smart enough to handle
+	 * anything other than a Var.  In particular, if there's some
+	 * PlaceHolderVar that would need to be evaluated within this join tree
+	 * (because there's an upper reference to a quantity that may go to NULL
+	 * as a result of an outer join), then we can't try to push the join down
+	 * because we'll fail when we get to hdfs_deparse_explicit_target_list().
+	 * However, a PlaceHolderVar that needs to be evaluated *at the top* of
+	 * this join tree is OK, because we can do that locally after fetching the
+	 * results from the remote side.
 	 */
 	foreach(lc, root->placeholder_list)
 	{
@@ -1333,8 +1333,8 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	fpinfo->joinclauses = joinclauses;
 
 	/*
-	 * By default, both the input relations are not required to be deparsed
-	 * as subqueries, but there might be some relations covered by the input
+	 * By default, both the input relations are not required to be deparsed as
+	 * subqueries, but there might be some relations covered by the input
 	 * relations that are required to be deparsed as subqueries, so save the
 	 * relids of those relations for later use by the deparser.
 	 */
@@ -1347,10 +1347,10 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 
 	/*
 	 * In case innerrel is a joinrel, HiveSQL (as of hive version 3.1.2) does
-	 * not support syntax of the form "A JOIN (B JOIN C)". It expects the right
-	 * side to be a subquery instead. However, if the outerrel is a joinrel
-	 * e.g. "(A JOIN B) JOIN C", this syntax is supported, so here we decide
-	 * to deparse only the innerrels that are joinrels to subquery.
+	 * not support syntax of the form "A JOIN (B JOIN C)". It expects the
+	 * right side to be a subquery instead. However, if the outerrel is a
+	 * joinrel e.g. "(A JOIN B) JOIN C", this syntax is supported, so here we
+	 * decide to deparse only the innerrels that are joinrels to subquery.
 	 */
 	if (IS_JOIN_REL(innerrel))
 	{
@@ -1371,9 +1371,9 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	 * join is evaluated.  The clauses from inner side are added to the
 	 * joinclauses, since they need to evaluated while constructing the join.
 	 *
-	 * For a FULL OUTER JOIN, the other clauses from either relation can not be
-	 * added to the joinclauses or remote_conds, since each relation acts as an
-	 * outer relation for the other.
+	 * For a FULL OUTER JOIN, the other clauses from either relation can not
+	 * be added to the joinclauses or remote_conds, since each relation acts
+	 * as an outer relation for the other.
 	 *
 	 * The joining sides can not have local conditions, thus no need to test
 	 * shippability of the clauses being pulled up.
@@ -1381,6 +1381,7 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	switch (jointype)
 	{
 		case JOIN_INNER:
+
 			/*
 			 * In case innerrel is a joinrel, we will be forming the subquery
 			 * as indicated above, hence we do not need to add innerrel's
@@ -1430,9 +1431,10 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 			break;
 
 		case JOIN_FULL:
+
 			/*
-			 * In this case, if any of the input relations has conditions,
-			 * we need to deparse that relation as a subquery so that the
+			 * In this case, if any of the input relations has conditions, we
+			 * need to deparse that relation as a subquery so that the
 			 * conditions can be evaluated before the join.  Remember it in
 			 * the fpinfo of this relation so that the deparser can take
 			 * appropriate action.  Also, save the relids of base relations
@@ -1540,7 +1542,7 @@ hdfsRecheckForeignScan(ForeignScanState *node, TupleTableSlot *slot)
  */
 List *
 hdfs_adjust_whole_row_ref(PlannerInfo *root, List *scan_var_list,
-						   List **whole_row_lists, Bitmapset *relids)
+						  List **whole_row_lists, Bitmapset *relids)
 {
 	ListCell   *lc;
 	bool		has_whole_row = false;
@@ -1609,8 +1611,8 @@ hdfs_adjust_whole_row_ref(PlannerInfo *root, List *scan_var_list,
 			 */
 			wr_var_list =
 				hdfs_build_scan_list_for_baserel(rte->relid, var->varno,
-												  attrs_used,
-												  &retrieved_attrs);
+												 attrs_used,
+												 &retrieved_attrs);
 			wr_list_array[var->varno - 1] = wr_var_list;
 			wr_scan_var_list = list_concat_unique(wr_scan_var_list,
 												  wr_var_list);
@@ -1644,8 +1646,8 @@ hdfs_adjust_whole_row_ref(PlannerInfo *root, List *scan_var_list,
  */
 static List *
 hdfs_build_scan_list_for_baserel(Oid relid, Index varno,
-								  Bitmapset *attrs_used,
-								  List **retrieved_attrs)
+								 Bitmapset *attrs_used,
+								 List **retrieved_attrs)
 {
 	int			attno;
 	List	   *tlist = NIL;
@@ -1778,7 +1780,7 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 			Var		   *var = lfirst(lc);
 			TargetEntry *tle_sl;
 
-			Assert(IsA(var, Var) &&var->varno == cnt_rt);
+			Assert(IsA(var, Var) && var->varno == cnt_rt);
 
 			tle_sl = tlist_member((Expr *) var, scan_tlist);
 			Assert(tle_sl);
@@ -1798,10 +1800,10 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 
 	/*
 	 * Construct the array mapping columns in the ForeignScan node output to
-	 * their positions in the result fetched from the foreign server.  Positive
-	 * values indicate the locations in the result and negative values
-	 * indicate the range table indexes of the base table whose whole-row
-	 * reference values are requested in that place.
+	 * their positions in the result fetched from the foreign server.
+	 * Positive values indicate the locations in the result and negative
+	 * values indicate the range table indexes of the base table whose
+	 * whole-row reference values are requested in that place.
 	 */
 	fs_num_atts = list_length(fdw_scan_tlist);
 	fs_attr_pos = (int *) palloc(sizeof(int) * fs_num_atts);
@@ -1874,8 +1876,8 @@ hdfs_get_tuple_with_whole_row(hdfsFdwExecutionState *festate, Datum *values,
 			if (!wr_nulls[cnt_attr])
 			{
 				HeapTuple	wr_tuple = hdfs_form_whole_row(wr_state,
-															values,
-															nulls);
+														   values,
+														   nulls);
 
 				wr_values[cnt_attr] = HeapTupleGetDatum(wr_tuple);
 			}
@@ -1921,7 +1923,7 @@ hdfs_form_whole_row(hdfsWRState *wr_state, Datum *values, bool *nulls)
 #if PG_VERSION_NUM >= 110000
 static bool
 hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel,
-						  Node *havingQual)
+						 Node *havingQual)
 #elif PG_VERSION_NUM >= 100000
 static bool
 hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
@@ -1929,7 +1931,7 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 {
 	Query	   *query = root->parse;
 #if PG_VERSION_NUM >= 110000
-	PathTarget *grouping_target =  grouped_rel->reltarget;
+	PathTarget *grouping_target = grouped_rel->reltarget;
 #elif PG_VERSION_NUM >= 100000
 	PathTarget *grouping_target = root->upper_targets[UPPERREL_GROUP_AGG];
 #endif
@@ -2062,7 +2064,8 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 #elif PG_VERSION_NUM >= 100000
 	if (root->hasHavingQual && query->havingQual)
 	{
-		ListCell	*lc;
+		ListCell   *lc;
+
 		foreach(lc, (List *) query->havingQual)
 #endif
 		{

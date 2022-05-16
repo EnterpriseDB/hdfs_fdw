@@ -113,7 +113,8 @@ hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 
 	/*
 	 * Any value below 1000 is going to cause materialization step to be
-	 * skipped from the plan, which is very crucial to avoid requery in rescan.
+	 * skipped from the plan, which is very crucial to avoid requery in
+	 * rescan.
 	 */
 	return (rc > 1000) ? rc : 1000;
 }
@@ -155,17 +156,17 @@ hdfs_describe(int con_index, hdfs_opt *opt, Relation rel)
 
 	/*
 	 * hdfs_deparse_describe() sends a query of the form "DESCRIBE FORMATTED
-	 * sometab" to the remote server.  This produces the output in the columnar
-	 * format.  The 'totalSize' is placed in the 1st column (indexed by 0) and
-	 * its value is placed in the 2nd column of the same row.  Hence, we
-	 * directly search for the 1st column of each row until we find the
-	 * 'totalSize', and once we find that, only then we retrieve the 2nd column
-	 * of that row and break.
+	 * sometab" to the remote server.  This produces the output in the
+	 * columnar format.  The 'totalSize' is placed in the 1st column (indexed
+	 * by 0) and its value is placed in the 2nd column of the same row.
+	 * Hence, we directly search for the 1st column of each row until we find
+	 * the 'totalSize', and once we find that, only then we retrieve the 2nd
+	 * column of that row and break.
 	 */
 	while (hdfs_fetch(con_index) == 0)
 	{
-		char   *value;
-		bool	is_null;
+		char	   *value;
+		bool		is_null;
 
 		value = hdfs_get_field_as_cstring(con_index, 1, &is_null);
 
@@ -174,7 +175,7 @@ hdfs_describe(int con_index, hdfs_opt *opt, Relation rel)
 
 		if (strstr(value, "totalSize") != 0)
 		{
-			char   *str;
+			char	   *str;
 
 			str = hdfs_get_field_as_cstring(con_index, 2, &is_null);
 			row_count = strtod(str, NULL);

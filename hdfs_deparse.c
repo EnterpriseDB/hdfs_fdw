@@ -53,7 +53,7 @@ typedef struct foreign_glob_cxt
 	 * of join conditions.  Also true for aggregate relations to restrict
 	 * aggregates for specified list.
 	 */
-	bool		is_remote_cond;	/* true for join or aggregate relations */
+	bool		is_remote_cond; /* true for join or aggregate relations */
 	Relids		relids;			/* relids of base relations in the underlying
 								 * scan */
 } foreign_glob_cxt;
@@ -391,7 +391,8 @@ hdfs_foreign_expr_walker(Node *node,
 				const char *operatorName = get_opname(oe->opno);
 
 				/*
-				 * Join-pushdown allows only a few operators to be pushed down.
+				 * Join-pushdown allows only a few operators to be pushed
+				 * down.
 				 */
 				if (glob_cxt->is_remote_cond &&
 					(!(strcmp(operatorName, "<") == 0 ||
@@ -548,10 +549,10 @@ hdfs_foreign_expr_walker(Node *node,
 
 				func_name = get_func_name(agg->aggfnoid);
 				if (!(strcmp(func_name, "min") == 0 ||
-					strcmp(func_name, "max") == 0 ||
-					strcmp(func_name, "sum") == 0 ||
-					strcmp(func_name, "avg") == 0 ||
-					strcmp(func_name, "count") == 0))
+					  strcmp(func_name, "max") == 0 ||
+					  strcmp(func_name, "sum") == 0 ||
+					  strcmp(func_name, "avg") == 0 ||
+					  strcmp(func_name, "count") == 0))
 					return false;
 
 				/*
@@ -636,9 +637,10 @@ hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf)
 	 * statement, but if where clause is parameterized we should handle it the
 	 * way postgres fdw does.
 	 * TODO:
-	 * if (fpinfo->remote_conds)
-	 * 	hdfs_append_where_clause(opt, buf, root, baserel, fpinfo->remote_conds,
-	 * true, &params_list);
+	 * 		if (fpinfo->remote_conds)
+	 * 			hdfs_append_where_clause(opt, buf, root, baserel,
+	 * 									 fpinfo->remote_conds, true,
+	 * 									 &params_list);
 	 */
 }
 
@@ -688,8 +690,8 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) rel->fdw_private;
 
 	/*
-	 * We handle relations for foreign tables and joins between those and upper
-	 * relations
+	 * We handle relations for foreign tables and joins between those and
+	 * upper relations
 	 */
 	Assert(IS_JOIN_REL(rel) || IS_SIMPLE_REL(rel) || IS_UPPER_REL(rel));
 
@@ -784,8 +786,8 @@ hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
 		Relation	rel;
 
 		/*
-		 * Core code already has some lock on each rel being planned, so we can
-		 * use NoLock here.
+		 * Core code already has some lock on each rel being planned, so we
+		 * can use NoLock here.
 		 */
 #if PG_VERSION_NUM < 130000
 		rel = heap_open(rte->relid, NoLock);
@@ -1028,8 +1030,8 @@ hdfs_deparse_target_list(StringInfo buf,
 static char *
 hdfs_quote_identifier(const char *str, char quotechar)
 {
-	char       *result = palloc(strlen(str) * 2 + 3);
-	char       *res = result;
+	char	   *result = palloc(strlen(str) * 2 + 3);
+	char	   *res = result;
 
 	*res++ = quotechar;
 	while (*str)
@@ -1425,8 +1427,8 @@ hdfs_deparse_var(Var *node, deparse_expr_cxt *context)
 
 	/*
 	 * If the Var belongs to the foreign relation that is deparsed as a
-	 * subquery, use the relation and column alias to the Var provided
-	 * by the subquery, instead of the remote name.
+	 * subquery, use the relation and column alias to the Var provided by the
+	 * subquery, instead of the remote name.
 	 */
 	if (hdfs_is_subquery_var(node, context->foreignrel, &relno, &colno, context))
 	{
