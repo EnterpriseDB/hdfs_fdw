@@ -147,6 +147,7 @@ extern void hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 											 bool is_subquery,
 											 List *pathkeys,
 											 bool has_final_sort,
+											 bool has_limit,
 											 List **retrieved_attrs,
 											 List **params_list);
 extern void hdfs_classify_conditions(PlannerInfo *root, RelOptInfo *baserel,

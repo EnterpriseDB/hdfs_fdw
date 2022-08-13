@@ -107,11 +107,14 @@ enum hdfsFdwScanPrivateIndex
  * We store:
  *
  * 1) Boolean flag showing if the remote query has the final sort
+ * 2) Boolean flag showing if the remote query has the LIMIT clause
  */
 enum FdwPathPrivateIndex
 {
 	/* has-final-sort flag (as an integer Value node) */
-	FdwPathPrivateHasFinalSort
+	FdwPathPrivateHasFinalSort,
+	/* has-limit flag (as an integer Value node) */
+	FdwPathPrivateHasLimit
 };
 
 /*
@@ -299,6 +302,10 @@ static void hdfs_add_paths_with_pathkeys(PlannerInfo *root,
 static void hdfs_add_foreign_ordered_paths(PlannerInfo *root,
 										   RelOptInfo *input_rel,
 										   RelOptInfo *ordered_rel);
+static void hdfs_add_foreign_final_paths(PlannerInfo *root,
+										 RelOptInfo *input_rel,
+										 RelOptInfo *final_rel,
+										 FinalPathExtraData *extra);
 #endif
 
 Datum
@@ -622,13 +629,19 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	List	   *scan_var_list = NIL;
 	List	   *whole_row_lists = NIL;
 	bool		has_final_sort = false;
+	bool		has_limit = false;
 
 	/*
 	 * Get FDW private data created by hdfsGetForeignUpperPaths(), if any.
 	 */
 	if (best_path->fdw_private)
+	{
 		has_final_sort = intVal(list_nth(best_path->fdw_private,
 										 FdwPathPrivateHasFinalSort));
+		has_limit = intVal(list_nth(best_path->fdw_private,
+									FdwPathPrivateHasLimit));
+	}
+
 	if (foreignrel->reloptkind == RELOPT_BASEREL ||
 		foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL)
 		scan_relid = foreignrel->relid;
@@ -781,7 +794,7 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	hdfs_deparse_select_stmt_for_rel(&sql, root, foreignrel, scan_var_list,
 									 remote_conds, false,
 									 best_path->path.pathkeys,
-									 has_final_sort,
+									 has_final_sort, has_limit,
 									 &retrieved_attrs,
 									 &params_list);
 
@@ -2233,8 +2246,6 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
  * hdfsGetForeignUpperPaths
  *		Add paths for post-join operations like aggregation, grouping etc. if
  *		corresponding operations are safe to push down.
- *
- * Right now, we only support aggregate, grouping and having clause pushdown.
  */
 #if PG_VERSION_NUM >= 110000
 static void
@@ -2259,7 +2270,8 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 
 	/* Ignore stages we don't support; and skip any duplicate calls. */
 #if PG_VERSION_NUM >= 120000
-	if ((stage != UPPERREL_GROUP_AGG && stage != UPPERREL_ORDERED) ||
+	if ((stage != UPPERREL_GROUP_AGG && stage != UPPERREL_ORDERED &&
+		 stage != UPPERREL_FINAL) ||
 #else
 	if (stage != UPPERREL_GROUP_AGG ||
 #endif
@@ -2280,6 +2292,10 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 			break;
 		case UPPERREL_ORDERED:
 			hdfs_add_foreign_ordered_paths(root, input_rel, output_rel);
+			break;
+		case UPPERREL_FINAL:
+			hdfs_add_foreign_final_paths(root, input_rel, output_rel,
+										 (FinalPathExtraData *)extra);
 			break;
 		default:
 			elog(ERROR, "unexpected upper relation: %d", (int) stage);
@@ -2814,7 +2830,7 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	 * Build the fdw_private list that will be used by hdfsGetForeignPlan.
 	 * Items in the list must match order in enum FdwPathPrivateIndex.
 	 */
-	fdw_private = list_make1(makeInteger(true));
+	fdw_private = list_make2(makeInteger(true), makeInteger(false));
 
 	/* Create foreign ordering path */
 	ordered_path = create_foreign_upper_path(root,
@@ -2894,3 +2910,236 @@ hdfs_find_em_expr_for_input_target(PlannerInfo *root,
 	elog(ERROR, "could not find pathkey item to sort");
 	return NULL;				/* keep compiler quiet */
 }
+
+#if PG_VERSION_NUM >= 120000
+/*
+ * hdfs_add_foreign_final_paths
+ *		Add foreign paths for performing the final processing remotely.
+ *
+ * Given input_rel contains the source-data Paths.  The paths are added to the
+ * given final_rel.
+ */
+static void
+hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
+							 RelOptInfo *final_rel, FinalPathExtraData *extra)
+{
+	Query	   *parse = root->parse;
+	HDFSFdwRelationInfo *ifpinfo = (HDFSFdwRelationInfo *) input_rel->fdw_private;
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) final_rel->fdw_private;
+	bool		has_final_sort = false;
+	List	   *pathkeys = NIL;
+	double		rows;
+	Cost		startup_cost;
+	Cost		total_cost;
+	List	   *fdw_private;
+	ForeignPath *final_path;
+
+	/*
+	 * Currently, we only support this for SELECT commands
+	 */
+	if (parse->commandType != CMD_SELECT)
+		return;
+
+	/*
+	 * No work if there is no FOR UPDATE/SHARE clause and if there is no need
+	 * to add a LIMIT node
+	 */
+	if (!parse->rowMarks && !extra->limit_needed)
+		return;
+
+	/* We don't support cases where there are any SRFs in the targetlist */
+	if (parse->hasTargetSRFs)
+		return;
+
+	/* hdfs does not support only OFFSET clause in a SELECT command. */
+	if (parse->limitOffset && !parse->limitCount)
+		return;
+
+	/* Save the input_rel as outerrel in fpinfo */
+	fpinfo->outerrel = input_rel;
+
+	/*
+	 * If there is no need to add a LIMIT node, there might be a ForeignPath
+	 * in the input_rel's pathlist that implements all behavior of the query.
+	 * Note: we would already have accounted for the query's FOR UPDATE/SHARE
+	 * (if any) before we get here.
+	 */
+	if (!extra->limit_needed)
+	{
+		ListCell   *lc;
+
+		Assert(parse->rowMarks);
+
+		/*
+		 * Grouping and aggregation are not supported with FOR UPDATE/SHARE,
+		 * so the input_rel should be a base, join, or ordered relation; and
+		 * if it's an ordered relation, its input relation should be a base or
+		 * join relation.
+		 */
+		Assert(input_rel->reloptkind == RELOPT_BASEREL ||
+			   input_rel->reloptkind == RELOPT_JOINREL ||
+			   (input_rel->reloptkind == RELOPT_UPPER_REL &&
+				ifpinfo->stage == UPPERREL_ORDERED &&
+				(ifpinfo->outerrel->reloptkind == RELOPT_BASEREL ||
+				 ifpinfo->outerrel->reloptkind == RELOPT_JOINREL)));
+
+		foreach(lc, input_rel->pathlist)
+		{
+			Path	   *path = (Path *) lfirst(lc);
+
+			/*
+			 * apply_scanjoin_target_to_paths() uses create_projection_path()
+			 * to adjust each of its input paths if needed, whereas
+			 * create_ordered_paths() uses apply_projection_to_path() to do
+			 * that.  So the former might have put a ProjectionPath on top of
+			 * the ForeignPath; look through ProjectionPath and see if the
+			 * path underneath it is ForeignPath.
+			 */
+			if (IsA(path, ForeignPath) ||
+				(IsA(path, ProjectionPath) &&
+				 IsA(((ProjectionPath *) path)->subpath, ForeignPath)))
+			{
+				/*
+				 * Create foreign final path; this gets rid of a
+				 * no-longer-needed outer plan (if any), which makes the
+				 * EXPLAIN output look cleaner
+				 */
+				final_path = create_foreign_upper_path(root,
+													   path->parent,
+													   path->pathtarget,
+													   path->rows,
+													   path->startup_cost,
+													   path->total_cost,
+													   path->pathkeys,
+													   NULL,	/* no extra plan */
+													   NULL);	/* no fdw_private */
+
+				/* and add it to the final_rel */
+				add_path(final_rel, (Path *) final_path);
+
+				/* Safe to push down */
+				fpinfo->pushdown_safe = true;
+
+				return;
+			}
+		}
+
+		/*
+		 * If we get here it means no ForeignPaths; since we would already
+		 * have considered pushing down all operations for the query to the
+		 * remote server, give up on it.
+		 */
+		return;
+	}
+
+	Assert(extra->limit_needed);
+
+	/*
+	 * If the input_rel is an ordered relation, replace the input_rel with its
+	 * input relation
+	 */
+	if (input_rel->reloptkind == RELOPT_UPPER_REL &&
+		ifpinfo->stage == UPPERREL_ORDERED)
+	{
+		/* Do not push down LIMIT if ORDER BY push down is disabled */
+		if (!enable_order_by_pushdown)
+			return;
+
+		input_rel = ifpinfo->outerrel;
+		ifpinfo = (HDFSFdwRelationInfo *) input_rel->fdw_private;
+		has_final_sort = true;
+		pathkeys = root->sort_pathkeys;
+	}
+
+	/* The input_rel should be a base, join, or grouping relation */
+	Assert(input_rel->reloptkind == RELOPT_BASEREL ||
+		   input_rel->reloptkind == RELOPT_JOINREL ||
+		   (input_rel->reloptkind == RELOPT_UPPER_REL &&
+			ifpinfo->stage == UPPERREL_GROUP_AGG));
+
+	/*
+	 * We try to create a path below by extending a simple foreign path for
+	 * the underlying base, join, or grouping relation to perform the final
+	 * sort (if has_final_sort) and the LIMIT restriction remotely, which is
+	 * stored into the fdw_private list of the resulting path.  (We
+	 * re-estimate the costs of sorting the underlying relation, if
+	 * has_final_sort.)
+	 */
+
+	/*
+	 * Assess if it is safe to push down the LIMIT and OFFSET to the remote
+	 * server
+	 */
+
+	/*
+	 * If the underlying relation has any local conditions, the LIMIT/OFFSET
+	 * cannot be pushed down.
+	 */
+	if (ifpinfo->local_conds)
+		return;
+
+	/*
+	 * hdfs doesn't support LIMIT/OFFSET NULL/ALL syntax, however, only check
+	 * for LIMIT NULL/ALL because one can specify a valid LIMIT value with
+	 * OFFSET NULL.  This can be handled by checking for OFFSET NULL
+	 * during deparse and ignoring it.  If const LIMIT node is null then do not
+	 * pushdown limit/offset clause.
+	 */
+	if (parse->limitCount)
+	{
+		if (nodeTag(parse->limitCount) != T_Const &&
+			nodeTag(parse->limitCount) != T_Param)
+			return;
+
+		if (nodeTag(parse->limitCount) == T_Const &&
+			((Const *) parse->limitCount)->constisnull)
+			return;
+	}
+	if (parse->limitOffset)
+	{
+		if (nodeTag(parse->limitOffset) != T_Const &&
+			nodeTag(parse->limitOffset) != T_Param)
+			return;
+	}
+
+	/*
+	 * Also, the LIMIT/OFFSET cannot be pushed down, if their expressions are
+	 * not safe to remote.
+	 */
+	if (!hdfs_is_foreign_expr(root, input_rel, (Expr *) parse->limitOffset, true) ||
+		!hdfs_is_foreign_expr(root, input_rel, (Expr *) parse->limitCount, true))
+		return;
+
+	/* Safe to push down */
+	fpinfo->pushdown_safe = true;
+
+	/* TODO: Put accurate estimates */
+	startup_cost = 1;
+	total_cost = 1 + startup_cost;
+	rows = 1;
+
+	/*
+	 * Build the fdw_private list that will be used by hdfsGetForeignPlan.
+	 * Items in the list must match order in enum FdwPathPrivateIndex.
+	 */
+	fdw_private = list_make2(makeInteger(has_final_sort),
+							 makeInteger(extra->limit_needed));
+
+	/*
+	 * Create foreign final path; this gets rid of a no-longer-needed outer
+	 * plan (if any), which makes the EXPLAIN output look cleaner
+	 */
+	final_path = create_foreign_upper_path(root,
+										   input_rel,
+										   root->upper_targets[UPPERREL_FINAL],
+										   rows,
+										   startup_cost,
+										   total_cost,
+										   pathkeys,
+										   NULL,	/* no extra plan */
+										   fdw_private);
+
+	/* and add it to the final_rel */
+	add_path(final_rel, (Path *) final_path);
+}
+#endif		/* PG_VERSION_NUM >= 120000 */

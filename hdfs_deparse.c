@@ -87,6 +87,7 @@ typedef struct deparse_expr_cxt
 								 * a base relation. */
 	StringInfo	buf;			/* output buffer to append to */
 	List	  **params_list;	/* exprs that will become remote Params */
+	bool		is_limit_node;	/* the expression represents a LIMIT node */
 } deparse_expr_cxt;
 
 #define REL_ALIAS_PREFIX	"r"
@@ -168,6 +169,7 @@ static Node *hdfs_deparse_sort_group_clause(Index ref, List *tlist,
 											deparse_expr_cxt *context);
 static void hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
 									   deparse_expr_cxt *context);
+static void hdfs_append_limit_clause(deparse_expr_cxt *context);
 
 /*
  * Helper functions
@@ -687,7 +689,7 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 								 RelOptInfo *rel, List *tlist,
 								 List *remote_conds, bool is_subquery,
 								 List *pathkeys,
-								 bool has_final_sort,
+								 bool has_final_sort, bool has_limit,
 								 List **retrieved_attrs,
 								 List **params_list)
 {
@@ -707,6 +709,7 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 	context.foreignrel = rel;
 	context.params_list = params_list;
 	context.scanrel = IS_UPPER_REL(rel) ? fpinfo->outerrel : rel;
+	context.is_limit_node = false;
 
 	/* Construct SELECT clause */
 	hdfs_deparse_select_sql(tlist, is_subquery, retrieved_attrs, &context);
@@ -745,6 +748,10 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 	/* Add ORDER BY clause if we found any useful pathkeys */
 	if (pathkeys)
 		hdfs_append_orderby_clause(pathkeys, has_final_sort, &context);
+
+	/* Add LIMIT clause if necessary */
+	if (has_limit)
+		hdfs_append_limit_clause(&context);
 }
 
 /*
@@ -1159,6 +1166,7 @@ hdfs_deparse_from_expr_for_rel(StringInfo buf, PlannerInfo *root,
 			context.scanrel = foreignrel;
 			context.root = root;
 			context.params_list = params_list;
+			context.is_limit_node = false;
 
 			appendStringInfo(buf, "(");
 			hdfs_append_conditions(fpinfo->joinclauses, &context);
@@ -1231,7 +1239,7 @@ hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
 		appendStringInfoChar(buf, '(');
 		hdfs_deparse_select_stmt_for_rel(buf, root, foreignrel, NIL,
 										 fpinfo->remote_conds, true,
-										 NULL, false,
+										 NULL, false, false,
 										 &retrieved_attrs, params_list);
 		appendStringInfoChar(buf, ')');
 
@@ -1507,7 +1515,10 @@ hdfs_deparse_const(Const *node, deparse_expr_cxt *context)
 		case FLOAT4OID:
 		case FLOAT8OID:
 		case NUMERICOID:
-			appendStringInfo(buf, "'%s'", extval);
+				if (context->is_limit_node)
+					appendStringInfoString(buf, extval);
+				else
+					appendStringInfo(buf, "'%s'", extval);
 			break;
 		case BITOID:
 		case VARBITOID:
@@ -2351,5 +2362,33 @@ hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
 			appendStringInfoString(buf, " NULLS LAST");
 
 		delim = ", ";
+	}
+}
+
+/*
+ * hdfs_append_limit_clause
+ * 		Deparse LIMIT OFFSET clause.
+ */
+static void
+hdfs_append_limit_clause(deparse_expr_cxt *context)
+{
+	PlannerInfo *root = context->root;
+
+	if (root->parse->limitCount)
+	{
+		StringInfo	buf = context->buf;
+		Const	   *c = (Const *)  root->parse->limitOffset;
+		appendStringInfoString(buf, " LIMIT ");
+		context->is_limit_node = true;
+
+		/* push down offset only if it's not NULL */
+		if (c && !c->constisnull)
+		{
+			hdfs_deparse_expr((Expr *) c, context);
+			appendStringInfoString(buf, ", ");
+		}
+
+		hdfs_deparse_expr((Expr *) root->parse->limitCount, context);
+		context->is_limit_node = false;
 	}
 }
