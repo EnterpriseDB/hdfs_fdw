@@ -5,6 +5,7 @@
 \set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 \c contrib_regression
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
 CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
@@ -74,15 +75,12 @@ SELECT dept FROM dept ORDER BY dept;
 -- attributes of the same table are requested - we do not add the attribute
 -- more than once to remote query.
 EXPLAIN (VERBOSE, COSTS OFF) SELECT dept, deptno FROM dept ORDER BY deptno;
-                    QUERY PLAN                     
----------------------------------------------------
- Sort
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Foreign Scan on public.dept
    Output: dept.*, deptno
-   Sort Key: dept.deptno
-   ->  Foreign Scan on public.dept
-         Output: dept.*, deptno
-         Remote SQL: SELECT * FROM `fdw_db`.`dept`
-(6 rows)
+   Remote SQL: SELECT * FROM `fdw_db`.`dept` ORDER BY `deptno` ASC NULLS LAST
+(3 rows)
 
 SELECT dept, deptno FROM dept ORDER BY deptno;
             dept            | deptno 
@@ -96,15 +94,12 @@ SELECT dept, deptno FROM dept ORDER BY deptno;
 -- Test if all the columns in the relation are referenced we instead send
 -- 'SELECT *' in remote query(this will avoid map-reduce job).
 EXPLAIN (VERBOSE, COSTS OFF) SELECT deptno, dname, loc FROM DEPT ORDER BY deptno;
-                    QUERY PLAN                     
----------------------------------------------------
- Sort
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Foreign Scan on public.dept
    Output: deptno, dname, loc
-   Sort Key: dept.deptno
-   ->  Foreign Scan on public.dept
-         Output: deptno, dname, loc
-         Remote SQL: SELECT * FROM `fdw_db`.`dept`
-(6 rows)
+   Remote SQL: SELECT * FROM `fdw_db`.`dept` ORDER BY `deptno` ASC NULLS LAST
+(3 rows)
 
 SELECT deptno, dname, loc FROM DEPT ORDER BY deptno;
  deptno |   dname    |   loc    
@@ -1004,7 +999,7 @@ SELECT deptno, empno, sal , MIN(sal) OVER win, MAX(sal) OVER win, SUM(sal) OVER 
      30 |  7900 |  950 |  950 | 2850 | 9400 | 1566.6666666666666667
 (9 rows)
 
-SELECT deptno, empno, sal, ROW_NUMBER() OVER (PARTITION BY deptno ORDER BY sal DESC)
+SELECT deptno, empno, sal, ROW_NUMBER() OVER (PARTITION BY deptno ORDER BY sal DESC, empno)
  FROM emp
  ORDER BY empno;
  deptno | empno | sal  | row_number 
@@ -1049,8 +1044,8 @@ SELECT deptno, empno, sal,
 (14 rows)
 
 SELECT deptno, empno, sal,
- LEAD(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC) NEXT_LOWER_SAL,
- LAG(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC ) PREV_HIGHER_SAL
+ LEAD(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC, empno) NEXT_LOWER_SAL,
+ LAG(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC, empno ) PREV_HIGHER_SAL
  FROM emp
  WHERE deptno IN (10, 20,30,40,50)
  ORDER BY deptno, sal DESC;
@@ -1130,20 +1125,16 @@ EXPLAIN (COSTS OFF) SELECT deptno,dname,loc FROM DEPT;
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM EMP ORDER BY deptno;
-        QUERY PLAN         
----------------------------
- Sort
-   Sort Key: deptno
-   ->  Foreign Scan on emp
-(3 rows)
+     QUERY PLAN      
+---------------------
+ Foreign Scan on emp
+(1 row)
 
 EXPLAIN (COSTS OFF) SELECT empno,ename FROM EMP ORDER BY deptno;
-        QUERY PLAN         
----------------------------
- Sort
-   Sort Key: deptno
-   ->  Foreign Scan on emp
-(3 rows)
+     QUERY PLAN      
+---------------------
+ Foreign Scan on emp
+(1 row)
 
 EXPLAIN (COSTS OFF) SELECT empno,ename FROM EMP;
      QUERY PLAN      
@@ -1184,16 +1175,14 @@ EXPLAIN (COSTS OFF)
 SELECT * FROM emp
  WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))
  ORDER BY empno;
-                QUERY PLAN                
-------------------------------------------
- Sort
-   Sort Key: emp.empno
-   ->  Foreign Scan on emp
-         Filter: (SubPlan 1)
-         SubPlan 1
-           ->  Materialize
-                 ->  Foreign Scan on dept
-(7 rows)
+             QUERY PLAN             
+------------------------------------
+ Foreign Scan on emp
+   Filter: (SubPlan 1)
+   SubPlan 1
+     ->  Materialize
+           ->  Foreign Scan on dept
+(5 rows)
 
 EXPLAIN (COSTS OFF)
 SELECT deptno, dname FROM dept
@@ -1231,25 +1220,21 @@ SELECT ename FROM emp WHERE empno >= 7788
 EXPLAIN (COSTS OFF)
 SELECT dept.dname, emp.ename FROM dept CROSS JOIN emp
  ORDER BY dept.deptno;
-                        QUERY PLAN                        
-----------------------------------------------------------
- Sort
-   Sort Key: dept.deptno
-   ->  Foreign Scan
-         Relations: (fdw_db.dept) INNER JOIN (fdw_db.emp)
-(4 rows)
+                     QUERY PLAN                     
+----------------------------------------------------
+ Foreign Scan
+   Relations: (fdw_db.dept) INNER JOIN (fdw_db.emp)
+(2 rows)
 
 EXPLAIN (COSTS OFF)
 SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d INNER JOIN emp e ON d.deptno=e.deptno
  ORDER BY d.deptno;
-                          QUERY PLAN                          
---------------------------------------------------------------
- Sort
-   Sort Key: d.deptno
-   ->  Foreign Scan
-         Relations: (fdw_db.dept d) INNER JOIN (fdw_db.emp e)
-(4 rows)
+                       QUERY PLAN                       
+--------------------------------------------------------
+ Foreign Scan
+   Relations: (fdw_db.dept d) INNER JOIN (fdw_db.emp e)
+(2 rows)
 
 EXPLAIN (COSTS OFF)
 SELECT ename FROM emp
@@ -1272,13 +1257,11 @@ SELECT d.deptno, d.dname, e.empno, e.ename, e.sal, e.deptno
  FROM dept d LEFT OUTER JOIN emp e
  ON d.deptno = e.deptno
  ORDER BY d.deptno;
-                         QUERY PLAN                          
--------------------------------------------------------------
- Sort
-   Sort Key: d.deptno
-   ->  Foreign Scan
-         Relations: (fdw_db.dept d) LEFT JOIN (fdw_db.emp e)
-(4 rows)
+                      QUERY PLAN                       
+-------------------------------------------------------
+ Foreign Scan
+   Relations: (fdw_db.dept d) LEFT JOIN (fdw_db.emp e)
+(2 rows)
 
 -- Retrieve Data from Foreign Table using Query Optimizer.
 CREATE TABLE dept_lcl (
@@ -1468,20 +1451,17 @@ EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM dept t1 LEFT JOIN LATERAL (
   SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1.deptno = t3.deptno
   ORDER BY 1;
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
- Sort
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Nested Loop Left Join
    Output: t1.deptno, t1.dname, t1.loc, t2.deptno, (t1.deptno)
-   Sort Key: t1.deptno
-   ->  Nested Loop Left Join
-         Output: t1.deptno, t1.dname, t1.loc, t2.deptno, (t1.deptno)
-         ->  Foreign Scan on public.dept t1
-               Output: t1.deptno, t1.dname, t1.loc
-               Remote SQL: SELECT * FROM `fdw_db`.`dept`
-         ->  Foreign Scan on public.dept t2
-               Output: t2.deptno, t1.deptno
-               Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept` WHERE ((? = `deptno`))
-(11 rows)
+   ->  Foreign Scan on public.dept t1
+         Output: t1.deptno, t1.dname, t1.loc
+         Remote SQL: SELECT * FROM `fdw_db`.`dept` ORDER BY `deptno` ASC NULLS LAST
+   ->  Foreign Scan on public.dept t2
+         Output: t2.deptno, t1.deptno
+         Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept` WHERE ((? = `deptno`))
+(8 rows)
 
 SELECT * FROM dept t1 LEFT JOIN LATERAL (
   SELECT t2.deptno, t1.deptno AS t1_a FROM dept t2) t3 ON t1.deptno = t3.deptno
@@ -1619,6 +1599,7 @@ SELECT * FROM
 (3 rows)
 
 --Cleanup
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP VIEW smpl_vw;
 DROP VIEW comp_vw;
 DROP VIEW temp_vw;

@@ -6,6 +6,7 @@
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 \c contrib_regression
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
 CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
@@ -170,6 +171,7 @@ EXPLAIN (COSTS FALSE, VERBOSE TRUE) SELECT bol1,bol2
 DROP FOREIGN TABLE bool_test;
 
 --Cleanup
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP USER MAPPING FOR public SERVER hdfs_server;
 DROP SERVER hdfs_server;
 DROP EXTENSION hdfs_fdw;

@@ -6,6 +6,7 @@
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 \c contrib_regression
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
 CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
@@ -411,6 +412,7 @@ SELECT empno, ename, sal, deptno
  (SELECT hiredate FROM emp WHERE emp.empno < e.empno OR emp.deptno > e.deptno)
  ORDER BY 1, 2, 3, 4;
 
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP FOREIGN TABLE emp;
 DROP FOREIGN TABLE dept;
 DROP USER MAPPING FOR public SERVER hdfs_server;

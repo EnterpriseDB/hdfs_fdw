@@ -6,6 +6,7 @@
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 \c contrib_regression
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
 CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
@@ -278,7 +279,7 @@ SELECT deptno, empno, sal , MIN(sal) OVER win, MAX(sal) OVER win, SUM(sal) OVER 
  WINDOW win AS (PARTITION BY deptno)
  ORDER BY deptno, empno;
 
-SELECT deptno, empno, sal, ROW_NUMBER() OVER (PARTITION BY deptno ORDER BY sal DESC)
+SELECT deptno, empno, sal, ROW_NUMBER() OVER (PARTITION BY deptno ORDER BY sal DESC, empno)
  FROM emp
  ORDER BY empno;
 
@@ -289,8 +290,8 @@ SELECT deptno, empno, sal,
  ORDER BY empno;
 
 SELECT deptno, empno, sal,
- LEAD(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC) NEXT_LOWER_SAL,
- LAG(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC ) PREV_HIGHER_SAL
+ LEAD(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC, empno) NEXT_LOWER_SAL,
+ LAG(sal, 1, 0) OVER (PARTITION BY deptno ORDER BY sal DESC, empno ) PREV_HIGHER_SAL
  FROM emp
  WHERE deptno IN (10, 20,30,40,50)
  ORDER BY deptno, sal DESC;
@@ -464,6 +465,7 @@ SELECT * FROM
  ORDER BY dept.deptno;
 
 --Cleanup
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP VIEW smpl_vw;
 DROP VIEW comp_vw;
 DROP VIEW temp_vw;

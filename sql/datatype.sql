@@ -6,6 +6,7 @@
 \set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
 
 \c contrib_regression
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
 CREATE EXTENSION IF NOT EXISTS hdfs_fdw;
 CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, auth_type :AUTH_TYPE);
@@ -148,7 +149,14 @@ SELECT empno FROM datatype_test_tbl ORDER BY 1 LIMIT 1;
 -- VARCHAR2 mapped to INT in Hadoop, should pass
 SELECT mgr FROM datatype_test_tbl ORDER BY 1 LIMIT 1;
 -- TEXT mapped to INT in Hadoop, should pass
+-- With ORDER BY pushdown enabled, ORDER BY is performed with sal considered
+-- as INT
 SELECT sal FROM datatype_test_tbl ORDER BY 1 LIMIT 1;
+-- With ORDER BY pushdown disabled, ORDER BY is performed with sal considered
+-- as TEXT
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
+SELECT sal FROM datatype_test_tbl ORDER BY 1 LIMIT 1;
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
 -- TEXT mapped to DATE, should pass.
 SELECT hiredate FROM datatype_test_tbl ORDER BY 1 LIMIT 1;
 DROP FOREIGN TABLE datatype_test_tbl;
@@ -386,6 +394,7 @@ SELECT * FROM datatype_test_tbl ORDER BY empno;
 DROP FOREIGN TABLE datatype_test_tbl;
 
 --Cleanup
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP USER MAPPING FOR public SERVER hdfs_server;
 DROP SERVER hdfs_server;
 DROP EXTENSION hdfs_fdw;
