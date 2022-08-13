@@ -156,8 +156,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM emp_ext ORDER BY deptno;
 
 EXPLAIN (COSTS OFF) SELECT empno,ename FROM emp_ext ORDER BY deptno;
 
-EXPLAIN (COSTS OFF) SELECT * FROM emp_ext LIMIT 2;
-
 EXPLAIN (COSTS OFF) SELECT * FROM emp_ext
  WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10, 30, 40))
  ORDER BY empno;

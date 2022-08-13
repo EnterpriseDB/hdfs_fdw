@@ -1280,15 +1280,13 @@ EXPLAIN (COSTS false, VERBOSE)
 SELECT jh.empno, e.ename, d.dname
   FROM emp e, dept d, jobhist jh WHERE e.deptno = 10 AND d.deptno = 20 AND jh.deptno = 30
   ORDER BY 1, 2, 3 LIMIT 10;
-                                                                                                                                                                       QUERY PLAN                                                                                                                                                                        
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Limit
+                                                                                                                                                                         QUERY PLAN                                                                                                                                                                         
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
    Output: jh.empno, e.ename, d.dname
-   ->  Foreign Scan
-         Output: jh.empno, e.ename, d.dname
-         Relations: ((fdw_db.emp e) INNER JOIN (fdw_db.dept d)) INNER JOIN (fdw_db.jobhist jh)
-         Remote SQL: SELECT r3.`empno`, r1.`ename`, r2.`dname` FROM ((`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE)) INNER JOIN `fdw_db`.`jobhist` r3 ON (TRUE)) WHERE ((r3.`deptno` = '30')) AND ((r2.`deptno` = '20')) AND ((r1.`deptno` = '10')) ORDER BY r3.`empno` ASC NULLS LAST, r1.`ename` ASC NULLS LAST, r2.`dname` ASC NULLS LAST
-(6 rows)
+   Relations: ((fdw_db.emp e) INNER JOIN (fdw_db.dept d)) INNER JOIN (fdw_db.jobhist jh)
+   Remote SQL: SELECT r3.`empno`, r1.`ename`, r2.`dname` FROM ((`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE)) INNER JOIN `fdw_db`.`jobhist` r3 ON (TRUE)) WHERE ((r3.`deptno` = '30')) AND ((r2.`deptno` = '20')) AND ((r1.`deptno` = '10')) ORDER BY r3.`empno` ASC NULLS LAST, r1.`ename` ASC NULLS LAST, r2.`dname` ASC NULLS LAST LIMIT 10
+(4 rows)
 
 -- Clauses within the nullable side are not pulled up, but the top level clause
 -- on nullable side is not pushed down into nullable side
@@ -1323,29 +1321,25 @@ EXPLAIN (COSTS false, VERBOSE)
 SELECT e.empno, d.deptno
   FROM emp e JOIN dept d ON (e.deptno = d.deptno)
   ORDER BY 1, 2 FOR UPDATE OF e;
-                                                                                                                                                     QUERY PLAN                                                                                                                                                     
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- LockRows
+                                                                                                                                                  QUERY PLAN                                                                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
    Output: e.empno, d.deptno, e.*, d.*
-   ->  Foreign Scan
-         Output: e.empno, d.deptno, e.*, d.*
-         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
-         Remote SQL: SELECT r1.`empno`, r2.`deptno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) ORDER BY r1.`empno` ASC NULLS LAST, r1.`deptno` ASC NULLS LAST
-(6 rows)
+   Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+   Remote SQL: SELECT r1.`empno`, r2.`deptno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) ORDER BY r1.`empno` ASC NULLS LAST, r1.`deptno` ASC NULLS LAST
+(4 rows)
 
 EXPLAIN (COSTS false, VERBOSE)
 SELECT e.empno, d.deptno
   FROM emp e JOIN dept d ON (e.deptno = d.deptno)
   ORDER BY 1, 2 FOR UPDATE;
-                                                                                                                                                     QUERY PLAN                                                                                                                                                     
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- LockRows
+                                                                                                                                                  QUERY PLAN                                                                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
    Output: e.empno, d.deptno, e.*, d.*
-   ->  Foreign Scan
-         Output: e.empno, d.deptno, e.*, d.*
-         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
-         Remote SQL: SELECT r1.`empno`, r2.`deptno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) ORDER BY r1.`empno` ASC NULLS LAST, r1.`deptno` ASC NULLS LAST
-(6 rows)
+   Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+   Remote SQL: SELECT r1.`empno`, r2.`deptno`, r1.`ename`, r1.`job`, r1.`mgr`, r1.`hiredate`, r1.`sal`, r1.`comm`, r1.`deptno`, r2.`dname`, r2.`loc` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) ORDER BY r1.`empno` ASC NULLS LAST, r1.`deptno` ASC NULLS LAST
+(4 rows)
 
 -- Test join between a table and a resultset of a subquery.
 EXPLAIN (COSTS false, VERBOSE)
@@ -1465,15 +1459,13 @@ EXPLAIN (COSTS false, VERBOSE)
 SELECT e.empno, d.deptno
   FROM emp e CROSS JOIN dept d
   ORDER BY 1, 2 LIMIT 10;
-                                                                                     QUERY PLAN                                                                                     
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Limit
+                                                                                      QUERY PLAN                                                                                       
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
    Output: e.empno, d.deptno
-   ->  Foreign Scan
-         Output: e.empno, d.deptno
-         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
-         Remote SQL: SELECT r1.`empno`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE)) ORDER BY r1.`empno` ASC NULLS LAST, r2.`deptno` ASC NULLS LAST
-(6 rows)
+   Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+   Remote SQL: SELECT r1.`empno`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (TRUE)) ORDER BY r1.`empno` ASC NULLS LAST, r2.`deptno` ASC NULLS LAST LIMIT 10
+(4 rows)
 
 -- CROSS JOIN of two foreign tables again cross joined with a local table.
 -- CROSS JOIN of foreign tables should be pushed down, and local table should
@@ -1560,15 +1552,13 @@ EXPLAIN (VERBOSE, COSTS OFF)
 SELECT t1.deptno, t2.deptno
   FROM v1 t1 LEFT JOIN v2 t2 ON (t1.deptno = t2.deptno)
   ORDER BY t1.deptno, t2.deptno LIMIT 10;
-                                                                                                  QUERY PLAN                                                                                                  
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Limit
+                                                                                                   QUERY PLAN                                                                                                    
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
    Output: emp.deptno, dept.deptno
-   ->  Foreign Scan
-         Output: emp.deptno, dept.deptno
-         Relations: (fdw_db.emp) LEFT JOIN (fdw_db.dept)
-         Remote SQL: SELECT r6.`deptno`, r9.`deptno` FROM (`fdw_db`.`emp` r6 LEFT JOIN `fdw_db`.`dept` r9 ON (((r6.`deptno` = r9.`deptno`)))) ORDER BY r6.`deptno` ASC NULLS LAST, r9.`deptno` ASC NULLS LAST
-(6 rows)
+   Relations: (fdw_db.emp) LEFT JOIN (fdw_db.dept)
+   Remote SQL: SELECT r6.`deptno`, r9.`deptno` FROM (`fdw_db`.`emp` r6 LEFT JOIN `fdw_db`.`dept` r9 ON (((r6.`deptno` = r9.`deptno`)))) ORDER BY r6.`deptno` ASC NULLS LAST, r9.`deptno` ASC NULLS LAST LIMIT 10
+(4 rows)
 
 -- Can't be pushed down, view owner not current user
 EXPLAIN (VERBOSE, COSTS OFF)
@@ -1602,15 +1592,13 @@ EXPLAIN (VERBOSE, COSTS OFF)
 SELECT t1.deptno, t2.deptno
   FROM v1 t1 LEFT JOIN dept t2 ON (t1.deptno = t2.deptno)
   ORDER BY t1.deptno, t2.deptno LIMIT 10;
-                                                                                                  QUERY PLAN                                                                                                  
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Limit
+                                                                                                   QUERY PLAN                                                                                                    
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
    Output: emp.deptno, t2.deptno
-   ->  Foreign Scan
-         Output: emp.deptno, t2.deptno
-         Relations: (fdw_db.emp) LEFT JOIN (fdw_db.dept t2)
-         Remote SQL: SELECT r6.`deptno`, r2.`deptno` FROM (`fdw_db`.`emp` r6 LEFT JOIN `fdw_db`.`dept` r2 ON (((r6.`deptno` = r2.`deptno`)))) ORDER BY r6.`deptno` ASC NULLS LAST, r2.`deptno` ASC NULLS LAST
-(6 rows)
+   Relations: (fdw_db.emp) LEFT JOIN (fdw_db.dept t2)
+   Remote SQL: SELECT r6.`deptno`, r2.`deptno` FROM (`fdw_db`.`emp` r6 LEFT JOIN `fdw_db`.`dept` r2 ON (((r6.`deptno` = r2.`deptno`)))) ORDER BY r6.`deptno` ASC NULLS LAST, r2.`deptno` ASC NULLS LAST LIMIT 10
+(4 rows)
 
 ALTER VIEW v1 OWNER TO regress_view_owner;
 -- Non-Var items in targetlist of the nullable rel of a join preventing

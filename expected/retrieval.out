@@ -1155,22 +1155,6 @@ EXPLAIN (COSTS OFF) SELECT COUNT(*) FROM jobhist;
    Relations: Aggregate on (fdw_db.jobhist)
 (2 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM jobhist LIMIT 2;
-          QUERY PLAN           
--------------------------------
- Limit
-   ->  Foreign Scan on jobhist
-(2 rows)
-
-EXPLAIN (COSTS OFF) SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
-           QUERY PLAN            
----------------------------------
- Limit
-   ->  Sort
-         Sort Key: emp.*
-         ->  Foreign Scan on emp
-(4 rows)
-
 EXPLAIN (COSTS OFF)
 SELECT * FROM emp
  WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10,30,40))

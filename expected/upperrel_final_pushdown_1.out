@@ -1,0 +1,684 @@
+\set HIVE_SERVER         `echo \'"$HIVE_SERVER"\'`
+\set HIVE_CLIENT_TYPE    `echo \'"$CLIENT_TYPE"\'`
+\set HIVE_PORT           `echo \'"$HIVE_PORT"\'`
+\set HIVE_USER           `echo \'"$HIVE_USER"\'`
+\set HIVE_PASSWORD       `echo \'"$HIVE_PASSWORD"\'`
+\set AUTH_TYPE           `echo \'"$AUTH_TYPE"\'`
+\c contrib_regression
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+CREATE EXTENSION hdfs_fdw;
+-- Create Hadoop FDW Server. log_remote_sql 'true' is required to setup logging
+-- for Remote SQL Sent to Hive Server.
+CREATE SERVER hdfs_server FOREIGN DATA WRAPPER hdfs_fdw
+  OPTIONS(host :HIVE_SERVER, port :HIVE_PORT, client_type :HIVE_CLIENT_TYPE, log_remote_sql 'true', auth_type :AUTH_TYPE);
+-- Create Hadoop USER MAPPING.
+CREATE USER MAPPING FOR public SERVER hdfs_server
+  OPTIONS (username :HIVE_USER, password :HIVE_PASSWORD);
+-- Create Foreign Tables.
+CREATE FOREIGN TABLE emp (
+    empno           INTEGER,
+    ename           VARCHAR(10),
+    job             VARCHAR(9),
+    mgr             INTEGER,
+    hiredate        pg_catalog.DATE,
+    sal             INTEGER,
+    comm            INTEGER,
+    deptno          INTEGER
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'emp');
+CREATE FOREIGN TABLE dept (
+    deptno          INTEGER,
+    dname           VARCHAR(14),
+    loc             VARCHAR(13)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+-- Test OFFSET variations with a numeric value for LIMIT
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 2;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 2;
+ empno 
+-------
+  7521
+  7566
+  7654
+  7698
+  7782
+(5 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET NULL;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET NULL;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+(5 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 0;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 0;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+(5 rows)
+
+-- Test OFFSET variations with LIMIT ALL
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT ALL;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT ALL;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT ALL OFFSET 1;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT ALL OFFSET 1;
+ empno 
+-------
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(13 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT ALL OFFSET NULL;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT ALL OFFSET NULL;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+-- Test OFFSET variations with LIMIT NULL
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT NULL;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT NULL;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT NULL OFFSET 1;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT NULL OFFSET 1;
+ empno 
+-------
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(13 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT NULL OFFSET NULL;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT NULL OFFSET NULL;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+-- Test LIMIT 0
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT 0;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT 0;
+ empno 
+-------
+(0 rows)
+
+-- OFFSET without LIMIT is not pushed down
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno OFFSET 1;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Foreign Scan on public.emp e
+         Output: empno
+         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno OFFSET 1;
+ empno 
+-------
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(13 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno OFFSET NULL;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+SELECT empno FROM emp e ORDER BY empno OFFSET NULL;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno OFFSET 0;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+SELECT empno FROM emp e ORDER BY empno OFFSET 0;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+-- LIMIT is not pushed down if the JOIN is not pushed down
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.sal) FROM emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.sal * t2.deptno * random() <= 1 LIMIT 5;
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: (sum(t1.sal))
+   ->  Aggregate
+         Output: sum(t1.sal)
+         ->  Foreign Scan
+               Output: t1.sal
+               Filter: ((((t1.sal * t2.deptno))::double precision * random()) <= '1'::double precision)
+               Relations: (fdw_db.emp t1) INNER JOIN (fdw_db.dept t2)
+               Remote SQL: SELECT r1.`sal`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(9 rows)
+
+-- Whole-row reference in ORDER BY, so upper rels are not pushed down
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno, emp.*
+   ->  Sort
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno, emp.*
+         Sort Key: emp.*
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno, emp.*
+               Remote SQL: SELECT * FROM `fdw_db`.`emp`
+(8 rows)
+
+SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7499 | ALLEN  | SALESMAN | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
+(5 rows)
+
+-- LIMIT/OFFSET scenarios eligible for pushdown
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT 5;
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK    | 7902 | 12-17-1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+(5 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT '5';
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT '5';
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7369 | SMITH  | CLERK    | 7902 | 12-17-1980 |  800 |      |     20
+  7499 | ALLEN  | SALESMAN | 7698 | 02-20-1981 | 1600 |  300 |     30
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+(5 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 1 + 1;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT 1 + 1;
+ empno | ename |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+-------+----------+------+------------+------+------+--------
+  7369 | SMITH | CLERK    | 7902 | 12-17-1980 |  800 |      |     20
+  7499 | ALLEN | SALESMAN | 7698 | 02-20-1981 | 1600 |  300 |     30
+(2 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER  | 7839 | 06-09-1981 | 2450 |      |     10
+(5 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET '2';
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET '2';
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER  | 7839 | 06-09-1981 | 2450 |      |     10
+(5 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 1 + 1;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 1 + 1;
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER  | 7839 | 06-09-1981 | 2450 |      |     10
+(5 rows)
+
+-- Invalid values for LIMIT/OFFSET clause
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 'abc';
+ERROR:  invalid input syntax for integer: "abc"
+LINE 2: SELECT * FROM emp ORDER BY empno LIMIT 'abc';
+                                               ^
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 'abc';
+ERROR:  invalid input syntax for integer: "abc"
+LINE 2: SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 'abc';
+                                                        ^
+-- Test LIMIT/OFFSET clause with negative values
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp LIMIT -1;
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp`
+(5 rows)
+
+SELECT * FROM emp LIMIT -1;
+ERROR:  LIMIT must not be negative
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp LIMIT 1 OFFSET -1;
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp`
+(5 rows)
+
+SELECT * FROM emp LIMIT 1 OFFSET -1;
+ERROR:  OFFSET must not be negative
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp LIMIT -1 OFFSET -1;
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp`
+(5 rows)
+
+SELECT * FROM emp LIMIT -1 OFFSET -1;
+ERROR:  OFFSET must not be negative
+-- Test FOR UPDATE/SHARE clauses
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno for update;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ LockRows
+   Output: empno, e.*
+   ->  Foreign Scan on public.emp e
+         Output: empno, e.*
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno for update;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno for share;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ LockRows
+   Output: empno, e.*
+   ->  Foreign Scan on public.emp e
+         Output: empno, e.*
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT empno FROM emp e ORDER BY empno for share;
+ empno 
+-------
+  7369
+  7499
+  7521
+  7566
+  7654
+  7698
+  7782
+  7788
+  7839
+  7844
+  7876
+  7900
+  7902
+  7934
+(14 rows)
+
+-- Test LIMIT/OFFSET with ORDER BY disabled
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 2;
+                          QUERY PLAN                          
+--------------------------------------------------------------
+ Limit
+   Output: empno
+   ->  Sort
+         Output: empno
+         Sort Key: e.empno
+         ->  Foreign Scan on public.emp e
+               Output: empno
+               Remote SQL: SELECT `empno` FROM `fdw_db`.`emp`
+(8 rows)
+
+SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 2;
+ empno 
+-------
+  7521
+  7566
+  7654
+  7698
+  7782
+(5 rows)
+
+-- Cleanup
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
+DROP FOREIGN TABLE emp;
+DROP FOREIGN TABLE dept;
+DROP USER MAPPING FOR public SERVER hdfs_server;
+DROP SERVER hdfs_server;
+DROP EXTENSION hdfs_fdw;

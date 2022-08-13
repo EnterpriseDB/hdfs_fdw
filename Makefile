@@ -16,7 +16,7 @@ SHLIB_LINK := -L$(HIVECLIENT_HOME) -lhive -lstdc++ -L$(JDK_INCLUDE) $(LDFLAGS)
 
 OBJS = hdfs_client.o hdfs_query.o hdfs_option.o hdfs_deparse.o hdfs_connection.o hdfs_fdw.o
 
-REGRESS = datatype external mapping retrieval date_comparison ldap_authentication remote_estimates log_remote_sql where_push_down misc where_push_down_normal_queries auth_client_type_parameters join_pushdown aggregate_pushdown order_by_pushdown
+REGRESS = datatype external mapping retrieval date_comparison ldap_authentication remote_estimates log_remote_sql where_push_down misc where_push_down_normal_queries auth_client_type_parameters join_pushdown aggregate_pushdown order_by_pushdown upperrel_final_pushdown
 EXTENSION = hdfs_fdw
 DATA = hdfs_fdw--2.0.5.sql hdfs_fdw--2.0.4--2.0.5.sql hdfs_fdw--2.0.4.sql hdfs_fdw--2.0.3--2.0.4.sql hdfs_fdw--2.0.2.sql hdfs_fdw--2.0.3.sql hdfs_fdw--2.0.1--2.0.2.sql hdfs_fdw--2.0.2--2.0.3.sql hdfs_fdw--2.0.1.sql hdfs_fdw--2.0--2.0.1.sql hdfs_fdw--1.0--2.0.sql hdfs_fdw--1.0.sql
 

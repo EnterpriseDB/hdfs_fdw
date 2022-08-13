@@ -486,13 +486,6 @@ EXPLAIN (COSTS OFF) SELECT empno,ename FROM emp_ext ORDER BY deptno;
  Foreign Scan on emp_ext
 (1 row)
 
-EXPLAIN (COSTS OFF) SELECT * FROM emp_ext LIMIT 2;
-          QUERY PLAN           
--------------------------------
- Limit
-   ->  Foreign Scan on emp_ext
-(2 rows)
-
 EXPLAIN (COSTS OFF) SELECT * FROM emp_ext
  WHERE deptno <> ALL (SELECT deptno FROM dept WHERE deptno IN (10, 30, 40))
  ORDER BY empno;
