@@ -28,6 +28,7 @@
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/pathnode.h"
+#include "optimizer/paths.h"
 #include "optimizer/planmain.h"
 #if PG_VERSION_NUM >= 120000
 #include "optimizer/optimizer.h"
@@ -56,6 +57,16 @@ PG_MODULE_MAGIC;
  * our version is 2.2.0 so number will be 20200
  */
 #define CODE_VERSION   20200
+
+/*
+ * The number of rows in a foreign relation are estimated to be so less that
+ * an in-memory sort on those many rows wouldn't cost noticeably higher than
+ * the underlying scan. Hence for now, cost sorts same as underlying scans.
+ */
+#define DEFAULT_HDFS_SORT_MULTIPLIER 1
+
+/* GUC variables. */
+static bool enable_order_by_pushdown = false;
 
 /*
  * Indexes of FDW-private information stored in fdw_private lists.
@@ -89,6 +100,18 @@ enum hdfsFdwScanPrivateIndex
 	 * whole-row references are involved.
 	 */
 	hdfsFdwPrivateScanTList
+};
+
+/*
+ * This enum describes what's kept in the fdw_private list for a ForeignPath.
+ * We store:
+ *
+ * 1) Boolean flag showing if the remote query has the final sort
+ */
+enum FdwPathPrivateIndex
+{
+	/* has-final-sort flag (as an integer Value node) */
+	FdwPathPrivateHasFinalSort
 };
 
 /*
@@ -263,6 +286,20 @@ static HeapTuple hdfs_form_whole_row(hdfsWRState *wr_state, Datum *values,
 
 
 static void hdfs_fdw_xact_callback(XACT_CB_SIGNATURE);
+static List *hdfs_get_useful_ecs_for_relation(PlannerInfo *root,
+											  RelOptInfo *rel);
+static List *hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root,
+												   RelOptInfo *rel);
+static void hdfs_add_paths_with_pathkeys(PlannerInfo *root,
+										 RelOptInfo *rel,
+										 Path *epq_path,
+										 Cost base_startup_cost,
+										 Cost base_total_cost);
+#if PG_VERSION_NUM >= 120000
+static void hdfs_add_foreign_ordered_paths(PlannerInfo *root,
+										   RelOptInfo *input_rel,
+										   RelOptInfo *ordered_rel);
+#endif
 
 Datum
 hdfs_fdw_version(PG_FUNCTION_ARGS)
@@ -296,6 +333,21 @@ _PG_init(void)
 							   NULL,
 							   NULL,
 							   NULL);
+
+	/*
+	 * ORDER BY is inefficient in Hive so it's disabled by default in
+	 * hdfs_fdw.
+	 */
+	DefineCustomBoolVariable("hdfs_fdw.enable_order_by_pushdown",
+							 "Enable/Disable ORDER BY push down",
+							 NULL,
+							 &enable_order_by_pushdown,
+							 false,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	rc = Initialize();
 
@@ -536,6 +588,10 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 								   NIL);	/* no fdw_private data */
 
 	add_path(baserel, (Path *) path);
+
+	/* Add paths with pathkeys */
+	hdfs_add_paths_with_pathkeys(root, baserel, NULL, fpinfo->fdw_startup_cost,
+								 total_cost);
 }
 
 
@@ -565,7 +621,14 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	List	   *fdw_scan_tlist = NIL;
 	List	   *scan_var_list = NIL;
 	List	   *whole_row_lists = NIL;
+	bool		has_final_sort = false;
 
+	/*
+	 * Get FDW private data created by hdfsGetForeignUpperPaths(), if any.
+	 */
+	if (best_path->fdw_private)
+		has_final_sort = intVal(list_nth(best_path->fdw_private,
+										 FdwPathPrivateHasFinalSort));
 	if (foreignrel->reloptkind == RELOPT_BASEREL ||
 		foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL)
 		scan_relid = foreignrel->relid;
@@ -716,7 +779,10 @@ hdfsGetForeignPlan(PlannerInfo *root,
 	 */
 	initStringInfo(&sql);
 	hdfs_deparse_select_stmt_for_rel(&sql, root, foreignrel, scan_var_list,
-									 remote_conds, false, &retrieved_attrs,
+									 remote_conds, false,
+									 best_path->path.pathkeys,
+									 has_final_sort,
+									 &retrieved_attrs,
 									 &params_list);
 
 	/*
@@ -1199,7 +1265,9 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	/* Add generated path into joinrel by add_path(). */
 	add_path(joinrel, (Path *) joinpath);
 
-	/* XXX Consider pathkeys for the join relation */
+	/* Add paths with pathkeys */
+	hdfs_add_paths_with_pathkeys(root, joinrel, NULL, startup_cost,
+								 total_cost);
 
 	/* XXX Consider parameterized paths for the join relation */
 }
@@ -2190,14 +2258,34 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 		return;
 
 	/* Ignore stages we don't support; and skip any duplicate calls. */
-	if (stage != UPPERREL_GROUP_AGG || output_rel->fdw_private)
+#if PG_VERSION_NUM >= 120000
+	if ((stage != UPPERREL_GROUP_AGG && stage != UPPERREL_ORDERED) ||
+#else
+	if (stage != UPPERREL_GROUP_AGG ||
+#endif
+		output_rel->fdw_private)
 		return;
 
 	fpinfo = (HDFSFdwRelationInfo *) palloc0(sizeof(HDFSFdwRelationInfo));
 	fpinfo->pushdown_safe = false;
+	fpinfo->stage = stage;
 	output_rel->fdw_private = fpinfo;
 
-#if PG_VERSION_NUM >= 110000
+#if PG_VERSION_NUM >= 120000
+	switch (stage)
+	{
+		case UPPERREL_GROUP_AGG:
+			hdfs_add_foreign_grouping_paths(root, input_rel, output_rel,
+											(GroupPathExtraData *) extra);
+			break;
+		case UPPERREL_ORDERED:
+			hdfs_add_foreign_ordered_paths(root, input_rel, output_rel);
+			break;
+		default:
+			elog(ERROR, "unexpected upper relation: %d", (int) stage);
+			break;
+	}
+#elif PG_VERSION_NUM >= 110000
 	hdfs_add_foreign_grouping_paths(root, input_rel, output_rel,
 									(GroupPathExtraData *) extra);
 #elif PG_VERSION_NUM >= 100000
@@ -2305,4 +2393,504 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 
 	/* Add generated path into grouped_rel by add_path(). */
 	add_path(grouped_rel, (Path *) grouppath);
+}
+
+/*
+ * hdfs_get_useful_ecs_for_relation
+ *		Determine which EquivalenceClasses might be involved in useful
+ *		orderings of this relation.
+ *
+ * This function is in some respects a mirror image of the core function
+ * pathkeys_useful_for_merging: for a regular table, we know what indexes
+ * we have and want to test whether any of them are useful.  For a foreign
+ * table, we don't know what indexes are present on the remote side but
+ * want to speculate about which ones we'd like to use if they existed.
+ *
+ * This function returns a list of potentially-useful equivalence classes,
+ * but it does not guarantee that an EquivalenceMember exists which contains
+ * Vars only from the given relation.  For example, given ft1 JOIN t1 ON
+ * ft1.x + t1.x = 0, this function will say that the equivalence class
+ * containing ft1.x + t1.x is potentially useful.  Supposing ft1 is remote and
+ * t1 is local (or on a different server), it will turn out that no useful
+ * ORDER BY clause can be generated.  It's not our job to figure that out
+ * here; we're only interested in identifying relevant ECs.
+ */
+static List *
+hdfs_get_useful_ecs_for_relation(PlannerInfo *root, RelOptInfo *rel)
+{
+	List	   *useful_eclass_list = NIL;
+	ListCell   *lc;
+	Relids		relids;
+
+	/*
+	 * First, consider whether any active EC is potentially useful for a merge
+	 * join against this relation.
+	 */
+	if (rel->has_eclass_joins)
+	{
+		foreach(lc, root->eq_classes)
+		{
+			EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
+
+			if (eclass_useful_for_merging(root, cur_ec, rel))
+				useful_eclass_list = lappend(useful_eclass_list, cur_ec);
+		}
+	}
+
+	/*
+	 * Next, consider whether there are any non-EC derivable join clauses that
+	 * are merge-joinable.  If the joininfo list is empty, we can exit
+	 * quickly.
+	 */
+	if (rel->joininfo == NIL)
+		return useful_eclass_list;
+
+	/* If this is a child rel, we must use the topmost parent rel to search. */
+	if (IS_OTHER_REL(rel))
+	{
+		Assert(!bms_is_empty(rel->top_parent_relids));
+		relids = rel->top_parent_relids;
+	}
+	else
+		relids = rel->relids;
+
+	/* Check each join clause in turn. */
+	foreach(lc, rel->joininfo)
+	{
+		RestrictInfo *restrictinfo = (RestrictInfo *) lfirst(lc);
+
+		/* Consider only mergejoinable clauses */
+		if (restrictinfo->mergeopfamilies == NIL)
+			continue;
+
+		/* Make sure we've got canonical ECs. */
+		update_mergeclause_eclasses(root, restrictinfo);
+
+		/*
+		 * restrictinfo->mergeopfamilies != NIL is sufficient to guarantee
+		 * that left_ec and right_ec will be initialized, per comments in
+		 * distribute_qual_to_rels.
+		 *
+		 * We want to identify which side of this merge-joinable clause
+		 * contains columns from the relation produced by this RelOptInfo. We
+		 * test for overlap, not containment, because there could be extra
+		 * relations on either side.  For example, suppose we've got something
+		 * like ((A JOIN B ON A.x = B.x) JOIN C ON A.y = C.y) LEFT JOIN D ON
+		 * A.y = D.y.  The input rel might be the joinrel between A and B, and
+		 * we'll consider the join clause A.y = D.y. relids contains a
+		 * relation not involved in the join class (B) and the equivalence
+		 * class for the left-hand side of the clause contains a relation not
+		 * involved in the input rel (C).  Despite the fact that we have only
+		 * overlap and not containment in either direction, A.y is potentially
+		 * useful as a sort column.
+		 *
+		 * Note that it's even possible that relids overlaps neither side of
+		 * the join clause.  For example, consider A LEFT JOIN B ON A.x = B.x
+		 * AND A.x = 1.  The clause A.x = 1 will appear in B's joininfo list,
+		 * but overlaps neither side of B.  In that case, we just skip this
+		 * join clause, since it doesn't suggest a useful sort order for this
+		 * relation.
+		 */
+		if (bms_overlap(relids, restrictinfo->right_ec->ec_relids))
+			useful_eclass_list = list_append_unique_ptr(useful_eclass_list,
+														restrictinfo->right_ec);
+		else if (bms_overlap(relids, restrictinfo->left_ec->ec_relids))
+			useful_eclass_list = list_append_unique_ptr(useful_eclass_list,
+														restrictinfo->left_ec);
+	}
+
+	return useful_eclass_list;
+}
+
+/*
+ * hdfs_get_useful_pathkeys_for_relation
+ *		Determine which orderings of a relation might be useful.
+ *
+ * Getting data in sorted order can be useful either because the requested
+ * order matches the final output ordering for the overall query we're
+ * planning, or because it enables an efficient merge join.  Here, we try
+ * to figure out which pathkeys to consider.
+ */
+static List *
+hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root, RelOptInfo *rel)
+{
+	List	   *useful_pathkeys_list = NIL;
+	List	   *useful_eclass_list;
+	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) rel->fdw_private;
+	EquivalenceClass *query_ec = NULL;
+	ListCell   *lc;
+
+	/*
+	 * Pushing the query_pathkeys to the remote server is always worth
+	 * considering, because it might let us avoid a local sort.
+	 */
+	fpinfo->qp_is_pushdown_safe = false;
+	if (root->query_pathkeys)
+	{
+		bool		query_pathkeys_ok = true;
+
+		foreach(lc, root->query_pathkeys)
+		{
+			PathKey    *pathkey = (PathKey *) lfirst(lc);
+			EquivalenceClass *pathkey_ec = pathkey->pk_eclass;
+			Expr	   *em_expr;
+
+			/*
+			 * The planner and executor don't have any clever strategy for
+			 * taking data sorted by a prefix of the query's pathkeys and
+			 * getting it to be sorted by all of those pathkeys. We'll just
+			 * end up resorting the entire data set.  So, unless we can push
+			 * down all of the query pathkeys, forget it.
+			 */
+			if (!(em_expr = hdfs_find_em_expr_for_rel(pathkey_ec, rel)) ||
+				!hdfs_is_foreign_expr(root, rel, em_expr, true))
+			{
+				query_pathkeys_ok = false;
+				break;
+			}
+		}
+
+		if (query_pathkeys_ok)
+		{
+			useful_pathkeys_list = list_make1(list_copy(root->query_pathkeys));
+			fpinfo->qp_is_pushdown_safe = true;
+		}
+	}
+
+	/* Get the list of interesting EquivalenceClasses. */
+	useful_eclass_list = hdfs_get_useful_ecs_for_relation(root, rel);
+
+	/* Extract unique EC for query, if any, so we don't consider it again. */
+	if (list_length(root->query_pathkeys) == 1)
+	{
+		PathKey    *query_pathkey = linitial(root->query_pathkeys);
+
+		query_ec = query_pathkey->pk_eclass;
+	}
+
+	/*
+	 * As a heuristic, the only pathkeys we consider here are those of length
+	 * one.  It's surely possible to consider more, but since each one we
+	 * choose to consider will generate a round-trip to the remote side, we
+	 * need to be a bit cautious here.  It would sure be nice to have a local
+	 * cache of information about remote index definitions...
+	 */
+	foreach(lc, useful_eclass_list)
+	{
+		EquivalenceClass *cur_ec = lfirst(lc);
+		Expr	   *em_expr;
+		PathKey    *pathkey;
+
+		/* If redundant with what we did above, skip it. */
+		if (cur_ec == query_ec)
+			continue;
+
+		/* If no pushable expression for this rel, skip it. */
+		em_expr = hdfs_find_em_expr_for_rel(cur_ec, rel);
+		if (em_expr == NULL || !hdfs_is_foreign_expr(root, rel, em_expr, true))
+			continue;
+
+		/* Looks like we can generate a pathkey, so let's do it. */
+		pathkey = make_canonical_pathkey(root, cur_ec,
+										 linitial_oid(cur_ec->ec_opfamilies),
+										 BTLessStrategyNumber,
+										 false);
+		useful_pathkeys_list = lappend(useful_pathkeys_list,
+									   list_make1(pathkey));
+	}
+
+	return useful_pathkeys_list;
+}
+
+/*
+ * hdfs_add_paths_with_pathkeys
+ *		 Add path with root->query_pathkeys if that's pushable.
+ *
+ * Pushing down query_pathkeys to the foreign server might let us avoid a
+ * local sort.
+ */
+static void
+hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
+							 Path *epq_path, Cost base_startup_cost,
+							 Cost base_total_cost)
+{
+	ListCell   *lc;
+	List	   *useful_pathkeys_list = NIL; /* List of all pathkeys */
+
+	if (!enable_order_by_pushdown)
+		return;
+
+	useful_pathkeys_list = hdfs_get_useful_pathkeys_for_relation(root, rel);
+
+	/* Create one path for each set of pathkeys we found above. */
+	foreach(lc, useful_pathkeys_list)
+	{
+		Cost		startup_cost;
+		Cost		total_cost;
+		List	   *useful_pathkeys = lfirst(lc);
+		Path	   *sorted_epq_path;
+
+		/* TODO put accurate estimates. */
+		startup_cost = base_startup_cost * DEFAULT_HDFS_SORT_MULTIPLIER;
+		total_cost = base_total_cost * DEFAULT_HDFS_SORT_MULTIPLIER;
+
+		/*
+		 * The EPQ path must be at least as well sorted as the path itself, in
+		 * case it gets used as input to a mergejoin.
+		 */
+		sorted_epq_path = epq_path;
+		if (sorted_epq_path != NULL &&
+			!pathkeys_contained_in(useful_pathkeys,
+								   sorted_epq_path->pathkeys))
+			sorted_epq_path = (Path *)
+				create_sort_path(root,
+								 rel,
+								 sorted_epq_path,
+								 useful_pathkeys,
+								 -1.0);
+
+#if PG_VERSION_NUM >= 120000
+		if (IS_SIMPLE_REL(rel))
+			add_path(rel, (Path *)
+					 create_foreignscan_path(root, rel,
+											 NULL,
+											 rel->rows,
+											 startup_cost,
+											 total_cost,
+											 useful_pathkeys,
+											 rel->lateral_relids,
+											 sorted_epq_path,
+											 NIL));
+		else
+			add_path(rel, (Path *)
+					 create_foreign_join_path(root, rel,
+											  NULL,
+											  rel->rows,
+											  startup_cost,
+											  total_cost,
+											  useful_pathkeys,
+											  rel->lateral_relids,
+											  sorted_epq_path,
+											  NIL));
+#else
+		add_path(rel, (Path *)
+				 create_foreignscan_path(root, rel,
+										 NULL,
+										 rel->rows,
+										 startup_cost,
+										 total_cost,
+										 useful_pathkeys,
+										 rel->lateral_relids,
+										 sorted_epq_path,
+										 NIL));
+#endif
+	}
+}
+
+/*
+ * Find an equivalence class member expression, all of whose Vars, come from
+ * the indicated relation.
+ */
+extern Expr *
+hdfs_find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel)
+{
+	ListCell   *lc_em;
+
+	foreach(lc_em, ec->ec_members)
+	{
+		EquivalenceMember *em = lfirst(lc_em);
+
+		if (bms_is_subset(em->em_relids, rel->relids))
+		{
+			/*
+			 * If there is more than one equivalence member whose Vars are
+			 * taken entirely from this relation, we'll be content to choose
+			 * any one of those.
+			 */
+			return em->em_expr;
+		}
+	}
+
+	/* We didn't find any suitable equivalence class expression */
+	return NULL;
+}
+
+/*
+ * hdfs_add_foreign_ordered_paths
+ *		Add foreign paths for performing the final sort remotely.
+ *
+ * Given input_rel contains the source-data Paths.  The paths are added to the
+ * given ordered_rel.
+ */
+#if PG_VERSION_NUM >= 120000
+static void
+hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
+							   RelOptInfo *ordered_rel)
+{
+	Query	   *parse = root->parse;
+	HDFSFdwRelationInfo *ifpinfo = input_rel->fdw_private;
+	HDFSFdwRelationInfo *fpinfo = ordered_rel->fdw_private;
+	double		rows;
+	Cost		startup_cost;
+	Cost		total_cost;
+	List	   *fdw_private;
+	ForeignPath *ordered_path;
+	ListCell   *lc;
+
+	if (!enable_order_by_pushdown)
+		return;
+
+	/* Shouldn't get here unless the query has ORDER BY */
+	Assert(parse->sortClause);
+
+	/* We don't support cases where there are any SRFs in the targetlist */
+	if (parse->hasTargetSRFs)
+		return;
+
+	/* Save the input_rel as outerrel in fpinfo */
+	fpinfo->outerrel = input_rel;
+
+	/*
+	 * If the input_rel is a base or join relation, we would already have
+	 * considered pushing down the final sort to the remote server when
+	 * creating pre-sorted foreign paths for that relation, because the
+	 * query_pathkeys is set to the root->sort_pathkeys in that case (see
+	 * standard_qp_callback()).
+	 */
+	if (input_rel->reloptkind == RELOPT_BASEREL ||
+		input_rel->reloptkind == RELOPT_JOINREL)
+	{
+		Assert(root->query_pathkeys == root->sort_pathkeys);
+
+		/* Safe to push down if the query_pathkeys is safe to push down */
+		fpinfo->pushdown_safe = ifpinfo->qp_is_pushdown_safe;
+
+		return;
+	}
+
+	/* The input_rel should be a grouping relation */
+	Assert(input_rel->reloptkind == RELOPT_UPPER_REL &&
+		   ifpinfo->stage == UPPERREL_GROUP_AGG);
+
+	/*
+	 * We try to create a path below by extending a simple foreign path for
+	 * the underlying grouping relation to perform the final sort remotely,
+	 * which is stored into the fdw_private list of the resulting path.
+	 */
+
+	/* Assess if it is safe to push down the final sort */
+	foreach(lc, root->sort_pathkeys)
+	{
+		PathKey    *pathkey = (PathKey *) lfirst(lc);
+		EquivalenceClass *pathkey_ec = pathkey->pk_eclass;
+		Expr	   *sort_expr;
+
+		/*
+		 * hdfs_is_foreign_expr would detect volatile expressions as well, but
+		 * checking ec_has_volatile here saves some cycles.
+		 */
+		if (pathkey_ec->ec_has_volatile)
+			return;
+
+		/* Get the sort expression for the pathkey_ec */
+		sort_expr = hdfs_find_em_expr_for_input_target(root,
+													   pathkey_ec,
+													   input_rel->reltarget);
+
+		/* If it's unsafe to remote, we cannot push down the final sort */
+		if (!hdfs_is_foreign_expr(root, input_rel, sort_expr, true))
+			return;
+	}
+
+	/* Safe to push down */
+	fpinfo->pushdown_safe = true;
+
+	/* TODO: Put accurate estimates */
+	startup_cost = 15;
+	total_cost = 10 + startup_cost;
+	rows = 10;
+
+	/*
+	 * Build the fdw_private list that will be used by hdfsGetForeignPlan.
+	 * Items in the list must match order in enum FdwPathPrivateIndex.
+	 */
+	fdw_private = list_make1(makeInteger(true));
+
+	/* Create foreign ordering path */
+	ordered_path = create_foreign_upper_path(root,
+											 input_rel,
+											 root->upper_targets[UPPERREL_ORDERED],
+											 rows,
+											 startup_cost,
+											 total_cost,
+											 root->sort_pathkeys,
+											 NULL,	/* no extra plan */
+											 fdw_private);
+
+	/* and add it to the ordered_rel */
+	add_path(ordered_rel, (Path *) ordered_path);
+}
+#endif							/* PG_VERSION_NUM >= 120000 */
+
+/*
+ * hdfs_find_em_expr_for_input_target
+ * 		Find an equivalence class member expression to be computed as a sort
+ * 		column in the given target.
+ */
+Expr *
+hdfs_find_em_expr_for_input_target(PlannerInfo *root,
+								   EquivalenceClass *ec,
+								   PathTarget *target)
+{
+	ListCell   *lc1;
+	int			i;
+
+	i = 0;
+	foreach(lc1, target->exprs)
+	{
+		Expr	   *expr = (Expr *) lfirst(lc1);
+		Index		sgref = get_pathtarget_sortgroupref(target, i);
+		ListCell   *lc2;
+
+		/* Ignore non-sort expressions */
+		if (sgref == 0 ||
+			get_sortgroupref_clause_noerr(sgref,
+										  root->parse->sortClause) == NULL)
+		{
+			i++;
+			continue;
+		}
+
+		/* We ignore binary-compatible relabeling on both ends */
+		while (expr && IsA(expr, RelabelType))
+			expr = ((RelabelType *) expr)->arg;
+
+		/* Locate an EquivalenceClass member matching this expr, if any */
+		foreach(lc2, ec->ec_members)
+		{
+			EquivalenceMember *em = (EquivalenceMember *) lfirst(lc2);
+			Expr	   *em_expr;
+
+			/* Don't match constants */
+			if (em->em_is_const)
+				continue;
+
+			/* Ignore child members */
+			if (em->em_is_child)
+				continue;
+
+			/* Match if same expression (after stripping relabel) */
+			em_expr = em->em_expr;
+			while (em_expr && IsA(em_expr, RelabelType))
+				em_expr = ((RelabelType *) em_expr)->arg;
+
+			if (equal(em_expr, expr))
+				return em->em_expr;
+		}
+
+		i++;
+	}
+
+	elog(ERROR, "could not find pathkey item to sort");
+	return NULL;				/* keep compiler quiet */
 }

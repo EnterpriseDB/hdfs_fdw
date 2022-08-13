@@ -166,6 +166,8 @@ static void hdfs_deparse_aggref(Aggref *node, deparse_expr_cxt *context);
 static void hdfs_append_groupby_clause(List *tlist, deparse_expr_cxt *context);
 static Node *hdfs_deparse_sort_group_clause(Index ref, List *tlist,
 											deparse_expr_cxt *context);
+static void hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
+									   deparse_expr_cxt *context);
 
 /*
  * Helper functions
@@ -669,6 +671,8 @@ hdfs_deparse_analyze(StringInfo buf, Relation rel)
  *
  * remote_conds is the list of conditions to be deparsed into the WHERE clause.
  *
+ * pathkeys is the list of pathkeys to order the result by.
+ *
  * If params_list is not NULL, it receives a list of Params and other-relation
  * Vars used in the clauses; these values must be transmitted to the remote
  * server as parameter values.
@@ -682,6 +686,8 @@ void
 hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 								 RelOptInfo *rel, List *tlist,
 								 List *remote_conds, bool is_subquery,
+								 List *pathkeys,
+								 bool has_final_sort,
 								 List **retrieved_attrs,
 								 List **params_list)
 {
@@ -735,6 +741,10 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 			hdfs_append_conditions(remote_conds, &context);
 		}
 	}
+
+	/* Add ORDER BY clause if we found any useful pathkeys */
+	if (pathkeys)
+		hdfs_append_orderby_clause(pathkeys, has_final_sort, &context);
 }
 
 /*
@@ -1221,6 +1231,7 @@ hdfs_deparse_rangeTblRef(StringInfo buf, PlannerInfo *root,
 		appendStringInfoChar(buf, '(');
 		hdfs_deparse_select_stmt_for_rel(buf, root, foreignrel, NIL,
 										 fpinfo->remote_conds, true,
+										 NULL, false,
 										 &retrieved_attrs, params_list);
 		appendStringInfoChar(buf, ')');
 
@@ -2289,4 +2300,56 @@ hdfs_is_foreign_param(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 			break;
 	}
 	return false;
+}
+
+/*
+ * hdfs_append_orderby_clause
+ * 		Deparse ORDER BY clause according to the given pathkeys for given
+ * 		base relation. From given pathkeys expressions belonging entirely
+ * 		to the given base relation are obtained and deparsed.
+ */
+void
+hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
+						   deparse_expr_cxt *context)
+{
+	ListCell   *lcell;
+	char	   *delim = " ";
+	RelOptInfo *baserel = context->scanrel;
+	StringInfo	buf = context->buf;
+
+	appendStringInfoString(buf, " ORDER BY");
+	foreach(lcell, pathkeys)
+	{
+		PathKey    *pathkey = lfirst(lcell);
+		Expr	   *em_expr;
+
+		if (has_final_sort)
+		{
+			/*
+			 * By construction, context->foreignrel is the input relation to
+			 * the final sort.
+			 */
+			em_expr = hdfs_find_em_expr_for_input_target(context->root,
+														 pathkey->pk_eclass,
+														 context->foreignrel->reltarget);
+		}
+		else
+			em_expr = hdfs_find_em_expr_for_rel(pathkey->pk_eclass, baserel);
+
+		Assert(em_expr != NULL);
+
+		appendStringInfoString(buf, delim);
+		hdfs_deparse_expr(em_expr, context);
+		if (pathkey->pk_strategy == BTLessStrategyNumber)
+			appendStringInfoString(buf, " ASC");
+		else
+			appendStringInfoString(buf, " DESC");
+
+		if (pathkey->pk_nulls_first)
+			appendStringInfoString(buf, " NULLS FIRST");
+		else
+			appendStringInfoString(buf, " NULLS LAST");
+
+		delim = ", ";
+	}
 }

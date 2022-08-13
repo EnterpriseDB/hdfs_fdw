@@ -75,6 +75,9 @@ typedef struct HDFSFdwRelationInfo
 	/* Bitmap of attr numbers we need to fetch from the remote server. */
 	Bitmapset  *attrs_used;
 
+	/* True means that the query_pathkeys is safe to push down */
+	bool		qp_is_pushdown_safe;
+
 	/* Cost and selectivity of local_conds. */
 	QualCost	local_conds_cost;
 	Selectivity local_conds_sel;
@@ -125,6 +128,9 @@ typedef struct HDFSFdwRelationInfo
 	int			relation_index;
 
 	hdfs_opt   *options;		/* Options applicable for this relation */
+
+	/* Upper relation information */
+	UpperRelationKind stage;
 } HDFSFdwRelationInfo;
 
 /* hdfs_option.c headers */
@@ -139,6 +145,8 @@ extern void hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 											 RelOptInfo *rel, List *tlist,
 											 List *remote_conds,
 											 bool is_subquery,
+											 List *pathkeys,
+											 bool has_final_sort,
 											 List **retrieved_attrs,
 											 List **params_list);
 extern void hdfs_classify_conditions(PlannerInfo *root, RelOptInfo *baserel,
@@ -151,6 +159,10 @@ extern void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf);
 extern void hdfs_deparse_analyze(StringInfo buf, Relation rel);
 extern bool hdfs_is_foreign_param(PlannerInfo *root, RelOptInfo *baserel,
 								  Expr *expr);
+extern Expr *hdfs_find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel);
+extern Expr *hdfs_find_em_expr_for_input_target(PlannerInfo *root,
+												EquivalenceClass *ec,
+												PathTarget *target);
 
 /* hdfs_query.c headers */
 extern double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
