@@ -43,6 +43,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/selfuncs.h"
+#include "utils/typcache.h"
 
 PG_MODULE_MAGIC;
 
@@ -2548,8 +2549,6 @@ hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root, RelOptInfo *rel)
 		foreach(lc, root->query_pathkeys)
 		{
 			PathKey    *pathkey = (PathKey *) lfirst(lc);
-			EquivalenceClass *pathkey_ec = pathkey->pk_eclass;
-			Expr	   *em_expr;
 
 			/*
 			 * The planner and executor don't have any clever strategy for
@@ -2558,8 +2557,7 @@ hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root, RelOptInfo *rel)
 			 * end up resorting the entire data set.  So, unless we can push
 			 * down all of the query pathkeys, forget it.
 			 */
-			if (!(em_expr = hdfs_find_em_expr_for_rel(pathkey_ec, rel)) ||
-				!hdfs_is_foreign_expr(root, rel, em_expr, true))
+			if (!hdfs_is_foreign_pathkey(root, rel, pathkey))
 			{
 				query_pathkeys_ok = false;
 				break;
@@ -2593,17 +2591,18 @@ hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root, RelOptInfo *rel)
 	 */
 	foreach(lc, useful_eclass_list)
 	{
+		EquivalenceMember *em = NULL;
 		EquivalenceClass *cur_ec = lfirst(lc);
-		Expr	   *em_expr;
 		PathKey    *pathkey;
 
 		/* If redundant with what we did above, skip it. */
 		if (cur_ec == query_ec)
 			continue;
 
-		/* If no pushable expression for this rel, skip it. */
-		em_expr = hdfs_find_em_expr_for_rel(cur_ec, rel);
-		if (em_expr == NULL || !hdfs_is_foreign_expr(root, rel, em_expr, true))
+		em = hdfs_find_em_for_rel(root, cur_ec, rel);
+
+		/* Can't push down the sort if the EC's opfamily is not shippable. */
+		if (!hdfs_is_builtin(linitial_oid(cur_ec->ec_opfamilies)))
 			continue;
 
 		/* Looks like we can generate a pathkey, so let's do it. */
@@ -2611,6 +2610,11 @@ hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root, RelOptInfo *rel)
 										 linitial_oid(cur_ec->ec_opfamilies),
 										 BTLessStrategyNumber,
 										 false);
+
+		/* Check for sort operator pushability. */
+		if (hdfs_get_sortby_direction_string(em, pathkey) == NULL)
+			continue;
+
 		useful_pathkeys_list = lappend(useful_pathkeys_list,
 									   list_make1(pathkey));
 	}
@@ -2704,30 +2708,36 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 }
 
 /*
- * Find an equivalence class member expression, all of whose Vars, come from
- * the indicated relation.
+ * Given an EquivalenceClass and a foreign relation, find an EC member
+ * that can be used to sort the relation remotely according to a pathkey
+ * using this EC.
+ *
+ * If there is more than one suitable candidate, return an arbitrary
+ * one of them.  If there is none, return NULL.
+ *
+ * This checks that the EC member expression uses only Vars from the given
+ * rel and is shippable.  Caller must separately verify that the pathkey's
+ * ordering operator is shippable.
  */
-extern Expr *
-hdfs_find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel)
+EquivalenceMember *
+hdfs_find_em_for_rel(PlannerInfo *root, EquivalenceClass *ec, RelOptInfo *rel)
 {
-	ListCell   *lc_em;
+	ListCell   *lc;
 
-	foreach(lc_em, ec->ec_members)
+	foreach(lc, ec->ec_members)
 	{
-		EquivalenceMember *em = lfirst(lc_em);
+		EquivalenceMember *em = (EquivalenceMember *) lfirst(lc);
 
-		if (bms_is_subset(em->em_relids, rel->relids))
-		{
-			/*
-			 * If there is more than one equivalence member whose Vars are
-			 * taken entirely from this relation, we'll be content to choose
-			 * any one of those.
-			 */
-			return em->em_expr;
-		}
+		/*
+		 * Note we require !bms_is_empty, else we'd accept constant
+		 * expressions which are not suitable for the purpose.
+		 */
+		if (bms_is_subset(em->em_relids, rel->relids) &&
+			!bms_is_empty(em->em_relids) &&
+			hdfs_is_foreign_expr(root, rel, em->em_expr, true))
+			return em;
 	}
 
-	/* We didn't find any suitable equivalence class expression */
 	return NULL;
 }
 
@@ -2799,7 +2809,7 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	{
 		PathKey    *pathkey = (PathKey *) lfirst(lc);
 		EquivalenceClass *pathkey_ec = pathkey->pk_eclass;
-		Expr	   *sort_expr;
+		EquivalenceMember *em;
 
 		/*
 		 * hdfs_is_foreign_expr would detect volatile expressions as well, but
@@ -2808,13 +2818,13 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 		if (pathkey_ec->ec_has_volatile)
 			return;
 
-		/* Get the sort expression for the pathkey_ec */
-		sort_expr = hdfs_find_em_expr_for_input_target(root,
-													   pathkey_ec,
-													   input_rel->reltarget);
+		/*
+		 * The EC must contain a shippable EM that is computed in input_rel's
+		 * reltarget, else we can't push down the sort.
+		 */
+		em = hdfs_find_em_for_rel_target(root, pathkey_ec, input_rel);
 
-		/* If it's unsafe to remote, we cannot push down the final sort */
-		if (!hdfs_is_foreign_expr(root, input_rel, sort_expr, true))
+		if (hdfs_get_sortby_direction_string(em, pathkey) == NULL)
 			return;
 	}
 
@@ -2849,15 +2859,23 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 #endif							/* PG_VERSION_NUM >= 120000 */
 
 /*
- * hdfs_find_em_expr_for_input_target
- * 		Find an equivalence class member expression to be computed as a sort
- * 		column in the given target.
+ * hdfs_find_em_for_rel_target
+ *
+ * Find an EquivalenceClass member that is to be computed as a sort column
+ * in the given rel's reltarget, and is shippable.
+ *
+ * If there is more than one suitable candidate, return an arbitrary
+ * one of them.  If there is none, return NULL.
+ *
+ * This checks that the EC member expression uses only Vars from the given
+ * rel and is shippable.  Caller must separately verify that the pathkey's
+ * ordering operator is shippable.
  */
-Expr *
-hdfs_find_em_expr_for_input_target(PlannerInfo *root,
-								   EquivalenceClass *ec,
-								   PathTarget *target)
+EquivalenceMember *
+hdfs_find_em_for_rel_target(PlannerInfo *root, EquivalenceClass *ec,
+							RelOptInfo *rel)
 {
+	PathTarget *target = rel->reltarget;
 	ListCell   *lc1;
 	int			i;
 
@@ -2900,15 +2918,18 @@ hdfs_find_em_expr_for_input_target(PlannerInfo *root,
 			while (em_expr && IsA(em_expr, RelabelType))
 				em_expr = ((RelabelType *) em_expr)->arg;
 
-			if (equal(em_expr, expr))
-				return em->em_expr;
+			if (!equal(em_expr, expr))
+				continue;
+
+			/* Check that expression (including relabels!) is shippable */
+			if (hdfs_is_foreign_expr(root, rel, em->em_expr, true))
+				return em;
 		}
 
 		i++;
 	}
 
-	elog(ERROR, "could not find pathkey item to sort");
-	return NULL;				/* keep compiler quiet */
+	return NULL;
 }
 
 #if PG_VERSION_NUM >= 120000
@@ -3143,3 +3164,50 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	add_path(final_rel, (Path *) final_path);
 }
 #endif		/* PG_VERSION_NUM >= 120000 */
+
+/*
+ * hdfs_get_sortby_direction_string
+ *		Fetch the operator oid from the operator family and datatype, and check
+ *		whether the operator is the default for sort expr's datatype. If it is,
+ *		then return ASC or DESC accordingly; NULL otherwise.
+ */
+char *
+hdfs_get_sortby_direction_string(EquivalenceMember *em, PathKey *pathkey)
+{
+	Oid			oprid;
+	TypeCacheEntry *typentry;
+
+	if (em == NULL)
+		return NULL;
+
+	/* Can't push down the sort if pathkey's opfamily is not shippable. */
+	if (!hdfs_is_builtin(pathkey->pk_opfamily))
+		return NULL;
+
+	oprid = get_opfamily_member(pathkey->pk_opfamily, em->em_datatype,
+								em->em_datatype, pathkey->pk_strategy);
+
+	if (!OidIsValid(oprid))
+		elog(ERROR, "missing operator %d(%u,%u) in opfamily %u",
+			 pathkey->pk_strategy, em->em_datatype, em->em_datatype,
+			 pathkey->pk_opfamily);
+
+	/* Can't push down the sort if the operator is not shippable. */
+	if (!hdfs_is_builtin(oprid))
+		return NULL;
+
+	/*
+	 * See whether the operator is default < or > for sort expr's datatype.
+	 * Here we need to use the expression's actual type to discover whether
+	 * the desired operator will be the default or not.
+	 */
+	typentry = lookup_type_cache(exprType((Node *)em->em_expr),
+								TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
+
+	if (oprid == typentry->lt_opr)
+		return "ASC";
+	else if (oprid == typentry->gt_opr)
+		return "DESC";
+
+	return NULL;
+}

@@ -104,6 +104,37 @@ CREATE TABLE local_dept (
 );
 INSERT INTO local_dept VALUES (10, 'ACCOUNTING', 'NEW YORK'), (20, 'RESEARCH', 'DALLAS');
 
+-- FDW-563: Test ORDER BY with user defined operators. Create the operator
+-- family required for the test.
+CREATE OPERATOR PUBLIC.<^ (
+  LEFTARG = INT4,
+  RIGHTARG = INT4,
+  PROCEDURE = INT4EQ
+);
+
+CREATE OPERATOR PUBLIC.=^ (
+  LEFTARG = INT4,
+  RIGHTARG = INT4,
+  PROCEDURE = INT4LT
+);
+
+CREATE OPERATOR PUBLIC.>^ (
+  LEFTARG = INT4,
+  RIGHTARG = INT4,
+  PROCEDURE = INT4GT
+);
+
+CREATE OPERATOR FAMILY my_op_family USING btree;
+
+CREATE FUNCTION MY_OP_CMP(A INT, B INT) RETURNS INT AS
+  $$ BEGIN RETURN BTINT4CMP(A, B); END $$ LANGUAGE PLPGSQL;
+
+CREATE OPERATOR CLASS my_op_class FOR TYPE INT USING btree FAMILY my_op_family AS
+ OPERATOR 1 PUBLIC.<^,
+ OPERATOR 3 PUBLIC.=^,
+ OPERATOR 5 PUBLIC.>^,
+ FUNCTION 1 my_op_cmp(INT, INT);
+
 -- Disable ORDER BY push down
 SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 EXPLAIN (COSTS FALSE, VERBOSE)
@@ -665,6 +696,18 @@ SELECT t1.c1, t2.c1
   FROM test1 t1 JOIN test2 t2 ON (t1.c1 = t2.c1)
   ORDER BY t1.c1;
 
+-- FDW-563: Test ORDER BY with user defined operators. User defined operators
+-- are not pushed down.
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT * FROM dept ORDER BY deptno USING OPERATOR(public.<^);
+
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT min(e.empno)
+  FROM emp e GROUP BY e.deptno
+  ORDER BY e.deptno USING OPERATOR(public.<^);
+
 -- Cleanup
 SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP TABLE local_dept;
@@ -684,6 +727,12 @@ DROP FOREIGN TABLE test1;
 DROP FOREIGN TABLE test2;
 DROP FOREIGN TABLE test3;
 DROP FOREIGN TABLE test4;
+DROP OPERATOR CLASS my_op_class USING btree;
+DROP FUNCTION my_op_cmp(a INT, b INT);
+DROP OPERATOR FAMILY my_op_family USING btree;
+DROP OPERATOR public.>^(INT, INT);
+DROP OPERATOR public.=^(INT, INT);
+DROP OPERATOR public.<^(INT, INT);
 DROP USER MAPPING FOR public SERVER hdfs_server;
 DROP USER MAPPING FOR public SERVER hdfs_server1;
 DROP SERVER hdfs_server;

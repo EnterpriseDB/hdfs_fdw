@@ -160,10 +160,18 @@ extern void hdfs_deparse_explain(hdfs_opt *opt, StringInfo buf);
 extern void hdfs_deparse_analyze(StringInfo buf, Relation rel);
 extern bool hdfs_is_foreign_param(PlannerInfo *root, RelOptInfo *baserel,
 								  Expr *expr);
-extern Expr *hdfs_find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel);
-extern Expr *hdfs_find_em_expr_for_input_target(PlannerInfo *root,
-												EquivalenceClass *ec,
-												PathTarget *target);
+extern bool hdfs_is_foreign_pathkey(PlannerInfo *root,
+									RelOptInfo *baserel,
+									PathKey *pathkey);
+extern char *hdfs_get_sortby_direction_string(EquivalenceMember *em,
+											  PathKey *pathkey);
+extern EquivalenceMember *hdfs_find_em_for_rel(PlannerInfo *root,
+											   EquivalenceClass *ec,
+											   RelOptInfo *rel);
+extern EquivalenceMember *hdfs_find_em_for_rel_target(PlannerInfo *root,
+													  EquivalenceClass *ec,
+													  RelOptInfo *rel);
+extern bool hdfs_is_builtin(Oid objectId);
 
 /* hdfs_query.c headers */
 extern double hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,

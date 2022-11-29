@@ -37,6 +37,7 @@
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
+#include "utils/typcache.h"
 
 
 /*
@@ -104,7 +105,6 @@ typedef struct deparse_expr_cxt
 static bool hdfs_foreign_expr_walker(Node *node,
 									 foreign_glob_cxt *glob_cxt,
 									 foreign_loc_cxt *outer_cxt);
-static bool hdfs_is_builtin(Oid procid);
 
 /*
  * Functions to construct string representation of a node tree.
@@ -168,6 +168,9 @@ static void hdfs_append_groupby_clause(List *tlist, deparse_expr_cxt *context);
 static Node *hdfs_deparse_sort_group_clause(Index ref, List *tlist,
 											deparse_expr_cxt *context);
 static void hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
+									   deparse_expr_cxt *context);
+static void hdfs_append_orderby_suffix(const char *sortby_dir, Oid sortcoltype,
+									   bool nulls_first,
 									   deparse_expr_cxt *context);
 static void hdfs_append_limit_clause(deparse_expr_cxt *context);
 
@@ -619,7 +622,7 @@ hdfs_foreign_expr_walker(Node *node,
  * be known to the remote server, if it's of an older version.  But keeping
  * track of that would be a huge exercise.
  */
-static bool
+bool
 hdfs_is_builtin(Oid oid)
 {
 #if PG_VERSION_NUM >= 120000
@@ -2315,9 +2318,14 @@ hdfs_is_foreign_param(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 
 /*
  * hdfs_append_orderby_clause
- * 		Deparse ORDER BY clause according to the given pathkeys for given
- * 		base relation. From given pathkeys expressions belonging entirely
- * 		to the given base relation are obtained and deparsed.
+ *
+ * Deparse ORDER BY clause defined by the given pathkeys.
+ *
+ * The clause should use Vars from context->scanrel if !has_final_sort,
+ * or from context->foreignrel's targetlist if has_final_sort.
+ *
+ * We find a suitable pathkey expression (some earlier step
+ * should have verified that there is one) and deparse it.
  */
 void
 hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
@@ -2325,14 +2333,15 @@ hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
 {
 	ListCell   *lcell;
 	char	   *delim = " ";
-	RelOptInfo *baserel = context->scanrel;
 	StringInfo	buf = context->buf;
 
 	appendStringInfoString(buf, " ORDER BY");
 	foreach(lcell, pathkeys)
 	{
 		PathKey    *pathkey = lfirst(lcell);
+		EquivalenceMember *em;
 		Expr	   *em_expr;
+		char	   *sortby_dir = NULL;
 
 		if (has_final_sort)
 		{
@@ -2340,26 +2349,32 @@ hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
 			 * By construction, context->foreignrel is the input relation to
 			 * the final sort.
 			 */
-			em_expr = hdfs_find_em_expr_for_input_target(context->root,
-														 pathkey->pk_eclass,
-														 context->foreignrel->reltarget);
+			em = hdfs_find_em_for_rel_target(context->root,
+											 pathkey->pk_eclass,
+											 context->foreignrel);
 		}
 		else
-			em_expr = hdfs_find_em_expr_for_rel(pathkey->pk_eclass, baserel);
+			em = hdfs_find_em_for_rel(context->root,
+									  pathkey->pk_eclass,
+									  context->scanrel);
 
-		Assert(em_expr != NULL);
+		/*
+		 * We don't expect any error here; it would mean that shippability
+		 * wasn't verified earlier.  For the same reason, we don't recheck
+		 * shippability of the sort operator.
+		 */
+		if (em == NULL)
+			elog(ERROR, "could not find pathkey item to sort");
+
+		em_expr = em->em_expr;
+
+		sortby_dir = hdfs_get_sortby_direction_string(em, pathkey);
 
 		appendStringInfoString(buf, delim);
 		hdfs_deparse_expr(em_expr, context);
-		if (pathkey->pk_strategy == BTLessStrategyNumber)
-			appendStringInfoString(buf, " ASC");
-		else
-			appendStringInfoString(buf, " DESC");
 
-		if (pathkey->pk_nulls_first)
-			appendStringInfoString(buf, " NULLS FIRST");
-		else
-			appendStringInfoString(buf, " NULLS LAST");
+		hdfs_append_orderby_suffix(sortby_dir, exprType((Node *) em_expr),
+								   pathkey->pk_nulls_first, context);
 
 		delim = ", ";
 	}
@@ -2391,4 +2406,51 @@ hdfs_append_limit_clause(deparse_expr_cxt *context)
 		hdfs_deparse_expr((Expr *) root->parse->limitCount, context);
 		context->is_limit_node = false;
 	}
+}
+
+/*
+ * hdfs_append_orderby_suffix
+ *		Append the ASC/DESC and NULLS FIRST/LAST parts of an ORDER BY clause.
+ */
+static void
+hdfs_append_orderby_suffix(const char *sortby_dir, Oid sortcoltype,
+						   bool nulls_first, deparse_expr_cxt *context)
+{
+	StringInfo	buf = context->buf;
+
+	Assert(sortby_dir != NULL);
+	appendStringInfo(buf, " %s", sortby_dir);
+
+	if (nulls_first)
+		appendStringInfoString(buf, " NULLS FIRST");
+	else
+		appendStringInfoString(buf, " NULLS LAST");
+}
+
+/*
+ * hdfs_is_foreign_pathkey
+ *		Returns true if it's safe to push down the sort expression described by
+ *		'pathkey' to the foreign server.
+ */
+bool
+hdfs_is_foreign_pathkey(PlannerInfo *root, RelOptInfo *baserel,
+						PathKey *pathkey)
+{
+	EquivalenceMember *em = NULL;
+	EquivalenceClass *pathkey_ec = pathkey->pk_eclass;
+
+	/*
+	 * hdfs_is_foreign_expr would detect volatile expressions as well,
+	 * but checking ec_has_volatile here saves some cycles.
+	 */
+	if (pathkey_ec->ec_has_volatile)
+		return false;
+
+	/* can push if a suitable EC member exists */
+	em = hdfs_find_em_for_rel(root, pathkey_ec, baserel);
+
+	if (hdfs_get_sortby_direction_string(em, pathkey) == NULL)
+		return false;
+
+	return true;
 }
