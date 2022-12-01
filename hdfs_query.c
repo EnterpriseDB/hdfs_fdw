@@ -158,9 +158,9 @@ hdfs_describe(int con_index, hdfs_opt *opt, Relation rel)
 	 * hdfs_deparse_describe() sends a query of the form "DESCRIBE FORMATTED
 	 * sometab" to the remote server.  This produces the output in the
 	 * columnar format.  The 'totalSize' is placed in the 1st column (indexed
-	 * by 0) and its value is placed in the 2nd column of the same row.
-	 * Hence, we directly search for the 1st column of each row until we find
-	 * the 'totalSize', and once we find that, only then we retrieve the 2nd
+	 * by 0) and its value is placed in the 2nd column of the same row. Hence,
+	 * we directly search for the 1st column of each row until we find the
+	 * 'totalSize', and once we find that, only then we retrieve the 2nd
 	 * column of that row and break.
 	 */
 	while (hdfs_fetch(con_index) == 0)

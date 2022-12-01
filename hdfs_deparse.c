@@ -1518,10 +1518,10 @@ hdfs_deparse_const(Const *node, deparse_expr_cxt *context)
 		case FLOAT4OID:
 		case FLOAT8OID:
 		case NUMERICOID:
-				if (context->is_limit_node)
-					appendStringInfoString(buf, extval);
-				else
-					appendStringInfo(buf, "'%s'", extval);
+			if (context->is_limit_node)
+				appendStringInfoString(buf, extval);
+			else
+				appendStringInfo(buf, "'%s'", extval);
 			break;
 		case BITOID:
 		case VARBITOID:
@@ -2392,7 +2392,8 @@ hdfs_append_limit_clause(deparse_expr_cxt *context)
 	if (root->parse->limitCount)
 	{
 		StringInfo	buf = context->buf;
-		Const	   *c = (Const *)  root->parse->limitOffset;
+		Const	   *c = (Const *) root->parse->limitOffset;
+
 		appendStringInfoString(buf, " LIMIT ");
 		context->is_limit_node = true;
 
@@ -2440,8 +2441,8 @@ hdfs_is_foreign_pathkey(PlannerInfo *root, RelOptInfo *baserel,
 	EquivalenceClass *pathkey_ec = pathkey->pk_eclass;
 
 	/*
-	 * hdfs_is_foreign_expr would detect volatile expressions as well,
-	 * but checking ec_has_volatile here saves some cycles.
+	 * hdfs_is_foreign_expr would detect volatile expressions as well, but
+	 * checking ec_has_volatile here saves some cycles.
 	 */
 	if (pathkey_ec->ec_has_volatile)
 		return false;

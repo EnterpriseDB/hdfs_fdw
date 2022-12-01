@@ -1882,10 +1882,10 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 
 	/*
 	 * Construct the array mapping columns in the ForeignScan node output to
-	 * their positions in the result fetched from the foreign server.
-	 * Positive values indicate the locations in the result and negative
-	 * values indicate the range table indexes of the base table whose
-	 * whole-row reference values are requested in that place.
+	 * their positions in the result fetched from the foreign server. Positive
+	 * values indicate the locations in the result and negative values
+	 * indicate the range table indexes of the base table whose whole-row
+	 * reference values are requested in that place.
 	 */
 	fs_num_atts = list_length(fdw_scan_tlist);
 	fs_attr_pos = (int *) palloc(sizeof(int) * fs_num_atts);
@@ -2296,7 +2296,7 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 			break;
 		case UPPERREL_FINAL:
 			hdfs_add_foreign_final_paths(root, input_rel, output_rel,
-										 (FinalPathExtraData *)extra);
+										 (FinalPathExtraData *) extra);
 			break;
 		default:
 			elog(ERROR, "unexpected upper relation: %d", (int) stage);
@@ -3102,8 +3102,8 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	/*
 	 * hdfs doesn't support LIMIT/OFFSET NULL/ALL syntax, however, only check
 	 * for LIMIT NULL/ALL because one can specify a valid LIMIT value with
-	 * OFFSET NULL.  This can be handled by checking for OFFSET NULL
-	 * during deparse and ignoring it.  If const LIMIT node is null then do not
+	 * OFFSET NULL.  This can be handled by checking for OFFSET NULL during
+	 * deparse and ignoring it.  If const LIMIT node is null then do not
 	 * pushdown limit/offset clause.
 	 */
 	if (parse->limitCount)
@@ -3163,7 +3163,7 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	/* and add it to the final_rel */
 	add_path(final_rel, (Path *) final_path);
 }
-#endif		/* PG_VERSION_NUM >= 120000 */
+#endif							/* PG_VERSION_NUM >= 120000 */
 
 /*
  * hdfs_get_sortby_direction_string
@@ -3201,8 +3201,8 @@ hdfs_get_sortby_direction_string(EquivalenceMember *em, PathKey *pathkey)
 	 * Here we need to use the expression's actual type to discover whether
 	 * the desired operator will be the default or not.
 	 */
-	typentry = lookup_type_cache(exprType((Node *)em->em_expr),
-								TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
+	typentry = lookup_type_cache(exprType((Node *) em->em_expr),
+								 TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
 
 	if (oprid == typentry->lt_opr)
 		return "ASC";
