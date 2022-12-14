@@ -55,9 +55,9 @@ PG_MODULE_MAGIC;
 
 /*
  * In PG 9.5.1 the number will be 90501,
- * our version is 2.2.0 so number will be 20200
+ * our version is 2.3.0 so number will be 20300
  */
-#define CODE_VERSION   20200
+#define CODE_VERSION   20300
 
 /*
  * The number of rows in a foreign relation are estimated to be so less that
