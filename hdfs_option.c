@@ -58,6 +58,8 @@ static struct HDFSFdwOption valid_options[] =
 	{"log_remote_sql", ForeignServerRelationId},
 	{"enable_join_pushdown", ForeignServerRelationId},
 	{"enable_join_pushdown", ForeignTableRelationId},
+	{"enable_aggregate_pushdown", ForeignServerRelationId},
+	{"enable_aggregate_pushdown", ForeignTableRelationId},
 	{"enable_order_by_pushdown", ForeignServerRelationId},
 	{"enable_order_by_pushdown", ForeignTableRelationId},
 	{NULL, InvalidOid}
@@ -115,6 +117,7 @@ hdfs_fdw_validator(PG_FUNCTION_ARGS)
 		}
 
 		if (strcmp(def->defname, "enable_join_pushdown") == 0 ||
+			strcmp(def->defname, "enable_aggregate_pushdown") == 0 ||
 			strcmp(def->defname, "enable_order_by_pushdown") == 0)
 			(void) defGetBoolean(def);
 	}
@@ -165,6 +168,7 @@ hdfs_get_options(Oid foreigntableid)
 	opt->port = DEFAULT_PORT;
 	opt->dbname = DEFAULT_DATABASE;
 	opt->enable_join_pushdown = true;
+	opt->enable_aggregate_pushdown = true;
 	opt->enable_order_by_pushdown = true;
 
 	/* Extract options from FDW objects. */
@@ -243,6 +247,9 @@ hdfs_get_options(Oid foreigntableid)
 
 		if (strcmp(def->defname, "enable_join_pushdown") == 0)
 			opt->enable_join_pushdown = defGetBoolean(def);
+
+		if (strcmp(def->defname, "enable_aggregate_pushdown") == 0)
+			opt->enable_aggregate_pushdown = defGetBoolean(def);
 
 		if (strcmp(def->defname, "enable_order_by_pushdown") == 0)
 			opt->enable_order_by_pushdown = defGetBoolean(def);

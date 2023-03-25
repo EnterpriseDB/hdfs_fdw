@@ -100,6 +100,12 @@ be specified in options:
 	join has set it to false then the join will not be pushed down. The
 	table-level value of the option takes precedence over the server-level
 	option value. Default is `true`.
+  * `enable_aggregate_pushdown`: If `true`, pushes aggregate operations to the
+	foreign server instead of performing them locally. This option can also
+	be set for an individual table, and if any of the tables involved in the
+	query has set it to false then the operations will not be pushed down. The
+	table-level value of the option takes precedence over the server-level
+	option value. Default is `true`.
   * `enable_order_by_pushdown`: If `true`, pushes the ORDER BY clause to the
 	foreign server instead of performing a sort locally. This option can also
 	be set for an individual table, and if any of the tables involved in the
@@ -125,10 +131,16 @@ options:
 	foreign table name.
   * `enable_join_pushdown`: Similar to the server-level option, but can be
 	configured at table level as well. Default is `true`.
+  * `enable_aggregate_pushdown`: Similar to the server-level option, but can
+	be configured at table level as well. Default is `true`.
   * `enable_order_by_pushdown`: Similar to the server-level option, but can
 	be configured at table level as well. Default is `true`.
 
 GUC variables:
+
+  * `hdfs_fdw.enable_aggregate_pushdown`: If `true`, pushes aggregate
+	operations to the foreign server, instead of fetching rows from the
+	foreign server and performing the operations locally. Default is `true`.
 
   * `hdfs_fdw.enable_order_by_pushdown`: If `true`, pushes the order by
 	operation to the foreign server, instead of fetching rows from the

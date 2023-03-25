@@ -38,6 +38,19 @@ CREATE FOREIGN TABLE dept (
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
 
+CREATE FOREIGN TABLE jobhist
+(
+    empno           INTEGER,
+    startdate       pg_catalog.DATE,
+    enddate         pg_catalog.DATE,
+    job             VARCHAR(9),
+    sal             FLOAT,
+    comm            FLOAT,
+    deptno          INTEGER,
+    chgdesc         VARCHAR(80)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'jobhist');
+
 -- Simple aggregates
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT sum(empno), avg(empno), min(sal), max(empno), sum(empno) * (random() <= 1)::int AS sum2 FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1, 2;
@@ -261,11 +274,111 @@ SELECT c2, avg(c1), max(c1), count(*) FROM fprt1 GROUP BY c2 HAVING sum(c1) < 70
 
 SET enable_partitionwise_aggregate TO off;
 
+-- FDW-557: Support enable_aggregate_pushdown option at server, table and
+-- session/query level.
+-- Check only boolean values are accepted.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_aggregate_pushdown 'abc11');
+
+-- Aggregate pushdown at GUC level is enabled by default.
+SHOW hdfs_fdw.enable_aggregate_pushdown;
+
+-- Test the option at server and table level, it's enabled by default at table
+-- server level, so aggregate is pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+
+-- Disable the option at server level, default for tables also gets disabled,
+-- so aggregate is not pushed down.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_aggregate_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+
+-- Enable the option at table level, table level overrides server level,
+-- so aggregate is pushed down.
+ALTER FOREIGN TABLE emp OPTIONS (ADD enable_aggregate_pushdown 'true');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+
+-- Enable the option at server level and disable at table level, table level
+-- overrides server level, so aggregate is not pushed down.
+ALTER SERVER hdfs_server OPTIONS (SET enable_aggregate_pushdown 'true');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+
+-- Test table level option on a join query, pushdown is disabled for emp and
+-- enabled for dept, so the aggregate is not pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+
+-- Test table level option on a join query, option for dept is enabled by
+-- default, so the aggregate is pushed down.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'true');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+
+-- Test table level option on a join query, aggregate is not pushed down if it's
+-- disabled for any of the tables, here it's disabled for emp.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+
+-- Test table level option with a complex join, aggregate is not pushed down
+-- if it's disabled for any of the tables
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'true');
+ALTER FOREIGN TABLE jobhist OPTIONS (ADD enable_aggregate_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT sum(e.empno)
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist h ON (d.deptno = h.deptno) WHERE e.empno = 7654
+  GROUP BY e.empno ORDER BY e.empno;
+
+-- Aggregate is pushed down since it's enabled for all the tables
+ALTER FOREIGN TABLE jobhist OPTIONS (SET enable_aggregate_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT sum(e.empno)
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist h ON (d.deptno = h.deptno) WHERE e.empno = 7654
+  GROUP BY e.empno ORDER BY e.empno;
+
+-- Test with join pushdown disabled at server level, aggregate is not pushed
+-- down if join pushdown is disabled
+ALTER SERVER hdfs_server OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+
+-- Test with join pushdown disabled at GUC level, aggregate is not pushed
+-- down if join pushdown is disabled
+ALTER SERVER hdfs_server OPTIONS (SET enable_join_pushdown 'true');
+SET hdfs_fdw.enable_join_pushdown TO off;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+
+-- Test aggregate pushdown at GUC level
+-- Disable aggregate pushdown at GUC level, aggregate is not pushed down
+SET hdfs_fdw.enable_aggregate_pushdown TO off;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+
+-- Test aggregate pushdown with order by
+-- Disable aggregate pushdown and enable order by pushdown,
+-- order by is also not pushed down
+SET hdfs_fdw.enable_order_by_pushdown TO on;
+EXPLAIN (VERBOSE, COSTS OFF)
+select count(*) from emp order by 1;
+
+-- Test aggregate pushdown with order by
+-- Enable aggregate pushdown and order by pushdown,
+-- both the operations are pushed down
+-- For versions < 12 only aggregate is pushed down
+SET hdfs_fdw.enable_aggregate_pushdown TO on;
+EXPLAIN (VERBOSE, COSTS OFF)
+select count(*) from emp order by 1;
+
 -- Cleanup
 DROP aggregate least_agg(variadic items anyarray);
 DROP FUNCTION least_accum(anyelement, variadic anyarray);
 DROP FOREIGN TABLE emp;
 DROP FOREIGN TABLE dept;
+DROP FOREIGN TABLE jobhist;
 DROP FOREIGN TABLE ftprt1_p1;
 DROP FOREIGN TABLE ftprt1_p2;
 DROP TABLE IF EXISTS fprt1;

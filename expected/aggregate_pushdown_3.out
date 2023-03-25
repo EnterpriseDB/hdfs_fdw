@@ -32,6 +32,18 @@ CREATE FOREIGN TABLE dept (
     loc             VARCHAR(13)
 )
 SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'dept');
+CREATE FOREIGN TABLE jobhist
+(
+    empno           INTEGER,
+    startdate       pg_catalog.DATE,
+    enddate         pg_catalog.DATE,
+    job             VARCHAR(9),
+    sal             FLOAT,
+    comm            FLOAT,
+    deptno          INTEGER,
+    chgdesc         VARCHAR(80)
+)
+SERVER hdfs_server OPTIONS (dbname 'fdw_db', table_name 'jobhist');
 -- Simple aggregates
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT sum(empno), avg(empno), min(sal), max(empno), sum(empno) * (random() <= 1)::int AS sum2 FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1, 2;
@@ -1187,11 +1199,266 @@ SELECT c2, avg(c1), max(c1), count(*) FROM fprt1 GROUP BY c2 HAVING sum(c1) < 70
 
 SET enable_partitionwise_aggregate TO off;
 ERROR:  unrecognized configuration parameter "enable_partitionwise_aggregate"
+-- FDW-557: Support enable_aggregate_pushdown option at server, table and
+-- session/query level.
+-- Check only boolean values are accepted.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_aggregate_pushdown 'abc11');
+ERROR:  enable_aggregate_pushdown requires a Boolean value
+-- Aggregate pushdown at GUC level is enabled by default.
+SHOW hdfs_fdw.enable_aggregate_pushdown;
+ hdfs_fdw.enable_aggregate_pushdown 
+------------------------------------
+ on
+(1 row)
+
+-- Test the option at server and table level, it's enabled by default at table
+-- server level, so aggregate is pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(empno)), sal
+   Sort Key: (sum(emp.empno))
+   ->  Foreign Scan
+         Output: (sum(empno)), sal
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT sum(`empno`), `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(7 rows)
+
+-- Disable the option at server level, default for tables also gets disabled,
+-- so aggregate is not pushed down.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_aggregate_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(empno)), sal
+   Sort Key: (sum(emp.empno))
+   ->  HashAggregate
+         Output: sum(empno), sal
+         Group Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(9 rows)
+
+-- Enable the option at table level, table level overrides server level,
+-- so aggregate is pushed down.
+ALTER FOREIGN TABLE emp OPTIONS (ADD enable_aggregate_pushdown 'true');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(empno)), sal
+   Sort Key: (sum(emp.empno))
+   ->  Foreign Scan
+         Output: (sum(empno)), sal
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT sum(`empno`), `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000')) GROUP BY `sal`
+(7 rows)
+
+-- Enable the option at server level and disable at table level, table level
+-- overrides server level, so aggregate is not pushed down.
+ALTER SERVER hdfs_server OPTIONS (SET enable_aggregate_pushdown 'true');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(empno)), sal
+   Sort Key: (sum(emp.empno))
+   ->  HashAggregate
+         Output: sum(empno), sal
+         Group Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(9 rows)
+
+-- Test table level option on a join query, pushdown is disabled for emp and
+-- enabled for dept, so the aggregate is not pushed down.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum(t1.empno)
+   ->  Foreign Scan
+         Output: t1.empno
+         Relations: (fdw_db.emp t1) INNER JOIN (fdw_db.dept t2)
+         Remote SQL: SELECT r1.`empno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) WHERE ((r1.`empno` = '7654'))
+(6 rows)
+
+-- Test table level option on a join query, option for dept is enabled by
+-- default, so the aggregate is pushed down.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'true');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+                                                                          QUERY PLAN                                                                          
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: (sum(t1.empno))
+   Relations: Aggregate on ((fdw_db.emp t1) INNER JOIN (fdw_db.dept t2))
+   Remote SQL: SELECT sum(r1.`empno`) FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) WHERE ((r1.`empno` = '7654'))
+(4 rows)
+
+-- Test table level option on a join query, aggregate is not pushed down if it's
+-- disabled for any of the tables, here it's disabled for emp.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum(t1.empno)
+   ->  Foreign Scan
+         Output: t1.empno
+         Relations: (fdw_db.emp t1) INNER JOIN (fdw_db.dept t2)
+         Remote SQL: SELECT r1.`empno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) WHERE ((r1.`empno` = '7654'))
+(6 rows)
+
+-- Test table level option with a complex join, aggregate is not pushed down
+-- if it's disabled for any of the tables
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_aggregate_pushdown 'true');
+ALTER FOREIGN TABLE jobhist OPTIONS (ADD enable_aggregate_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT sum(e.empno)
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist h ON (d.deptno = h.deptno) WHERE e.empno = 7654
+  GROUP BY e.empno ORDER BY e.empno;
+                                                                                                             QUERY PLAN                                                                                                              
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: sum(e.empno), e.empno
+   Group Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno
+         Relations: ((fdw_db.emp e) INNER JOIN (fdw_db.dept d)) INNER JOIN (fdw_db.jobhist h)
+         Remote SQL: SELECT r1.`empno` FROM ((`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) INNER JOIN `fdw_db`.`jobhist` r4 ON (((r1.`deptno` = r4.`deptno`)))) WHERE ((r1.`empno` = '7654'))
+(7 rows)
+
+-- Aggregate is pushed down since it's enabled for all the tables
+ALTER FOREIGN TABLE jobhist OPTIONS (SET enable_aggregate_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT sum(e.empno)
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist h ON (d.deptno = h.deptno) WHERE e.empno = 7654
+  GROUP BY e.empno ORDER BY e.empno;
+                                                                                                                             QUERY PLAN                                                                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: (sum(e.empno)), e.empno
+   Relations: Aggregate on (((fdw_db.emp e) INNER JOIN (fdw_db.dept d)) INNER JOIN (fdw_db.jobhist h))
+   Remote SQL: SELECT sum(r1.`empno`), r1.`empno` FROM ((`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) INNER JOIN `fdw_db`.`jobhist` r4 ON (((r1.`deptno` = r4.`deptno`)))) WHERE ((r1.`empno` = '7654')) GROUP BY r1.`empno`
+(4 rows)
+
+-- Test with join pushdown disabled at server level, aggregate is not pushed
+-- down if join pushdown is disabled
+ALTER SERVER hdfs_server OPTIONS (ADD enable_join_pushdown 'false');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+                                            QUERY PLAN                                             
+---------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum(t1.empno)
+   ->  Nested Loop
+         Output: t1.empno
+         Join Filter: (t1.deptno = t2.deptno)
+         ->  Foreign Scan on public.emp t1
+               Output: t1.empno, t1.ename, t1.job, t1.mgr, t1.hiredate, t1.sal, t1.comm, t1.deptno
+               Remote SQL: SELECT `empno`, `deptno` FROM `fdw_db`.`emp` WHERE ((`empno` = '7654'))
+         ->  Materialize
+               Output: t2.deptno
+               ->  Foreign Scan on public.dept t2
+                     Output: t2.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(13 rows)
+
+-- Test with join pushdown disabled at GUC level, aggregate is not pushed
+-- down if join pushdown is disabled
+ALTER SERVER hdfs_server OPTIONS (SET enable_join_pushdown 'true');
+SET hdfs_fdw.enable_join_pushdown TO off;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(t1.empno) FROM  emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHERE t1.empno = 7654;
+                                            QUERY PLAN                                             
+---------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum(t1.empno)
+   ->  Nested Loop
+         Output: t1.empno
+         Join Filter: (t1.deptno = t2.deptno)
+         ->  Foreign Scan on public.emp t1
+               Output: t1.empno, t1.ename, t1.job, t1.mgr, t1.hiredate, t1.sal, t1.comm, t1.deptno
+               Remote SQL: SELECT `empno`, `deptno` FROM `fdw_db`.`emp` WHERE ((`empno` = '7654'))
+         ->  Materialize
+               Output: t2.deptno
+               ->  Foreign Scan on public.dept t2
+                     Output: t2.deptno
+                     Remote SQL: SELECT `deptno` FROM `fdw_db`.`dept`
+(13 rows)
+
+-- Test aggregate pushdown at GUC level
+-- Disable aggregate pushdown at GUC level, aggregate is not pushed down
+SET hdfs_fdw.enable_aggregate_pushdown TO off;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT sum(empno) FROM emp WHERE sal > 1000 GROUP BY sal ORDER BY 1;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Sort
+   Output: (sum(empno)), sal
+   Sort Key: (sum(emp.empno))
+   ->  HashAggregate
+         Output: sum(empno), sal
+         Group Key: emp.sal
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT `empno`, `sal` FROM `fdw_db`.`emp` WHERE ((`sal` > '1000'))
+(9 rows)
+
+-- Test aggregate pushdown with order by
+-- Disable aggregate pushdown and enable order by pushdown,
+-- order by is also not pushed down
+SET hdfs_fdw.enable_order_by_pushdown TO on;
+EXPLAIN (VERBOSE, COSTS OFF)
+select count(*) from emp order by 1;
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Sort
+   Output: (count(*))
+   Sort Key: (count(*))
+   ->  Aggregate
+         Output: count(*)
+         ->  Foreign Scan on public.emp
+               Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+               Remote SQL: SELECT NULL FROM `fdw_db`.`emp`
+(8 rows)
+
+-- Test aggregate pushdown with order by
+-- Enable aggregate pushdown and order by pushdown,
+-- both the operations are pushed down
+-- For versions < 12 only aggregate is pushed down
+SET hdfs_fdw.enable_aggregate_pushdown TO on;
+EXPLAIN (VERBOSE, COSTS OFF)
+select count(*) from emp order by 1;
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Sort
+   Output: (count(*))
+   Sort Key: (count(*))
+   ->  Foreign Scan
+         Output: (count(*))
+         Relations: Aggregate on (fdw_db.emp)
+         Remote SQL: SELECT count(*) FROM `fdw_db`.`emp`
+(7 rows)
+
 -- Cleanup
 DROP aggregate least_agg(variadic items anyarray);
 DROP FUNCTION least_accum(anyelement, variadic anyarray);
 DROP FOREIGN TABLE emp;
 DROP FOREIGN TABLE dept;
+DROP FOREIGN TABLE jobhist;
 DROP FOREIGN TABLE ftprt1_p1;
 DROP FOREIGN TABLE ftprt1_p2;
 DROP TABLE IF EXISTS fprt1;

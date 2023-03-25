@@ -54,6 +54,7 @@ typedef struct hdfs_opt
 	int			fetch_size;
 	bool		log_remote_sql;
 	bool		enable_join_pushdown;
+	bool		enable_aggregate_pushdown;
 	bool		enable_order_by_pushdown;
 } hdfs_opt;
 
@@ -134,6 +135,7 @@ typedef struct HDFSFdwRelationInfo
 	UpperRelationKind stage;
 
 	/* Inherit required flags from hdfs_opt */
+	bool		enable_aggregate_pushdown;
 	bool		enable_order_by_pushdown;
 } HDFSFdwRelationInfo;
 

@@ -67,6 +67,7 @@ PG_MODULE_MAGIC;
 #define DEFAULT_HDFS_SORT_MULTIPLIER 1
 
 /* GUC variables. */
+static bool enable_aggregate_pushdown = true;
 static bool enable_order_by_pushdown = false;
 
 /*
@@ -342,6 +343,17 @@ _PG_init(void)
 							   NULL,
 							   NULL);
 
+	DefineCustomBoolVariable("hdfs_fdw.enable_aggregate_pushdown",
+							 "Enable/Disable aggregate push down",
+							 NULL,
+							 &enable_aggregate_pushdown,
+							 true,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
 	/*
 	 * ORDER BY is inefficient in Hive so it's disabled by default in
 	 * hdfs_fdw.
@@ -538,6 +550,9 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 
 	/* Also store the options in fpinfo for further use */
 	fpinfo->options = options;
+
+	/* Set the flag enable_aggregate_pushdown of the base relation */
+	fpinfo->enable_aggregate_pushdown = options->enable_aggregate_pushdown;
 
 	/* Set the flag enable_order_by_pushdown of the base relation */
 	fpinfo->enable_order_by_pushdown = options->enable_order_by_pushdown;
@@ -1246,6 +1261,11 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	if (!hdfs_foreign_join_ok(root, joinrel, jointype, outerrel, innerrel,
 							  extra))
 		return;
+
+	/* Set the flag enable_aggregate_pushdown of the join relation */
+	fpinfo->enable_aggregate_pushdown =
+		((HDFSFdwRelationInfo *) innerrel->fdw_private)->enable_aggregate_pushdown &&
+		((HDFSFdwRelationInfo *) outerrel->fdw_private)->enable_aggregate_pushdown;
 
 	/* Set the flag enable_order_by_pushdown of the join relation */
 	fpinfo->enable_order_by_pushdown =
@@ -2350,6 +2370,14 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 
 	/* save the input_rel as outerrel in fpinfo */
 	fpinfo->outerrel = input_rel;
+
+	/* Set aggregation flag of aggregate relation */
+	fpinfo->enable_aggregate_pushdown =
+		((HDFSFdwRelationInfo *) input_rel->fdw_private)->enable_aggregate_pushdown;
+
+	/* If aggregate pushdown is not enabled, honor it. */
+	if (!enable_aggregate_pushdown || !fpinfo->enable_aggregate_pushdown)
+		return;
 
 	/* Assess if it is safe to push down aggregation and grouping. */
 #if PG_VERSION_NUM >= 110000
