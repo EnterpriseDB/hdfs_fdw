@@ -573,6 +573,36 @@ SELECT t1.c1, t2.c1
   FROM test1 t1 JOIN test2 t2 ON (t1.c1 = t2.c1)
   ORDER BY t1.c1;
 
+-- FDW-505: Test hdfs_fdw.enable_join_pushdown GUC.
+-- Negative testing for GUC value.
+SET hdfs_fdw.enable_join_pushdown to 'abc';
+-- Check default value.
+SHOW hdfs_fdw.enable_join_pushdown;
+-- Pushdown should happen as enable_join_pushdown is true.
+ALTER SERVER hdfs_server OPTIONS (SET enable_join_pushdown 'true');
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'true');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+--Disable the GUC enable_join_pushdown.
+SET hdfs_fdw.enable_join_pushdown to false;
+-- Pushdown shouldn't happen as enable_join_pushdown is false.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+-- Enable the GUC and table level option is set to false, should not pushdown.
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'false');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'false');
+SET hdfs_fdw.enable_join_pushdown to true;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
 -- Cleanup
 DROP TABLE local_dept;
 DROP OWNED BY regress_view_owner;

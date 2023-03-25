@@ -138,6 +138,10 @@ options:
 
 GUC variables:
 
+  * `hdfs_fdw.enable_join_pushdown`: If `true`, pushes the join between two
+    foreign tables from the same foreign server, instead of fetching all the
+	rows for both the tables and performing a join locally. Default is `true`.
+
   * `hdfs_fdw.enable_aggregate_pushdown`: If `true`, pushes aggregate
 	operations to the foreign server, instead of fetching rows from the
 	foreign server and performing the operations locally. Default is `true`.

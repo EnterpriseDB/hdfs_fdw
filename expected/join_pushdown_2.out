@@ -1650,6 +1650,87 @@ SELECT t1.c1, t2.c1
          Remote SQL: SELECT r1.`c1`, r2.`c1` FROM (`fdw_db`.`test1` r1 INNER JOIN `fdw_db`.`test2` r2 ON (((r1.`c1` = r2.`c1`))))
 (7 rows)
 
+-- FDW-505: Test hdfs_fdw.enable_join_pushdown GUC.
+-- Negative testing for GUC value.
+SET hdfs_fdw.enable_join_pushdown to 'abc';
+ERROR:  parameter "hdfs_fdw.enable_join_pushdown" requires a Boolean value
+-- Check default value.
+SHOW hdfs_fdw.enable_join_pushdown;
+ hdfs_fdw.enable_join_pushdown 
+-------------------------------
+ on
+(1 row)
+
+-- Pushdown should happen as enable_join_pushdown is true.
+ALTER SERVER hdfs_server OPTIONS (SET enable_join_pushdown 'true');
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'true');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'true');
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+--Disable the GUC enable_join_pushdown.
+SET hdfs_fdw.enable_join_pushdown to false;
+-- Pushdown shouldn't happen as enable_join_pushdown is false.
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.dname, d.deptno
+                     Remote SQL: SELECT `deptno`, `dname` FROM `fdw_db`.`dept`
+(14 rows)
+
+-- Enable the GUC and table level option is set to false, should not pushdown.
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_join_pushdown 'false');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_join_pushdown 'false');
+SET hdfs_fdw.enable_join_pushdown to true;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Nested Loop
+         Output: e.empno, e.ename, d.dname
+         Join Filter: (e.deptno = d.deptno)
+         ->  Foreign Scan on public.emp e
+               Output: e.empno, e.ename, e.job, e.mgr, e.hiredate, e.sal, e.comm, e.deptno
+               Remote SQL: SELECT `empno`, `ename`, `deptno` FROM `fdw_db`.`emp`
+         ->  Materialize
+               Output: d.dname, d.deptno
+               ->  Foreign Scan on public.dept d
+                     Output: d.dname, d.deptno
+                     Remote SQL: SELECT `deptno`, `dname` FROM `fdw_db`.`dept`
+(14 rows)
+
 -- Cleanup
 DROP TABLE local_dept;
 DROP OWNED BY regress_view_owner;

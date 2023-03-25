@@ -67,6 +67,7 @@ PG_MODULE_MAGIC;
 #define DEFAULT_HDFS_SORT_MULTIPLIER 1
 
 /* GUC variables. */
+static bool enable_join_pushdown = true;
 static bool enable_aggregate_pushdown = true;
 static bool enable_order_by_pushdown = false;
 
@@ -342,6 +343,17 @@ _PG_init(void)
 							   NULL,
 							   NULL,
 							   NULL);
+
+	DefineCustomBoolVariable("hdfs_fdw.enable_join_pushdown",
+							 "enable/disable join pushdown",
+							 NULL,
+							 &enable_join_pushdown,
+							 true,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	DefineCustomBoolVariable("hdfs_fdw.enable_aggregate_pushdown",
 							 "Enable/Disable aggregate push down",
@@ -1238,11 +1250,22 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	ForeignPath *joinpath;
 	Cost		startup_cost;
 	Cost		total_cost;
+	HDFSFdwRelationInfo *fpinfo_o;
+	HDFSFdwRelationInfo *fpinfo_i;
 
 	/*
 	 * Skip if this join combination has been considered already.
 	 */
 	if (joinrel->fdw_private)
+		return;
+
+	fpinfo_o = (HDFSFdwRelationInfo *) outerrel->fdw_private;
+	fpinfo_i = (HDFSFdwRelationInfo *) innerrel->fdw_private;
+
+	/* If join pushdown is not enabled, honor it. */
+	if ((!IS_JOIN_REL(outerrel) && !fpinfo_o->options->enable_join_pushdown) ||
+		(!IS_JOIN_REL(innerrel) && !fpinfo_i->options->enable_join_pushdown) ||
+		!enable_join_pushdown)
 		return;
 
 	/*
@@ -1340,11 +1363,6 @@ hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 	fpinfo = (HDFSFdwRelationInfo *) joinrel->fdw_private;
 	fpinfo_o = (HDFSFdwRelationInfo *) outerrel->fdw_private;
 	fpinfo_i = (HDFSFdwRelationInfo *) innerrel->fdw_private;
-
-	/* If join pushdown is not enabled, honor it. */
-	if ((!IS_JOIN_REL(outerrel) && !fpinfo_o->options->enable_join_pushdown) ||
-		(!IS_JOIN_REL(innerrel) && !fpinfo_i->options->enable_join_pushdown))
-		return false;
 
 	/*
 	 * If either of the joining relations is marked as unsafe to pushdown, the
