@@ -219,18 +219,11 @@ static void hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 static bool hdfsRecheckForeignScan(ForeignScanState *node,
 								   TupleTableSlot *slot);
 
-#if PG_VERSION_NUM >= 110000
 static void hdfsGetForeignUpperPaths(PlannerInfo *root,
 									 UpperRelationKind stage,
 									 RelOptInfo *input_rel,
 									 RelOptInfo *output_rel,
 									 void *extra);
-#elif PG_VERSION_NUM >= 100000
-static void hdfsGetForeignUpperPaths(PlannerInfo *root,
-									 UpperRelationKind stage,
-									 RelOptInfo *input_rel,
-									 RelOptInfo *output_rel);
-#endif
 
 /*
  * Helper functions
@@ -250,7 +243,6 @@ static bool hdfs_foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 								 RelOptInfo *innerrel,
 								 JoinPathExtraData *extra);
 
-#if PG_VERSION_NUM >= 110000
 static bool hdfs_foreign_grouping_ok(PlannerInfo *root,
 									 RelOptInfo *grouped_rel,
 									 Node *havingQual);
@@ -258,20 +250,9 @@ static void hdfs_add_foreign_grouping_paths(PlannerInfo *root,
 											RelOptInfo *input_rel,
 											RelOptInfo *grouped_rel,
 											GroupPathExtraData *extra);
-#elif PG_VERSION_NUM >= 100000
-static bool hdfs_foreign_grouping_ok(PlannerInfo *root,
-									 RelOptInfo *grouped_rel);
-static void hdfs_add_foreign_grouping_paths(PlannerInfo *root,
-											RelOptInfo *input_rel,
-											RelOptInfo *grouped_rel);
-#endif
 
 #ifdef EDB_NATIVE_LANG
-#if PG_VERSION_NUM >= 90300 && PG_VERSION_NUM < 110000
-#define XACT_CB_SIGNATURE XactEvent event, void *arg, bool spl_commit
-#else
 #define XACT_CB_SIGNATURE XactEvent event, void *arg
-#endif
 #else
 #define XACT_CB_SIGNATURE XactEvent event, void *arg
 #endif
@@ -933,13 +914,7 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 
 	festate->batch_cxt = AllocSetContextCreate(estate->es_query_cxt,
 											   "hdfs_fdw tuple data",
-#if PG_VERSION_NUM >= 110000
 											   ALLOCSET_DEFAULT_SIZES);
-#else
-											   ALLOCSET_DEFAULT_MINSIZE,
-											   ALLOCSET_DEFAULT_INITSIZE,
-											   ALLOCSET_DEFAULT_MAXSIZE);
-#endif
 
 	festate->query_executed = false;
 	festate->query = strVal(list_nth(fdw_private, hdfsFdwScanPrivateSelectSql));
@@ -2048,21 +2023,12 @@ hdfs_form_whole_row(hdfsWRState *wr_state, Datum *values, bool *nulls)
  * 		information we obtain in this function to HDFSFdwRelationInfo of
  * 		the input relation.
  */
-#if PG_VERSION_NUM >= 110000
 static bool
 hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel,
 						 Node *havingQual)
-#elif PG_VERSION_NUM >= 100000
-static bool
-hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
-#endif
 {
 	Query	   *query = root->parse;
-#if PG_VERSION_NUM >= 110000
 	PathTarget *grouping_target = grouped_rel->reltarget;
-#elif PG_VERSION_NUM >= 100000
-	PathTarget *grouping_target = root->upper_targets[UPPERREL_GROUP_AGG];
-#endif
 	HDFSFdwRelationInfo *fpinfo = (HDFSFdwRelationInfo *) grouped_rel->fdw_private;
 	HDFSFdwRelationInfo *ofpinfo;
 	ListCell   *lc;
@@ -2183,19 +2149,11 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 	 * Classify the pushable and non-pushable having clauses and save them in
 	 * remote_conds and local_conds of the grouped rel's fpinfo.
 	 */
-#if PG_VERSION_NUM >= 110000
 	if (havingQual)
 	{
 		ListCell   *lc;
 
 		foreach(lc, (List *) havingQual)
-#elif PG_VERSION_NUM >= 100000
-	if (root->hasHavingQual && query->havingQual)
-	{
-		ListCell   *lc;
-
-		foreach(lc, (List *) query->havingQual)
-#endif
 		{
 			Expr	   *expr = (Expr *) lfirst(lc);
 			RestrictInfo *rinfo;
@@ -2294,16 +2252,10 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
  *		Add paths for post-join operations like aggregation, grouping etc. if
  *		corresponding operations are safe to push down.
  */
-#if PG_VERSION_NUM >= 110000
 static void
 hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 						 RelOptInfo *input_rel, RelOptInfo *output_rel,
 						 void *extra)
-#elif PG_VERSION_NUM >= 100000
-static void
-hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
-						 RelOptInfo *input_rel, RelOptInfo *output_rel)
-#endif
 {
 	HDFSFdwRelationInfo *fpinfo;
 
@@ -2348,11 +2300,9 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 			elog(ERROR, "unexpected upper relation: %d", (int) stage);
 			break;
 	}
-#elif PG_VERSION_NUM >= 110000
+#else
 	hdfs_add_foreign_grouping_paths(root, input_rel, output_rel,
 									(GroupPathExtraData *) extra);
-#elif PG_VERSION_NUM >= 100000
-	hdfs_add_foreign_grouping_paths(root, input_rel, output_rel);
 #endif
 }
 
@@ -2363,16 +2313,10 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
  * Given input_rel represents the underlying scan.  The paths are added to the
  * given grouped_rel.
  */
-#if PG_VERSION_NUM >= 110000
 static void
 hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 								RelOptInfo *grouped_rel,
 								GroupPathExtraData *extra)
-#elif PG_VERSION_NUM >= 100000
-static void
-hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
-								RelOptInfo *grouped_rel)
-#endif
 {
 	Query	   *parse = root->parse;
 	HDFSFdwRelationInfo *fpinfo = grouped_rel->fdw_private;
@@ -2398,11 +2342,7 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 		return;
 
 	/* Assess if it is safe to push down aggregation and grouping. */
-#if PG_VERSION_NUM >= 110000
 	if (!hdfs_foreign_grouping_ok(root, grouped_rel, extra->havingQual))
-#elif PG_VERSION_NUM >= 100000
-	if (!hdfs_foreign_grouping_ok(root, grouped_rel))
-#endif
 		return;
 
 	fpinfo->enable_order_by_pushdown =
@@ -2441,21 +2381,10 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										  NIL,	/* no pathkeys */
 										  NULL,
 										  NIL); /* no fdw_private */
-#elif PG_VERSION_NUM >= 110000
-	grouppath = create_foreignscan_path(root,
-										grouped_rel,
-										grouped_rel->reltarget,
-										num_groups,
-										startup_cost,
-										total_cost,
-										NIL,	/* no pathkeys */
-										grouped_rel->lateral_relids,
-										NULL,
-										NIL);	/* no fdw_private */
 #else
 	grouppath = create_foreignscan_path(root,
 										grouped_rel,
-										root->upper_targets[UPPERREL_GROUP_AGG],
+										grouped_rel->reltarget,
 										num_groups,
 										startup_cost,
 										total_cost,

@@ -4,7 +4,7 @@ This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for
 [Hadoop][1] (HDFS).
 
 Please note that this version of hdfs_fdw works with PostgreSQL and EDB 
-Postgres Advanced Server 10, 11, 12, 13, 14, and 15.
+Postgres Advanced Server 11, 12, 13, 14, and 15.
 
 Installation
 ------------
