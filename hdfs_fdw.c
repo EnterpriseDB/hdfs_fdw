@@ -539,6 +539,9 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 	/* Also store the options in fpinfo for further use */
 	fpinfo->options = options;
 
+	/* Set the flag enable_order_by_pushdown of the base relation */
+	fpinfo->enable_order_by_pushdown = options->enable_order_by_pushdown;
+
 	/*
 	 * Set the name of relation in fpinfo, while we are constructing it here.
 	 * It will be used to build the string describing the join relation in
@@ -1243,6 +1246,11 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	if (!hdfs_foreign_join_ok(root, joinrel, jointype, outerrel, innerrel,
 							  extra))
 		return;
+
+	/* Set the flag enable_order_by_pushdown of the join relation */
+	fpinfo->enable_order_by_pushdown =
+		((HDFSFdwRelationInfo *) innerrel->fdw_private)->enable_order_by_pushdown &&
+		((HDFSFdwRelationInfo *) outerrel->fdw_private)->enable_order_by_pushdown;
 
 	/* TODO: Put accurate estimates here */
 	startup_cost = 15.0;
@@ -2351,6 +2359,9 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 #endif
 		return;
 
+	fpinfo->enable_order_by_pushdown =
+		((HDFSFdwRelationInfo *) input_rel->fdw_private)->enable_order_by_pushdown;
+
 	/*
 	 * TODO: Put accurate estimates here.
 	 *
@@ -2637,7 +2648,8 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 	ListCell   *lc;
 	List	   *useful_pathkeys_list = NIL; /* List of all pathkeys */
 
-	if (!enable_order_by_pushdown)
+	if (!enable_order_by_pushdown ||
+		!((HDFSFdwRelationInfo *) rel->fdw_private)->enable_order_by_pushdown)
 		return;
 
 	useful_pathkeys_list = hdfs_get_useful_pathkeys_for_relation(root, rel);
@@ -2763,7 +2775,11 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	ForeignPath *ordered_path;
 	ListCell   *lc;
 
-	if (!enable_order_by_pushdown)
+	/* Set the flag enable_order_by_pushdown of the ordered relation */
+	fpinfo->enable_order_by_pushdown =
+		((HDFSFdwRelationInfo *) input_rel->fdw_private)->enable_order_by_pushdown;
+
+	if (!enable_order_by_pushdown || !fpinfo->enable_order_by_pushdown)
 		return;
 
 	/* Shouldn't get here unless the query has ORDER BY */

@@ -1907,6 +1907,180 @@ SELECT min(e.empno)
          Remote SQL: SELECT min(`empno`), `deptno` FROM `fdw_db`.`emp` GROUP BY `deptno`
 (7 rows)
 
+-- FDW-556: Support enable_order_by_pushdown option at server level and table
+-- level.
+-- Check only boolean values are accepted.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_order_by_pushdown 'abc11');
+ERROR:  enable_order_by_pushdown requires a Boolean value
+-- Test default behavior of table and server level settings
+-- By default order by pushdown is enabled at table and server level,
+-- order by is pushed down since it's also enabled at GUC level.
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno, ename
+   Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+-- Disable order by pushdown at GUC level and test the options at table
+-- and server level.
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
+-- Test the option at server level.
+-- No pushdown since it's disabled at GUC and server level.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Sort
+   Output: empno, ename
+   Sort Key: e.empno
+   ->  Foreign Scan on public.emp e
+         Output: empno, ename
+         Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp`
+(6 rows)
+
+-- No pushdown since it's disabled at GUC level.
+ALTER SERVER hdfs_server OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Sort
+   Output: empno, ename
+   Sort Key: e.empno
+   ->  Foreign Scan on public.emp e
+         Output: empno, ename
+         Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp`
+(6 rows)
+
+-- Test the option at table level. No pushdown since it's disabled at GUC
+-- and table level.
+ALTER FOREIGN TABLE emp OPTIONS (ADD enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Sort
+   Output: empno, ename
+   Sort Key: e.empno
+   ->  Foreign Scan on public.emp e
+         Output: empno, ename
+         Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp`
+(6 rows)
+
+-- No pushdown since it's disabled at GUC level.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Sort
+   Output: empno, ename
+   Sort Key: e.empno
+   ->  Foreign Scan on public.emp e
+         Output: empno, ename
+         Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp`
+(6 rows)
+
+-- Enable order by pushdown at GUC level.
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+SHOW hdfs_fdw.enable_order_by_pushdown;
+ hdfs_fdw.enable_order_by_pushdown 
+-----------------------------------
+ on
+(1 row)
+
+-- Table level overrides server level option, here pushdown is disabled at
+-- server level and enabled at table level order by pushed down since pushdown
+-- is enabled at GUC and table level.
+ALTER SERVER hdfs_server OPTIONS (SET enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
+   Output: empno, ename
+   Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(3 rows)
+
+-- Table level overrides server level option, here pushdown is enabled
+-- at server level and disabled at table level, order by not pushed down since
+-- pushdown is disabled at table level.
+ALTER SERVER hdfs_server OPTIONS (SET enable_order_by_pushdown 'true');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Sort
+   Output: empno, ename
+   Sort Key: e.empno
+   ->  Foreign Scan on public.emp e
+         Output: empno, ename
+         Remote SQL: SELECT `empno`, `ename` FROM `fdw_db`.`emp`
+(6 rows)
+
+-- Test table and server level settings with a simple join, pushdown is
+-- disabled for emp and enabled for dept, order by is not pushed down.
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_order_by_pushdown 'true');
+ERROR:  option "enable_order_by_pushdown" not found
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: e.empno, e.ename, d.dname
+   Sort Key: e.empno
+   ->  Foreign Scan
+         Output: e.empno, e.ename, d.dname
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`))))
+(7 rows)
+
+-- Test table and server level settings with a simple join, pushdown is enabled
+-- for emp and dept, order by is pushed down.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+                                                                                      QUERY PLAN                                                                                      
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: e.empno, e.ename, d.dname
+   Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+   Remote SQL: SELECT r1.`empno`, r1.`ename`, r2.`dname` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) ORDER BY r1.`empno` ASC NULLS LAST
+(4 rows)
+
+-- Test table and server level settings with complex join, order by is not
+-- pushed down since at least one of the tables has pushdown disabled.
+ALTER FOREIGN TABLE jobhist OPTIONS (ADD enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist h ON (d.deptno = h.deptno)
+  ORDER BY e.empno;
+                                                                                                      QUERY PLAN                                                                                                      
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop
+   Output: e.empno, e.ename, d.dname
+   Join Filter: (e.deptno = h.deptno)
+   ->  Foreign Scan
+         Output: e.empno, e.ename, e.deptno, d.dname, d.deptno
+         Relations: (fdw_db.emp e) INNER JOIN (fdw_db.dept d)
+         Remote SQL: SELECT r1.`empno`, r1.`ename`, r1.`deptno`, r2.`dname`, r2.`deptno` FROM (`fdw_db`.`emp` r1 INNER JOIN `fdw_db`.`dept` r2 ON (((r1.`deptno` = r2.`deptno`)))) ORDER BY r1.`empno` ASC NULLS LAST
+   ->  Materialize
+         Output: h.deptno
+         ->  Foreign Scan on public.jobhist h
+               Output: h.deptno
+               Remote SQL: SELECT `deptno` FROM `fdw_db`.`jobhist`
+(12 rows)
+
 -- Cleanup
 SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP TABLE local_dept;

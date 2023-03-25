@@ -708,6 +708,87 @@ SELECT min(e.empno)
   FROM emp e GROUP BY e.deptno
   ORDER BY e.deptno USING OPERATOR(public.<^);
 
+-- FDW-556: Support enable_order_by_pushdown option at server level and table
+-- level.
+-- Check only boolean values are accepted.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_order_by_pushdown 'abc11');
+
+-- Test default behavior of table and server level settings
+-- By default order by pushdown is enabled at table and server level,
+-- order by is pushed down since it's also enabled at GUC level.
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- Disable order by pushdown at GUC level and test the options at table
+-- and server level.
+SET hdfs_fdw.enable_order_by_pushdown TO OFF;
+
+-- Test the option at server level.
+-- No pushdown since it's disabled at GUC and server level.
+ALTER SERVER hdfs_server OPTIONS (ADD enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- No pushdown since it's disabled at GUC level.
+ALTER SERVER hdfs_server OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- Test the option at table level. No pushdown since it's disabled at GUC
+-- and table level.
+ALTER FOREIGN TABLE emp OPTIONS (ADD enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- No pushdown since it's disabled at GUC level.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- Enable order by pushdown at GUC level.
+SET hdfs_fdw.enable_order_by_pushdown TO ON;
+SHOW hdfs_fdw.enable_order_by_pushdown;
+
+-- Table level overrides server level option, here pushdown is disabled at
+-- server level and enabled at table level order by pushed down since pushdown
+-- is enabled at GUC and table level.
+ALTER SERVER hdfs_server OPTIONS (SET enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- Table level overrides server level option, here pushdown is enabled
+-- at server level and disabled at table level, order by not pushed down since
+-- pushdown is disabled at table level.
+ALTER SERVER hdfs_server OPTIONS (SET enable_order_by_pushdown 'true');
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename FROM emp e ORDER BY e.empno;
+
+-- Test table and server level settings with a simple join, pushdown is
+-- disabled for emp and enabled for dept, order by is not pushed down.
+ALTER FOREIGN TABLE dept OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+-- Test table and server level settings with a simple join, pushdown is enabled
+-- for emp and dept, order by is pushed down.
+ALTER FOREIGN TABLE emp OPTIONS (SET enable_order_by_pushdown 'true');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno)
+  ORDER BY e.empno;
+
+-- Test table and server level settings with complex join, order by is not
+-- pushed down since at least one of the tables has pushdown disabled.
+ALTER FOREIGN TABLE jobhist OPTIONS (ADD enable_order_by_pushdown 'false');
+EXPLAIN (COSTS FALSE, VERBOSE)
+SELECT e.empno, e.ename, d.dname
+  FROM emp e JOIN dept d ON (e.deptno = d.deptno) JOIN jobhist h ON (d.deptno = h.deptno)
+  ORDER BY e.empno;
+
 -- Cleanup
 SET hdfs_fdw.enable_order_by_pushdown TO OFF;
 DROP TABLE local_dept;
