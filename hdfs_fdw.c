@@ -292,6 +292,11 @@ static void hdfs_add_foreign_final_paths(PlannerInfo *root,
 										 FinalPathExtraData *extra);
 #endif
 
+#if PG_VERSION_NUM >= 160000
+static TargetEntry *hdfs_tlist_member_match_var(Var *var, List *targetlist);
+static List *hdfs_varlist_append_unique_var(List *varlist, Var *var);
+#endif
+
 Datum
 hdfs_fdw_version(PG_FUNCTION_ARGS)
 {
@@ -906,8 +911,17 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 	if (fsplan->scan.scanrelid > 0)
 		rtindex = fsplan->scan.scanrelid;
 	else
+#if PG_VERSION_NUM >= 160000
+		rtindex = bms_next_member(fsplan->fs_base_relids, -1);
+#else
 		rtindex = bms_next_member(fsplan->fs_relids, -1);
+#endif
+
+#if PG_VERSION_NUM >= 160000
+	rte = exec_rt_fetch(rtindex, estate);
+#else
 	rte = rt_fetch(rtindex, estate->es_range_table);
+#endif
 
 	opt = hdfs_get_options(rte->relid);
 	festate->con_index = GetConnection(opt, rte->relid);
@@ -967,7 +981,12 @@ hdfsIterateForeignScan(ForeignScanState *node)
 	if (fsplan->scan.scanrelid > 0)
 		rtindex = fsplan->scan.scanrelid;
 	else
+#if PG_VERSION_NUM >= 160000
+		rtindex = bms_next_member(fsplan->fs_base_relids, -1);
+#else
 		rtindex = bms_next_member(fsplan->fs_relids, -1);
+#endif
+
 	rte = rt_fetch(rtindex, estate->es_range_table);
 
 	/* Get the options */
@@ -1686,6 +1705,9 @@ hdfs_adjust_whole_row_ref(PlannerInfo *root, List *scan_var_list,
 	foreach(lc, scan_var_list)
 	{
 		Var		   *var = (Var *) lfirst(lc);
+#if PG_VERSION_NUM >= 160000
+		ListCell   *cell;
+#endif
 
 		Assert(IsA(var, Var));
 
@@ -1717,13 +1739,27 @@ hdfs_adjust_whole_row_ref(PlannerInfo *root, List *scan_var_list,
 												 attrs_used,
 												 &retrieved_attrs);
 			wr_list_array[var->varno - 1] = wr_var_list;
+#if PG_VERSION_NUM >= 160000
+			foreach(cell, wr_var_list)
+			{
+				Var		   *tlvar = (Var *) lfirst(cell);
+
+				wr_scan_var_list = hdfs_varlist_append_unique_var(wr_scan_var_list,
+										  tlvar);
+			}
+#else
 			wr_scan_var_list = list_concat_unique(wr_scan_var_list,
 												  wr_var_list);
+#endif
 			bms_free(attrs_used);
 			list_free(retrieved_attrs);
 		}
 		else
-			wr_scan_var_list = list_append_unique(wr_scan_var_list, var);
+#if PG_VERSION_NUM >= 160000
+		wr_scan_var_list = hdfs_varlist_append_unique_var(wr_scan_var_list, var);
+#else
+		wr_scan_var_list = list_append_unique(wr_scan_var_list, var);
+#endif
 	}
 
 	/*
@@ -1885,7 +1921,11 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 
 			Assert(IsA(var, Var) && var->varno == cnt_rt);
 
+#if PG_VERSION_NUM >= 160000
+			tle_sl = hdfs_tlist_member_match_var(var, scan_tlist);
+#else
 			tle_sl = tlist_member((Expr *) var, scan_tlist);
+#endif
 			Assert(tle_sl);
 
 			wr_state->attr_pos[cnt_attr++] = tle_sl->resno - 1;
@@ -1921,7 +1961,12 @@ hdfs_build_whole_row_constr_info(hdfsFdwExecutionState *festate,
 			fs_attr_pos[cnt_attr] = -var->varno;
 		else
 		{
+
+#if PG_VERSION_NUM >= 160000
+			TargetEntry *tle_sl = hdfs_tlist_member_match_var(var, scan_tlist);
+#else
 			TargetEntry *tle_sl = tlist_member((Expr *) var, scan_tlist);
+#endif
 
 			Assert(tle_sl);
 			fs_attr_pos[cnt_attr] = tle_sl->resno - 1;
@@ -2163,7 +2208,18 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel,
 			 * RestrictInfos, so we must make our own.
 			 */
 			Assert(!IsA(expr, RestrictInfo));
-#if PG_VERSION_NUM >= 140000
+#if PG_VERSION_NUM >= 160000
+			rinfo = make_restrictinfo(root,
+									  expr,
+									  true,
+									  false,
+									  false,
+									  false,
+									  root->qual_security_level,
+									  grouped_rel->relids,
+									  NULL,
+									  NULL);
+#elif PG_VERSION_NUM >= 140000
 			rinfo = make_restrictinfo(root,
 									  expr,
 									  true,
@@ -3202,3 +3258,56 @@ hdfs_get_sortby_direction_string(EquivalenceMember *em, PathKey *pathkey)
 
 	return NULL;
 }
+
+#if PG_VERSION_NUM >= 160000
+/*
+ * hdfs_tlist_member_match_var
+ *	  Finds the (first) member of the given tlist whose Var is
+ *	  same as the given Var.  Result is NULL if no such member.
+ */
+static TargetEntry *
+hdfs_tlist_member_match_var(Var *var, List *targetlist)
+{
+	ListCell   *temp;
+
+	foreach(temp, targetlist)
+	{
+		TargetEntry *tlentry = (TargetEntry *) lfirst(temp);
+		Var		   *tlvar = (Var *) tlentry->expr;
+
+		if (!tlvar || !IsA(tlvar, Var))
+			continue;
+		if (var->varno == tlvar->varno &&
+			var->varattno == tlvar->varattno &&
+			var->varlevelsup == tlvar->varlevelsup &&
+			var->vartype == tlvar->vartype)
+			return tlentry;
+	}
+	return NULL;
+}
+
+/*
+ * hdfs_varlist_append_unique_var
+ * 	Append var to var list, but only if it isn't already in the list.
+ *
+ * Whether a var is already a member of list is determined using varno and
+ * varattno.
+ */
+static List *
+hdfs_varlist_append_unique_var(List *varlist, Var *var)
+{
+	ListCell   *lc;
+
+	foreach(lc, varlist)
+	{
+		Var		   *tlvar = (Var *) lfirst(lc);
+
+		if (IsA(tlvar, Var) &&
+			tlvar->varno == var->varno &&
+			tlvar->varattno == var->varattno)
+			return varlist;
+	}
+
+	return lappend(varlist, var);
+}
+#endif

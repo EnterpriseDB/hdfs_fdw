@@ -2130,7 +2130,21 @@ hdfs_get_relation_column_alias_ids(Var *node, RelOptInfo *foreignrel,
 	i = 1;
 	foreach(lc, scan_var_list)
 	{
+#if PG_VERSION_NUM >= 160000
+		Var		   *tlvar = (Var *) lfirst(lc);
+
+		/*
+		 * Match reltarget entries only on varno/varattno.  Ideally there
+		 * would be some cross-check on varnullingrels, but it's unclear what
+		 * to do exactly; we don't have enough context to know what that value
+		 * should be.
+		 */
+		if (IsA(tlvar, Var) &&
+			tlvar->varno == node->varno &&
+			tlvar->varattno == node->varattno)
+#else
 		if (equal(lfirst(lc), (Node *) node))
+#endif
 		{
 			*colno = i;
 			return;
