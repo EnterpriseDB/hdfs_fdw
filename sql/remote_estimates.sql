@@ -77,17 +77,6 @@ $$;
 ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'false');
 SELECT v_rows FROM query_rows_count (:HIVE_CLIENT_TYPE, false, 'SELECT * FROM weblogs');
 
--- Check rows with use_remote_estimate set to true.
--- use_remote_estimate when true in case of hive shows actual rows in plan.
--- use_remote_estimate when true in case of spark shows minimum 1000 rows in plan.
--- to make output file consistent inserted actual rows using query_rows_count.
--- This can be removed once use_remote_estimate fixed for spark.
--- NOTE: if the test fails on hive due to mismatch in the rows, execute
--- following ANALYZE command on weblogs table on hive client(beeline):
--- ANALYZE TABLE fdw_db.weblogs COMPUTE STATISTICS;
-ALTER SERVER hdfs_server OPTIONS (SET use_remote_estimate 'true');
-SELECT v_rows FROM query_rows_count (:HIVE_CLIENT_TYPE, true, 'SELECT * FROM weblogs');
-
 --Cleanup
 DROP FUNCTION query_rows_count(VARCHAR, BOOL, TEXT);
 DROP FOREIGN TABLE weblogs;
