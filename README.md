@@ -454,6 +454,8 @@ for the behaviour of ANALYZE command and the connection string in case
 of NOSASL. It is better to use ALTER SERVER and change the client_type
 option if Hive is to be replaced with Spark.
 
+For more details, please refer to [hdfs_fdw documentation][13].
+
 
 Contributing
 ------------
@@ -509,3 +511,4 @@ See the [`LICENSE`][12] file for full details.
 [10]: https://github.com/EnterpriseDB/hdfs_fdw/issues/new
 [11]: CONTRIBUTING.md
 [12]: LICENSE
+[13]: https://www.enterprisedb.com/docs/hadoop_data_adapter/latest/
