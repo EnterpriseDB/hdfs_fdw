@@ -20,6 +20,7 @@
 #include "access/table.h"
 #endif
 #include "access/xact.h"
+#include "catalog/pg_type.h"
 #include "commands/explain.h"
 #include "foreign/fdwapi.h"
 #include "funcapi.h"
@@ -70,6 +71,7 @@ PG_MODULE_MAGIC;
 static bool enable_join_pushdown = true;
 static bool enable_aggregate_pushdown = true;
 static bool enable_order_by_pushdown = false;
+static bool enable_limit_pushdown = true;
 
 /*
  * Indexes of FDW-private information stored in fdw_private lists.
@@ -367,6 +369,17 @@ _PG_init(void)
 							 NULL,
 							 NULL);
 
+	DefineCustomBoolVariable("hdfs_fdw.enable_limit_pushdown",
+							 "Enable/Disable LIMIT/OFFSET push down",
+							 NULL,
+							 &enable_limit_pushdown,
+							 true,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
 	rc = Initialize();
 
 	if (rc == -1)
@@ -554,6 +567,7 @@ hdfsGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel,
 
 	/* Set the flag enable_order_by_pushdown of the base relation */
 	fpinfo->enable_order_by_pushdown = options->enable_order_by_pushdown;
+	fpinfo->client_type = options->client_type;
 
 	/*
 	 * Set the name of relation in fpinfo, while we are constructing it here.
@@ -1286,6 +1300,20 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	fpinfo->enable_order_by_pushdown =
 		((HDFSFdwRelationInfo *) innerrel->fdw_private)->enable_order_by_pushdown &&
 		((HDFSFdwRelationInfo *) outerrel->fdw_private)->enable_order_by_pushdown;
+
+	/*
+	 * It is possible that two foreign servers are setup, one with 'hiveserver2'
+	 * as the client_type and the other with 'spark'. More worse, it's possible
+	 * that each of these servers are setup with a different host.
+	 * That would not work, but the fdw does not complain either currently.
+	 * This check does a partial risk mitigation.
+	 */
+	if (((HDFSFdwRelationInfo *) innerrel->fdw_private)->client_type !=
+		((HDFSFdwRelationInfo *) outerrel->fdw_private)->client_type)
+		elog(ERROR, "Multiple client_type server options not supported");
+
+	fpinfo->client_type =
+		((HDFSFdwRelationInfo *)innerrel->fdw_private)->client_type;
 
 	/* TODO: Put accurate estimates here */
 	startup_cost = 15.0;
@@ -2399,6 +2427,9 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	fpinfo->enable_order_by_pushdown =
 		((HDFSFdwRelationInfo *) input_rel->fdw_private)->enable_order_by_pushdown;
 
+	fpinfo->client_type =
+		((HDFSFdwRelationInfo *) input_rel->fdw_private)->client_type;
+
 	/*
 	 * TODO: Put accurate estimates here.
 	 *
@@ -2808,6 +2839,9 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	if (!enable_order_by_pushdown || !fpinfo->enable_order_by_pushdown)
 		return;
 
+	fpinfo->client_type =
+		((HDFSFdwRelationInfo *) input_rel->fdw_private)->client_type;
+
 	/* Shouldn't get here unless the query has ORDER BY */
 	Assert(parse->sortClause);
 
@@ -2997,6 +3031,9 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	List	   *fdw_private;
 	ForeignPath *final_path;
 
+	if (!enable_limit_pushdown)
+		return;
+
 	/*
 	 * Currently, we only support this for SELECT commands
 	 */
@@ -3014,8 +3051,9 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	if (parse->hasTargetSRFs)
 		return;
 
-	/* hdfs does not support only OFFSET clause in a SELECT command. */
-	if (parse->limitOffset && !parse->limitCount)
+	/* HiveQL does not support only OFFSET clause in a SELECT command. */
+	if (ifpinfo->client_type == HIVESERVER2 &&
+		parse->limitOffset && !parse->limitCount)
 		return;
 
 	/* Save the input_rel as outerrel in fpinfo */
@@ -3150,19 +3188,37 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	 */
 	if (parse->limitCount)
 	{
-		if (nodeTag(parse->limitCount) != T_Const &&
-			nodeTag(parse->limitCount) != T_Param)
+		Node	   *node = parse->limitCount;
+
+		if (nodeTag(node) != T_Const &&
+			nodeTag(node) != T_Param)
 			return;
 
-		if (nodeTag(parse->limitCount) == T_Const &&
-			((Const *) parse->limitCount)->constisnull)
-			return;
+		/* Negative LIMIT value is not supported in Hive/Spark */
+		if (nodeTag(node) == T_Const)
+		{
+			if (((Const *) node)->constisnull ||
+				(((Const *) node)->consttype != INT8OID) ||
+				(DatumGetInt64(((Const *) node)->constvalue) < 0))
+				return;
+		}
 	}
 	if (parse->limitOffset)
 	{
-		if (nodeTag(parse->limitOffset) != T_Const &&
-			nodeTag(parse->limitOffset) != T_Param)
+		Node	   *node = parse->limitOffset;
+
+		if (nodeTag(node) != T_Const &&
+			nodeTag(node) != T_Param)
 			return;
+
+		/* Negative OFFSET value is not supported in Hive/Spark */
+		if (nodeTag(node) == T_Const)
+		{
+			if (!((Const *) node)->constisnull &&
+				((((Const *) node)->consttype != INT8OID) ||
+				(DatumGetInt64(((Const *) node)->constvalue) < 0)))
+				return;
+		}
 	}
 
 	/*

@@ -36,11 +36,11 @@ SET hdfs_fdw.enable_order_by_pushdown TO ON;
 -- Test OFFSET variations with a numeric value for LIMIT
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 2;
-                                         QUERY PLAN                                          
----------------------------------------------------------------------------------------------
+                                            QUERY PLAN                                             
+---------------------------------------------------------------------------------------------------
  Foreign Scan on public.emp e
    Output: empno
-   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 2, 5
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 5 OFFSET 2
 (3 rows)
 
 SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 2;
@@ -74,11 +74,11 @@ SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET NULL;
 
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 0;
-                                         QUERY PLAN                                          
----------------------------------------------------------------------------------------------
+                                            QUERY PLAN                                             
+---------------------------------------------------------------------------------------------------
  Foreign Scan on public.emp e
    Output: empno
-   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 0, 5
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 5 OFFSET 0
 (3 rows)
 
 SELECT empno FROM emp e ORDER BY empno LIMIT 5 OFFSET 0;
@@ -281,14 +281,12 @@ SELECT empno FROM emp e ORDER BY empno LIMIT 0;
 -- OFFSET without LIMIT is not pushed down when the remote server is Hive
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT empno FROM emp e ORDER BY empno OFFSET 1;
-                                       QUERY PLAN                                       
-----------------------------------------------------------------------------------------
- Limit
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Foreign Scan on public.emp e
    Output: empno
-   ->  Foreign Scan on public.emp e
-         Output: empno
-         Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
-(5 rows)
+   Remote SQL: SELECT `empno` FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST OFFSET 1
+(3 rows)
 
 SELECT empno FROM emp e ORDER BY empno OFFSET 1;
  empno 
@@ -486,11 +484,11 @@ SELECT * FROM emp ORDER BY empno LIMIT 1 + 1;
 
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
  Foreign Scan on public.emp
    Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
-   Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 2, 5
+   Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 5 OFFSET 2
 (3 rows)
 
 SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
@@ -505,11 +503,11 @@ SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
 
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET '2';
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
  Foreign Scan on public.emp
    Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
-   Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 2, 5
+   Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 5 OFFSET 2
 (3 rows)
 
 SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET '2';
@@ -524,11 +522,11 @@ SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET '2';
 
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 1 + 1;
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
  Foreign Scan on public.emp
    Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
-   Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 2, 5
+   Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST LIMIT 5 OFFSET 2
 (3 rows)
 
 SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 1 + 1;

@@ -231,10 +231,10 @@ SELECT empno, mgr
 EXPLAIN (COSTS FALSE, VERBOSE)
 SELECT empno, sal, deptno
   FROM emp
-  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST;
+  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST, empno DESC;
 SELECT empno, sal, deptno
   FROM emp
-  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST;
+  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST, empno DESC;
 
 -- Test expressions in ORDER BY clause
 EXPLAIN (COSTS FALSE, VERBOSE)

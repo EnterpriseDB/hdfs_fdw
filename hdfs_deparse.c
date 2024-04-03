@@ -172,7 +172,8 @@ static void hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
 static void hdfs_append_orderby_suffix(const char *sortby_dir, Oid sortcoltype,
 									   bool nulls_first,
 									   deparse_expr_cxt *context);
-static void hdfs_append_limit_clause(deparse_expr_cxt *context);
+static void hdfs_append_limit_clause(deparse_expr_cxt *context,
+									 CLIENT_TYPE client_type);
 
 /*
  * Helper functions
@@ -754,7 +755,7 @@ hdfs_deparse_select_stmt_for_rel(StringInfo buf, PlannerInfo *root,
 
 	/* Add LIMIT clause if necessary */
 	if (has_limit)
-		hdfs_append_limit_clause(&context);
+		hdfs_append_limit_clause(&context, fpinfo->client_type);
 }
 
 /*
@@ -2395,28 +2396,34 @@ hdfs_append_orderby_clause(List *pathkeys, bool has_final_sort,
  * 		Deparse LIMIT OFFSET clause.
  */
 static void
-hdfs_append_limit_clause(deparse_expr_cxt *context)
+hdfs_append_limit_clause(deparse_expr_cxt *context, CLIENT_TYPE client_type)
 {
 	PlannerInfo *root = context->root;
+	Const	   *c = (Const *) root->parse->limitOffset;
+	/* Push down offset only if it's not NULL */
+	bool		is_valid_offset = (c && !c->constisnull);
+	StringInfo	buf = context->buf;
 
+	context->is_limit_node = true;
 	if (root->parse->limitCount)
 	{
-		StringInfo	buf = context->buf;
-		Const	   *c = (Const *) root->parse->limitOffset;
-
 		appendStringInfoString(buf, " LIMIT ");
-		context->is_limit_node = true;
 
-		/* push down offset only if it's not NULL */
-		if (c && !c->constisnull)
+		if (client_type == HIVESERVER2 && is_valid_offset)
 		{
 			hdfs_deparse_expr((Expr *) c, context);
 			appendStringInfoString(buf, ", ");
 		}
 
 		hdfs_deparse_expr((Expr *) root->parse->limitCount, context);
-		context->is_limit_node = false;
 	}
+
+	if (client_type == SPARKSERVER && is_valid_offset)
+	{
+		appendStringInfoString(buf, " OFFSET ");
+		hdfs_deparse_expr((Expr *) c, context);
+	}
+	context->is_limit_node = false;
 }
 
 /*

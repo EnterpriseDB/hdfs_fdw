@@ -150,6 +150,12 @@ GUC variables:
 	operation to the foreign server, instead of fetching rows from the
 	foreign server and performing the sort locally. Default is `false`.
 
+  * `hdfs_fdw.enable_limit_pushdown`: If `true`, pushes the LIMIT/OFFSET
+	clause to the foreign server. In Apache Spark, support for the OFFSET
+	clause has been introduced in 3.4.1. So for versions < 3.4.1 the option
+	either needs to be disabled or the OFFSET clause should not be used.
+	Default is `true`.
+
 Using HDFS FDW with Apache Hive on top of Hadoop
 -----
 

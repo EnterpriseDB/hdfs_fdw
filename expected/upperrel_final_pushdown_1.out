@@ -286,7 +286,7 @@ SELECT empno FROM emp e ORDER BY empno LIMIT 0;
 -------
 (0 rows)
 
--- OFFSET without LIMIT is not pushed down
+-- OFFSET without LIMIT is not pushed down when the remote server is Hive
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT empno FROM emp e ORDER BY empno OFFSET 1;
                                        QUERY PLAN                                       
@@ -413,6 +413,30 @@ SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
   7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
 (5 rows)
 
+-- Test LIMIT/OFFSET pushdown with enable_limit_pushdown GUC
+SET hdfs_fdw.enable_limit_pushdown TO OFF;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Limit
+   Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+   ->  Foreign Scan on public.emp
+         Output: empno, ename, job, mgr, hiredate, sal, comm, deptno
+         Remote SQL: SELECT * FROM `fdw_db`.`emp` ORDER BY `empno` ASC NULLS LAST
+(5 rows)
+
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
+ empno | ename  |   job    | mgr  |  hiredate  | sal  | comm | deptno 
+-------+--------+----------+------+------------+------+------+--------
+  7521 | WARD   | SALESMAN | 7698 | 02-22-1981 | 1250 |  500 |     30
+  7566 | JONES  | MANAGER  | 7839 | 04-02-1981 | 2975 |      |     20
+  7654 | MARTIN | SALESMAN | 7698 | 09-28-1981 | 1250 | 1400 |     30
+  7698 | BLAKE  | MANAGER  | 7839 | 05-01-1981 | 2850 |      |     30
+  7782 | CLARK  | MANAGER  | 7839 | 06-09-1981 | 2450 |      |     10
+(5 rows)
+
+SET hdfs_fdw.enable_limit_pushdown TO ON;
 -- LIMIT/OFFSET scenarios eligible for pushdown
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM emp ORDER BY empno LIMIT 5;

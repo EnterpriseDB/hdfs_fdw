@@ -84,7 +84,7 @@ EXPLAIN (VERBOSE, COSTS OFF)
 SELECT empno FROM emp e ORDER BY empno LIMIT 0;
 SELECT empno FROM emp e ORDER BY empno LIMIT 0;
 
--- OFFSET without LIMIT is not pushed down
+-- OFFSET without LIMIT is not pushed down when the remote server is Hive
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT empno FROM emp e ORDER BY empno OFFSET 1;
 SELECT empno FROM emp e ORDER BY empno OFFSET 1;
@@ -105,6 +105,13 @@ SELECT sum(t1.sal) FROM emp t1 INNER JOIN dept t2 ON (t1.deptno = t2.deptno) WHE
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
 SELECT * FROM emp ORDER BY emp LIMIT 5 OFFSET 1;
+
+-- Test LIMIT/OFFSET pushdown with enable_limit_pushdown GUC
+SET hdfs_fdw.enable_limit_pushdown TO OFF;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
+SELECT * FROM emp ORDER BY empno LIMIT 5 OFFSET 2;
+SET hdfs_fdw.enable_limit_pushdown TO ON;
 
 -- LIMIT/OFFSET scenarios eligible for pushdown
 EXPLAIN (VERBOSE, COSTS OFF)

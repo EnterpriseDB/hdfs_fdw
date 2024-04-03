@@ -137,6 +137,7 @@ typedef struct HDFSFdwRelationInfo
 	/* Inherit required flags from hdfs_opt */
 	bool		enable_aggregate_pushdown;
 	bool		enable_order_by_pushdown;
+	CLIENT_TYPE client_type;
 } HDFSFdwRelationInfo;
 
 /* hdfs_option.c headers */

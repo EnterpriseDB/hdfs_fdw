@@ -456,24 +456,24 @@ SELECT empno, mgr
 EXPLAIN (COSTS FALSE, VERBOSE)
 SELECT empno, sal, deptno
   FROM emp
-  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST;
-                                                         QUERY PLAN                                                         
-----------------------------------------------------------------------------------------------------------------------------
+  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST, empno DESC;
+                                                                      QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
  Foreign Scan on public.emp
    Output: empno, sal, deptno
-   Remote SQL: SELECT `empno`, `sal`, `deptno` FROM `fdw_db`.`emp` ORDER BY `deptno` ASC NULLS LAST, `sal` DESC NULLS FIRST
+   Remote SQL: SELECT `empno`, `sal`, `deptno` FROM `fdw_db`.`emp` ORDER BY `deptno` ASC NULLS LAST, `sal` DESC NULLS FIRST, `empno` DESC NULLS FIRST
 (3 rows)
 
 SELECT empno, sal, deptno
   FROM emp
-  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST;
+  ORDER BY deptno ASC NULLS LAST, sal DESC NULLS FIRST, empno DESC;
  empno | sal  | deptno 
 -------+------+--------
   7839 | 5000 |     10
   7782 | 2450 |     10
   7934 | 1300 |     10
-  7788 | 3000 |     20
   7902 | 3000 |     20
+  7788 | 3000 |     20
   7566 | 2975 |     20
   7876 | 1100 |     20
   7369 |  800 |     20
