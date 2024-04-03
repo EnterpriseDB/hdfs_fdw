@@ -4,7 +4,7 @@
  * 		Connection management functions.
  *
  * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
- * Portions Copyright (c) 2004-2023, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2024, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_connection.c
