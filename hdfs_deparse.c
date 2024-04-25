@@ -26,13 +26,7 @@
 #include "commands/defrem.h"
 #include "hdfs_fdw.h"
 #include "nodes/nodeFuncs.h"
-#if PG_VERSION_NUM < 120000
-#include "optimizer/clauses.h"
-#include "optimizer/tlist.h"
-#include "optimizer/var.h"
-#else
 #include "optimizer/optimizer.h"
-#endif
 #include "parser/parsetree.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
@@ -123,12 +117,8 @@ static void hdfs_deparse_expr(Expr *expr, deparse_expr_cxt *context);
 static void hdfs_deparse_var(Var *node, deparse_expr_cxt *context);
 static void hdfs_deparse_const(Const *node, deparse_expr_cxt *context);
 static void hdfs_deparse_param(Param *node, deparse_expr_cxt *context);
-#if PG_VERSION_NUM < 120000
-static void hdfs_deparse_array_ref(ArrayRef *node, deparse_expr_cxt *context);
-#else
 static void hdfs_deparse_subscripting_ref(SubscriptingRef *node,
 										  deparse_expr_cxt *context);
-#endif
 static void hdfs_deparse_func_expr(FuncExpr *node, deparse_expr_cxt *context);
 static void hdfs_deparse_op_expr(OpExpr *node, deparse_expr_cxt *context);
 static void hdfs_deparse_operator_name(StringInfo buf,
@@ -313,32 +303,6 @@ hdfs_foreign_expr_walker(Node *node,
 		case T_Const:
 		case T_Param:
 			break;
-#if PG_VERSION_NUM < 120000
-		case T_ArrayRef:
-			{
-				ArrayRef   *ar = (ArrayRef *) node;;
-
-				/* Assignment should not be in restrictions. */
-				if (ar->refassgnexpr != NULL)
-					return false;
-
-				/*
-				 * Recurse to remaining subexpressions.  Since the array
-				 * subscripts must yield (noncollatable) integers, they won't
-				 * affect the inner_cxt state.
-				 */
-				if (!hdfs_foreign_expr_walker((Node *) ar->refupperindexpr,
-											  glob_cxt, &inner_cxt))
-					return false;
-				if (!hdfs_foreign_expr_walker((Node *) ar->reflowerindexpr,
-											  glob_cxt, &inner_cxt))
-					return false;
-				if (!hdfs_foreign_expr_walker((Node *) ar->refexpr,
-											  glob_cxt, &inner_cxt))
-					return false;
-			}
-			break;
-#else
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbref = (SubscriptingRef *) node;;
@@ -367,7 +331,6 @@ hdfs_foreign_expr_walker(Node *node,
 					return false;
 			}
 			break;
-#endif
 		case T_FuncExpr:
 			{
 				FuncExpr   *fe = (FuncExpr *) node;
@@ -626,11 +589,7 @@ hdfs_foreign_expr_walker(Node *node,
 bool
 hdfs_is_builtin(Oid oid)
 {
-#if PG_VERSION_NUM >= 120000
 	return (oid < FirstGenbkiObjectId);
-#else
-	return (oid < FirstBootstrapObjectId);
-#endif
 }
 
 void
@@ -1381,14 +1340,9 @@ hdfs_deparse_expr(Expr *node, deparse_expr_cxt *context)
 		case T_Param:
 			hdfs_deparse_param((Param *) node, context);
 			break;
-#if PG_VERSION_NUM < 120000
-		case T_ArrayRef:
-			hdfs_deparse_array_ref((ArrayRef *) node, context);
-#else
 		case T_SubscriptingRef:
 			hdfs_deparse_subscripting_ref((SubscriptingRef *) node, context);
 			break;
-#endif
 		case T_FuncExpr:
 			hdfs_deparse_func_expr((FuncExpr *) node, context);
 			break;
@@ -1562,12 +1516,8 @@ hdfs_deparse_param(Param *node, deparse_expr_cxt *context)
  * Deparse an array subscript expression.
  */
 static void
-#if PG_VERSION_NUM < 120000
-hdfs_deparse_array_ref(ArrayRef *node, deparse_expr_cxt *context)
-#else
 hdfs_deparse_subscripting_ref(SubscriptingRef *node,
 							  deparse_expr_cxt *context)
-#endif
 {
 	StringInfo	buf = context->buf;
 	ListCell   *lowlist_item;

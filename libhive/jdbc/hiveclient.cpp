@@ -30,14 +30,12 @@
 #include "hiveclient.h"
 
 /*
- * In PG12, sprintf is redefined as pg_sprintf.  If we want to use that,
+ * Since PG12, sprintf is redefined as pg_sprintf.  If we want to use that,
  * we have to include src/port/snpritf.c in our build.  For now, just use
  * the default sprintf function.
  */
-#if PG_VERSION_NUM >= 120000
 #ifdef sprintf
 #undef sprintf
-#endif
 #endif
 
 using namespace std;

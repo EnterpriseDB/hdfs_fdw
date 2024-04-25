@@ -16,9 +16,7 @@
 
 #include "access/htup_details.h"
 #include "access/sysattr.h"
-#if PG_VERSION_NUM >= 120000
 #include "access/table.h"
-#endif
 #include "access/xact.h"
 #include "catalog/pg_type.h"
 #include "commands/explain.h"
@@ -31,11 +29,7 @@
 #include "optimizer/pathnode.h"
 #include "optimizer/paths.h"
 #include "optimizer/planmain.h"
-#if PG_VERSION_NUM >= 120000
 #include "optimizer/optimizer.h"
-#else
-#include "optimizer/var.h"
-#endif
 #include "optimizer/restrictinfo.h"
 #include "optimizer/tlist.h"
 #include "parser/parsetree.h"
@@ -284,7 +278,6 @@ static void hdfs_add_paths_with_pathkeys(PlannerInfo *root,
 										 Path *epq_path,
 										 Cost base_startup_cost,
 										 Cost base_total_cost);
-#if PG_VERSION_NUM >= 120000
 static void hdfs_add_foreign_ordered_paths(PlannerInfo *root,
 										   RelOptInfo *input_rel,
 										   RelOptInfo *ordered_rel);
@@ -292,7 +285,6 @@ static void hdfs_add_foreign_final_paths(PlannerInfo *root,
 										 RelOptInfo *input_rel,
 										 RelOptInfo *final_rel,
 										 FinalPathExtraData *extra);
-#endif
 
 #if PG_VERSION_NUM >= 160000
 static TargetEntry *hdfs_tlist_member_match_var(Var *var, List *targetlist);
@@ -904,11 +896,7 @@ hdfsBeginForeignScan(ForeignScanState *node, int eflags)
 											   hdfsFdwPrivateWholeRowLists);
 		List	   *scan_tlist = list_nth(fdw_private,
 										  hdfsFdwPrivateScanTList);
-#if PG_VERSION_NUM >= 120000
 		TupleDesc	scan_tupdesc = ExecTypeFromTL(scan_tlist);
-#else
-		TupleDesc	scan_tupdesc = ExecTypeFromTL(scan_tlist, false);
-#endif
 
 		hdfs_build_whole_row_constr_info(festate, tupleDescriptor,
 										 fsplan->fs_relids,
@@ -1059,11 +1047,7 @@ hdfsIterateForeignScan(ForeignScanState *node)
 			tuple = heap_form_tuple(attinmeta->tupdesc, values, nulls);
 		}
 
-#if PG_VERSION_NUM < 120000
-		ExecStoreTuple(tuple, slot, InvalidBuffer, true);
-#else
 		ExecStoreHeapTuple(tuple, slot, true);
-#endif
 	}
 
 	MemoryContextSwitchTo(oldcontext);
@@ -1323,7 +1307,6 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	 * Create a new join path and add it to the joinrel which represents a
 	 * join between foreign tables.
 	 */
-#if PG_VERSION_NUM >= 120000
 	joinpath = create_foreign_join_path(root,
 										joinrel,
 										NULL,
@@ -1334,18 +1317,6 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 										joinrel->lateral_relids,
 										NULL,
 										NIL);	/* no fdw_private */
-#else
-	joinpath = create_foreignscan_path(root,
-									   joinrel,
-									   NULL,	/* default pathtarget */
-									   joinrel->rows,
-									   startup_cost,
-									   total_cost,
-									   NIL, /* no pathkeys */
-									   joinrel->lateral_relids,
-									   NULL,
-									   NIL);	/* no fdw_private */
-#endif							/* PG_VERSION_NUM >= 120000 */
 
 	/* Add generated path into joinrel by add_path(). */
 	add_path(joinrel, (Path *) joinpath);
@@ -2347,12 +2318,8 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 		return;
 
 	/* Ignore stages we don't support; and skip any duplicate calls. */
-#if PG_VERSION_NUM >= 120000
 	if ((stage != UPPERREL_GROUP_AGG && stage != UPPERREL_ORDERED &&
 		 stage != UPPERREL_FINAL) ||
-#else
-	if (stage != UPPERREL_GROUP_AGG ||
-#endif
 		output_rel->fdw_private)
 		return;
 
@@ -2361,7 +2328,6 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 	fpinfo->stage = stage;
 	output_rel->fdw_private = fpinfo;
 
-#if PG_VERSION_NUM >= 120000
 	switch (stage)
 	{
 		case UPPERREL_GROUP_AGG:
@@ -2379,10 +2345,6 @@ hdfsGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
 			elog(ERROR, "unexpected upper relation: %d", (int) stage);
 			break;
 	}
-#else
-	hdfs_add_foreign_grouping_paths(root, input_rel, output_rel,
-									(GroupPathExtraData *) extra);
-#endif
 }
 
 /*
@@ -2453,7 +2415,6 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 #endif
 
 	/* Create and add foreign path to the grouping relation. */
-#if PG_VERSION_NUM >= 120000
 	grouppath = create_foreign_upper_path(root,
 										  grouped_rel,
 										  grouped_rel->reltarget,
@@ -2463,18 +2424,6 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										  NIL,	/* no pathkeys */
 										  NULL,
 										  NIL); /* no fdw_private */
-#else
-	grouppath = create_foreignscan_path(root,
-										grouped_rel,
-										grouped_rel->reltarget,
-										num_groups,
-										startup_cost,
-										total_cost,
-										NIL,	/* no pathkeys */
-										grouped_rel->lateral_relids,
-										NULL,
-										NIL);	/* no fdw_private */
-#endif
 
 	/* Add generated path into grouped_rel by add_path(). */
 	add_path(grouped_rel, (Path *) grouppath);
@@ -2738,7 +2687,6 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 								 useful_pathkeys,
 								 -1.0);
 
-#if PG_VERSION_NUM >= 120000
 		if (IS_SIMPLE_REL(rel))
 			add_path(rel, (Path *)
 					 create_foreignscan_path(root, rel,
@@ -2761,18 +2709,6 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 											  rel->lateral_relids,
 											  sorted_epq_path,
 											  NIL));
-#else
-		add_path(rel, (Path *)
-				 create_foreignscan_path(root, rel,
-										 NULL,
-										 rel->rows,
-										 startup_cost,
-										 total_cost,
-										 useful_pathkeys,
-										 rel->lateral_relids,
-										 sorted_epq_path,
-										 NIL));
-#endif
 	}
 }
 
@@ -2817,7 +2753,6 @@ hdfs_find_em_for_rel(PlannerInfo *root, EquivalenceClass *ec, RelOptInfo *rel)
  * Given input_rel contains the source-data Paths.  The paths are added to the
  * given ordered_rel.
  */
-#if PG_VERSION_NUM >= 120000
 static void
 hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 							   RelOptInfo *ordered_rel)
@@ -2932,7 +2867,6 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	/* and add it to the ordered_rel */
 	add_path(ordered_rel, (Path *) ordered_path);
 }
-#endif							/* PG_VERSION_NUM >= 120000 */
 
 /*
  * hdfs_find_em_for_rel_target
@@ -3008,7 +2942,6 @@ hdfs_find_em_for_rel_target(PlannerInfo *root, EquivalenceClass *ec,
 	return NULL;
 }
 
-#if PG_VERSION_NUM >= 120000
 /*
  * hdfs_add_foreign_final_paths
  *		Add foreign paths for performing the final processing remotely.
@@ -3261,7 +3194,6 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	/* and add it to the final_rel */
 	add_path(final_rel, (Path *) final_path);
 }
-#endif							/* PG_VERSION_NUM >= 120000 */
 
 /*
  * hdfs_get_sortby_direction_string

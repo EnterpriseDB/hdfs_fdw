@@ -1437,7 +1437,6 @@ select count(*) from emp order by 1;
 -- Test aggregate pushdown with order by
 -- Enable aggregate pushdown and order by pushdown,
 -- both the operations are pushed down
--- For versions < 12 only aggregate is pushed down
 SET hdfs_fdw.enable_aggregate_pushdown TO on;
 EXPLAIN (VERBOSE, COSTS OFF)
 select count(*) from emp order by 1;
