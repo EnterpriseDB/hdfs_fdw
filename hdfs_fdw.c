@@ -273,11 +273,20 @@ static List *hdfs_get_useful_ecs_for_relation(PlannerInfo *root,
 											  RelOptInfo *rel);
 static List *hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root,
 												   RelOptInfo *rel);
+#if PG_VERSION_NUM >= 170000
+static void hdfs_add_paths_with_pathkeys(PlannerInfo *root,
+										 RelOptInfo *rel,
+										 Path *epq_path,
+										 Cost base_startup_cost,
+										 Cost base_total_cost,
+										 List *restrictlist);
+#else
 static void hdfs_add_paths_with_pathkeys(PlannerInfo *root,
 										 RelOptInfo *rel,
 										 Path *epq_path,
 										 Cost base_startup_cost,
 										 Cost base_total_cost);
+#endif
 static void hdfs_add_foreign_ordered_paths(PlannerInfo *root,
 										   RelOptInfo *input_rel,
 										   RelOptInfo *ordered_rel);
@@ -607,6 +616,18 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 	 * actually be an indexscan happening there).  We already did all the work
 	 * to estimate cost and size of this path.
 	 */
+#if PG_VERSION_NUM >= 170000
+	path = create_foreignscan_path(root, baserel,
+								   NULL,	/* default pathtarget */
+								   fpinfo->rows,
+								   fpinfo->fdw_startup_cost,
+								   total_cost,
+								   NIL, /* no pathkeys */
+								   baserel->lateral_relids,
+								   NULL,	/* no extra plan */
+								   NIL, /* no fdw_restrictinfo list */
+								   NIL);	/* no fdw_private data */
+#else
 	path = create_foreignscan_path(root, baserel,
 								   NULL,	/* default pathtarget */
 								   fpinfo->rows,
@@ -616,12 +637,18 @@ hdfsGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 								   baserel->lateral_relids,
 								   NULL,	/* no extra plan */
 								   NIL);	/* no fdw_private data */
+#endif
 
 	add_path(baserel, (Path *) path);
 
 	/* Add paths with pathkeys */
+#if PG_VERSION_NUM >= 170000
+	hdfs_add_paths_with_pathkeys(root, baserel, NULL, fpinfo->fdw_startup_cost,
+								 total_cost, NIL);
+#else
 	hdfs_add_paths_with_pathkeys(root, baserel, NULL, fpinfo->fdw_startup_cost,
 								 total_cost);
+#endif
 }
 
 
@@ -1307,6 +1334,19 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 	 * Create a new join path and add it to the joinrel which represents a
 	 * join between foreign tables.
 	 */
+#if PG_VERSION_NUM >= 170000
+	joinpath = create_foreign_join_path(root,
+										joinrel,
+										NULL,
+										joinrel->rows,
+										startup_cost,
+										total_cost,
+										NIL,	/* no pathkeys */
+										joinrel->lateral_relids,
+										NULL,
+										extra->restrictlist,
+										NIL);	/* no fdw_private */
+#else
 	joinpath = create_foreign_join_path(root,
 										joinrel,
 										NULL,
@@ -1317,13 +1357,19 @@ hdfsGetForeignJoinPaths(PlannerInfo *root, RelOptInfo *joinrel,
 										joinrel->lateral_relids,
 										NULL,
 										NIL);	/* no fdw_private */
+#endif
 
 	/* Add generated path into joinrel by add_path(). */
 	add_path(joinrel, (Path *) joinpath);
 
 	/* Add paths with pathkeys */
+#if PG_VERSION_NUM >= 170000
+	hdfs_add_paths_with_pathkeys(root, joinrel, NULL, startup_cost,
+								 total_cost, extra->restrictlist);
+#else
 	hdfs_add_paths_with_pathkeys(root, joinrel, NULL, startup_cost,
 								 total_cost);
+#endif
 
 	/* XXX Consider parameterized paths for the join relation */
 }
@@ -2415,6 +2461,18 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 #endif
 
 	/* Create and add foreign path to the grouping relation. */
+#if PG_VERSION_NUM >= 170000
+	grouppath = create_foreign_upper_path(root,
+										  grouped_rel,
+										  grouped_rel->reltarget,
+										  num_groups,
+										  startup_cost,
+										  total_cost,
+										  NIL,	/* no pathkeys */
+										  NULL,
+										  NIL,	/* no fdw_restrictinfo list */
+										  NIL); /* no fdw_private */
+#else
 	grouppath = create_foreign_upper_path(root,
 										  grouped_rel,
 										  grouped_rel->reltarget,
@@ -2424,6 +2482,7 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										  NIL,	/* no pathkeys */
 										  NULL,
 										  NIL); /* no fdw_private */
+#endif
 
 	/* Add generated path into grouped_rel by add_path(). */
 	add_path(grouped_rel, (Path *) grouppath);
@@ -2646,10 +2705,17 @@ hdfs_get_useful_pathkeys_for_relation(PlannerInfo *root, RelOptInfo *rel)
  * Pushing down query_pathkeys to the foreign server might let us avoid a
  * local sort.
  */
+#if PG_VERSION_NUM >= 170000
+static void
+hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
+							 Path *epq_path, Cost base_startup_cost,
+							 Cost base_total_cost, List *restrictlist)
+#else
 static void
 hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 							 Path *epq_path, Cost base_startup_cost,
 							 Cost base_total_cost)
+#endif
 {
 	ListCell   *lc;
 	List	   *useful_pathkeys_list = NIL; /* List of all pathkeys */
@@ -2688,6 +2754,7 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 								 -1.0);
 
 		if (IS_SIMPLE_REL(rel))
+#if PG_VERSION_NUM >= 170000
 			add_path(rel, (Path *)
 					 create_foreignscan_path(root, rel,
 											 NULL,
@@ -2697,8 +2764,22 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 											 useful_pathkeys,
 											 rel->lateral_relids,
 											 sorted_epq_path,
-											 NIL));
+											 NIL,	/* no fdw_restrictinfo list */
+											 NIL));	/* no fdw_private list */
+#else
+		add_path(rel, (Path *)
+					 create_foreignscan_path(root, rel,
+											 NULL,
+											 rel->rows,
+											 startup_cost,
+											 total_cost,
+											 useful_pathkeys,
+											 rel->lateral_relids,
+											 sorted_epq_path,
+											 NIL));	/* no fdw_private list */
+#endif
 		else
+#if PG_VERSION_NUM >= 170000
 			add_path(rel, (Path *)
 					 create_foreign_join_path(root, rel,
 											  NULL,
@@ -2708,7 +2789,20 @@ hdfs_add_paths_with_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 											  useful_pathkeys,
 											  rel->lateral_relids,
 											  sorted_epq_path,
-											  NIL));
+											  restrictlist,
+											  NIL));	/* no fdw_private */
+#else
+			add_path(rel, (Path *)
+					 create_foreign_join_path(root, rel,
+											  NULL,
+											  rel->rows,
+											  startup_cost,
+											  total_cost,
+											  useful_pathkeys,
+											  rel->lateral_relids,
+											  sorted_epq_path,
+											  NIL));	/* no fdw_private */
+#endif
 	}
 }
 
@@ -2854,6 +2948,18 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	fdw_private = list_make2(makeInteger(true), makeInteger(false));
 
 	/* Create foreign ordering path */
+#if PG_VERSION_NUM >= 170000
+	ordered_path = create_foreign_upper_path(root,
+											 input_rel,
+											 root->upper_targets[UPPERREL_ORDERED],
+											 rows,
+											 startup_cost,
+											 total_cost,
+											 root->sort_pathkeys,
+											 NULL,	/* no extra plan */
+											 NIL,	/* no fdw_restrictinfo list */
+											 fdw_private);
+#else
 	ordered_path = create_foreign_upper_path(root,
 											 input_rel,
 											 root->upper_targets[UPPERREL_ORDERED],
@@ -2863,6 +2969,7 @@ hdfs_add_foreign_ordered_paths(PlannerInfo *root, RelOptInfo *input_rel,
 											 root->sort_pathkeys,
 											 NULL,	/* no extra plan */
 											 fdw_private);
+#endif
 
 	/* and add it to the ordered_rel */
 	add_path(ordered_rel, (Path *) ordered_path);
@@ -3038,6 +3145,7 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 				 * no-longer-needed outer plan (if any), which makes the
 				 * EXPLAIN output look cleaner
 				 */
+#if PG_VERSION_NUM >= 170000
 				final_path = create_foreign_upper_path(root,
 													   path->parent,
 													   path->pathtarget,
@@ -3046,7 +3154,19 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 													   path->total_cost,
 													   path->pathkeys,
 													   NULL,	/* no extra plan */
-													   NULL);	/* no fdw_private */
+													   NIL,		/* no fdw_restrictinfo list */
+													   NIL);	/* no fdw_private */
+#else
+				final_path = create_foreign_upper_path(root,
+													   path->parent,
+													   path->pathtarget,
+													   path->rows,
+													   path->startup_cost,
+													   path->total_cost,
+													   path->pathkeys,
+													   NULL,	/* no extra plan */
+													   NIL);	/* no fdw_private */
+#endif
 
 				/* and add it to the final_rel */
 				add_path(final_rel, (Path *) final_path);
@@ -3181,6 +3301,18 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	 * Create foreign final path; this gets rid of a no-longer-needed outer
 	 * plan (if any), which makes the EXPLAIN output look cleaner
 	 */
+#if PG_VERSION_NUM >= 170000
+	final_path = create_foreign_upper_path(root,
+										   input_rel,
+										   root->upper_targets[UPPERREL_FINAL],
+										   rows,
+										   startup_cost,
+										   total_cost,
+										   pathkeys,
+										   NULL,	/* no extra plan */
+										   NIL,		/* no fdw_restrictinfo list */
+										   fdw_private);
+#else
 	final_path = create_foreign_upper_path(root,
 										   input_rel,
 										   root->upper_targets[UPPERREL_FINAL],
@@ -3190,6 +3322,7 @@ hdfs_add_foreign_final_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										   pathkeys,
 										   NULL,	/* no extra plan */
 										   fdw_private);
+#endif
 
 	/* and add it to the final_rel */
 	add_path(final_rel, (Path *) final_path);
