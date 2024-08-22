@@ -20,6 +20,7 @@ REGRESS = datatype external mapping retrieval date_comparison ldap_authenticatio
 EXTENSION = hdfs_fdw
 DATA = hdfs_fdw--2.0.5.sql hdfs_fdw--2.0.4--2.0.5.sql hdfs_fdw--2.0.4.sql hdfs_fdw--2.0.3--2.0.4.sql hdfs_fdw--2.0.2.sql hdfs_fdw--2.0.3.sql hdfs_fdw--2.0.1--2.0.2.sql hdfs_fdw--2.0.2--2.0.3.sql hdfs_fdw--2.0.1.sql hdfs_fdw--2.0--2.0.1.sql hdfs_fdw--1.0--2.0.sql hdfs_fdw--1.0.sql
 
+ifdef USE_PGXS
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -30,4 +31,11 @@ endif
 
 ifeq (,$(findstring $(MAJORVERSION), 12 13 14 15 16 17))
 $(error PostgreSQL 12, 13, 14, 15, 16, or 17 is required to compile this extension)
+endif
+
+else
+subdir = contrib/hdfs_fdw
+top_builddir = ../..
+include $(top_builddir)/src/Makefile.global
+include $(top_srcdir)/contrib/contrib-global.mk
 endif
