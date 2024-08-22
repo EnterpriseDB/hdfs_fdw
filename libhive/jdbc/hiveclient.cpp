@@ -98,7 +98,7 @@ int Initialize()
     {
         return -1;
     }
-    delete libjvm;
+    delete[] libjvm;
 
     _JNI_CreateJavaVM = (_JNI_CreateJavaVM_PTR)dlsym(hdfs_dll_handle, "JNI_CreateJavaVM");
 
@@ -118,7 +118,7 @@ int Initialize()
     rc = _JNI_CreateJavaVM(&g_jvm, &g_jni, &vm_args);
 
     delete[] options[0].optionString;
-	delete options;
+	delete[] options;
 	if (rc != JNI_OK)
 	{
 		return(-1);

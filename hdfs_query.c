@@ -72,7 +72,7 @@ hdfs_find_row_count(char *src)
 	strncpy(row_count, pos + strlen(statistics_str), 50);
 
 	/* Make sure that the string is null terminated */
-	row_count[51] = '\0';
+	row_count[50] = '\0';
 
 	return strtod(row_count, NULL);
 }
@@ -88,7 +88,7 @@ hdfs_rowcount(int con_index, hdfs_opt *opt, PlannerInfo *root,
 {
 	bool		is_null;
 	StringInfoData sql;
-	double		rc;
+	double		rc = 0;
 
 	initStringInfo(&sql);
 	hdfs_deparse_explain(opt, &sql);
