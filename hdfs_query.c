@@ -4,7 +4,7 @@
  * 		Planner helper functions to get information from Hive/Spark server.
  *
  * Portions Copyright (c) 2012-2019, PostgreSQL Global Development Group
- * Portions Copyright (c) 2004-2024, EnterpriseDB Corporation.
+ * Portions Copyright (c) 2004-2025, EnterpriseDB Corporation.
  *
  * IDENTIFICATION
  * 		hdfs_query.c
