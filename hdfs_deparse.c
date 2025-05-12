@@ -769,21 +769,13 @@ hdfs_deparse_select_sql(List *tlist, bool is_subquery, List **retrieved_attrs,
 		 * Core code already has some lock on each rel being planned, so we
 		 * can use NoLock here.
 		 */
-#if PG_VERSION_NUM < 130000
-		rel = heap_open(rte->relid, NoLock);
-#else
 		rel = table_open(rte->relid, NoLock);
-#endif
 
 		/* Construct target list */
 		hdfs_deparse_target_list(buf, root, foreignrel->relid, rel,
 								 fpinfo->attrs_used, retrieved_attrs);
 
-#if PG_VERSION_NUM < 130000
-		heap_close(rel, NoLock);
-#else
 		table_close(rel, NoLock);
-#endif
 	}
 }
 
@@ -1145,11 +1137,7 @@ hdfs_deparse_from_expr_for_rel(StringInfo buf, PlannerInfo *root,
 		 * Core code already has some lock on each rel being planned, so we
 		 * can use NoLock here.
 		 */
-#if PG_VERSION_NUM < 130000
-		Relation	rel = heap_open(rte->relid, NoLock);
-#else
 		Relation	rel = table_open(rte->relid, NoLock);
-#endif
 
 		hdfs_deparse_relation(buf, rel);
 
@@ -1162,11 +1150,7 @@ hdfs_deparse_from_expr_for_rel(StringInfo buf, PlannerInfo *root,
 			appendStringInfo(buf, " %s%d", REL_ALIAS_PREFIX,
 							 foreignrel->relid);
 
-#if PG_VERSION_NUM < 130000
-		heap_close(rel, NoLock);
-#else
 		table_close(rel, NoLock);
-#endif
 	}
 	return;
 }
@@ -1551,11 +1535,7 @@ hdfs_deparse_subscripting_ref(SubscriptingRef *node,
 		{
 			hdfs_deparse_expr(lfirst(lowlist_item), context);
 			appendStringInfoChar(buf, ':');
-#if PG_VERSION_NUM < 130000
-			lowlist_item = lnext(lowlist_item);
-#else
 			lowlist_item = lnext(node->reflowerindexpr, lowlist_item);
-#endif
 		}
 
 		hdfs_deparse_expr(lfirst(uplist_item), context);

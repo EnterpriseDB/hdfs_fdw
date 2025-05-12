@@ -27,11 +27,7 @@
 #define DEFAULT_DATABASE "default"
 
 /* Macro for list API backporting. */
-#if PG_VERSION_NUM < 130000
-#define hdfs_list_concat(l1, l2) list_concat(l1, list_copy(l2))
-#else
 #define hdfs_list_concat(l1, l2) list_concat((l1), (l2))
-#endif
 
 /* Options structure to store the HDFS server information */
 typedef struct hdfs_opt

@@ -1843,11 +1843,7 @@ hdfs_build_scan_list_for_baserel(Oid relid, Index varno,
 	*retrieved_attrs = NIL;
 
 	/* Planner must have taken a lock, so request no lock here */
-#if PG_VERSION_NUM < 130000
-	relation = heap_open(relid, NoLock);
-#else
 	relation = table_open(relid, NoLock);
-#endif
 
 	tupdesc = RelationGetDescr(relation);
 
@@ -1880,11 +1876,7 @@ hdfs_build_scan_list_for_baserel(Oid relid, Index varno,
 		}
 	}
 
-#if PG_VERSION_NUM < 130000
-	heap_close(relation, NoLock);
-#else
 	table_close(relation, NoLock);
-#endif
 
 	return tlist;
 }
