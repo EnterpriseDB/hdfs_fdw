@@ -29,8 +29,8 @@ ifndef MAJORVERSION
 	MAJORVERSION := $(basename $(VERSION))
 endif
 
-ifeq (,$(findstring $(MAJORVERSION), 13 14 15 16 17))
-$(error PostgreSQL 13, 14, 15, 16, or 17 is required to compile this extension)
+ifeq (,$(findstring $(MAJORVERSION), 13 14 15 16 17 18))
+$(error PostgreSQL 13, 14, 15, 16, 17, or 18 is required to compile this extension)
 endif
 
 else

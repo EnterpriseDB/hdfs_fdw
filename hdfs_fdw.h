@@ -199,8 +199,5 @@ extern List *hdfs_adjust_whole_row_ref(PlannerInfo *root,
 									   List *scan_var_list,
 									   List **whole_row_lists,
 									   Bitmapset *relids);
-#ifndef TupleDescAttr
-#define TupleDescAttr(tupdesc, i) ((tupdesc)->attrs[(i)])
-#endif
 
 #endif							/* HADOOP_FDW_H */
