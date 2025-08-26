@@ -40,6 +40,7 @@ typedef struct hdfs_opt
 	char	   *table_name;		/* Hive/Spark table name */
 	CLIENT_TYPE client_type;
 	AUTH_TYPE	auth_type;
+	char	   *auth_type_str;
 	bool		use_remote_estimate;
 	int			connect_timeout;
 	int			receive_timeout;
@@ -48,6 +49,10 @@ typedef struct hdfs_opt
 	bool		enable_join_pushdown;
 	bool		enable_aggregate_pushdown;
 	bool		enable_order_by_pushdown;
+	bool		ssl;
+	bool		useSystemTrustStore;
+	char	   *sslTrustStore;
+	char	   *trustStorePassword;
 } hdfs_opt;
 
 /*

@@ -62,6 +62,10 @@ static struct HDFSFdwOption valid_options[] =
 	{"enable_aggregate_pushdown", ForeignTableRelationId},
 	{"enable_order_by_pushdown", ForeignServerRelationId},
 	{"enable_order_by_pushdown", ForeignTableRelationId},
+	{"ssl", ForeignServerRelationId},
+	{"usesystemtruststore", ForeignServerRelationId},
+	{"ssltruststore", ForeignServerRelationId},
+	{"truststorepassword", ForeignServerRelationId},
 	{NULL, InvalidOid}
 };
 
@@ -170,6 +174,10 @@ hdfs_get_options(Oid foreigntableid)
 	opt->enable_join_pushdown = true;
 	opt->enable_aggregate_pushdown = true;
 	opt->enable_order_by_pushdown = true;
+	opt->ssl = false;
+	opt->useSystemTrustStore = false;
+	opt->sslTrustStore = NULL;
+	opt->trustStorePassword = NULL;
 
 	/* Extract options from FDW objects. */
 	f_table = GetForeignTable(foreigntableid);
@@ -184,6 +192,7 @@ hdfs_get_options(Oid foreigntableid)
 	/* Set default client type to HiverServer2 and auth type to unspecified. */
 	opt->client_type = HIVESERVER2;
 	opt->auth_type = AUTH_TYPE_UNSPECIFIED;
+	opt->auth_type_str = NULL;
 
 	foreach(lc, options)
 	{
@@ -228,15 +237,16 @@ hdfs_get_options(Oid foreigntableid)
 
 		if (strcmp(def->defname, "auth_type") == 0)
 		{
-			if (strcasecmp(defGetString(def), "NOSASL") == 0)
+			opt->auth_type_str = defGetString(def);
+
+			if (strcasecmp(opt->auth_type_str, "NOSASL") == 0)
 				opt->auth_type = AUTH_TYPE_NOSASL;
-			else if (strcasecmp(defGetString(def), "LDAP") == 0)
+			else if (strcasecmp(opt->auth_type_str, "LDAP") == 0)
 				opt->auth_type = AUTH_TYPE_LDAP;
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
-						 errmsg("invalid option \"%s\"", defGetString(def)),
-						 errhint("Valid auth_type are NOSASL & LDAP.")));
+						 errmsg("invalid option \"%s\"", opt->auth_type_str)));
 		}
 
 		if (strcmp(def->defname, "log_remote_sql") == 0)
@@ -280,6 +290,18 @@ hdfs_get_options(Oid foreigntableid)
 						 errhint("Valid range is 1 - 100000 S.")));
 			opt->connect_timeout = opt->connect_timeout * 1000;
 		}
+
+		if (strcmp(def->defname, "ssl") == 0)
+			opt->ssl = defGetBoolean(def);
+
+		if (strcmp(def->defname, "usesystemtruststore") == 0)
+			opt->useSystemTrustStore = defGetBoolean(def);
+
+		if (strcmp(def->defname, "ssltruststore") == 0)
+			opt->sslTrustStore = defGetString(def);
+
+		if (strcmp(def->defname, "truststorepassword") == 0)
+			opt->trustStorePassword = defGetString(def);
 	}
 
 	/*

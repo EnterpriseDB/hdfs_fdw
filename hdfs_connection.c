@@ -25,12 +25,33 @@ hdfs_get_connection(ForeignServer *server, hdfs_opt *opt)
 {
 	int			conn;
 	char	   *err_buf = "unknown";
+	StringInfoData connstr;
+
+	initStringInfo(&connstr);
+	appendStringInfo(&connstr, "jdbc:hive2://%s:%d/%s",
+					 opt->host, opt->port, opt->dbname);
+	if (opt->ssl)
+		appendStringInfo(&connstr, ";ssl=true");
+	if (opt->useSystemTrustStore)
+		appendStringInfo(&connstr, ";useSystemTrustStore=true");
+	if (opt->sslTrustStore)
+		appendStringInfo(&connstr, ";sslTrustStore=%s", opt->sslTrustStore);
+	if (opt->trustStorePassword)
+		appendStringInfo(&connstr, ";trustStorePassword=%s",
+						 opt->trustStorePassword);
+	if (opt->auth_type_str)
+		appendStringInfo(&connstr, ";auth=%s", opt->auth_type_str);
+	else
+	{
+		if (opt->username == NULL || opt->username[0] == '\0')
+			appendStringInfo(&connstr, ";auth=noSasl");	/* DEFAULT */
+	}
 
 	conn = DBOpenConnection(opt->host,
 							opt->port,
-							opt->dbname,
 							opt->username,
 							opt->password,
+							connstr.data,
 							opt->connect_timeout,
 							opt->receive_timeout,
 							opt->auth_type,
