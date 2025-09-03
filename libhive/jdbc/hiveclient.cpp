@@ -401,10 +401,10 @@ int Destroy()
 	return(0);
 }
 
-int DBOpenConnection(char *host, int port, char *databaseName,
-					char *username, char *password,
-					int connectTimeout, int receiveTimeout,
-					AUTH_TYPE auth_type, CLIENT_TYPE client_type, char **errBuf)
+int DBOpenConnection(char *host, int port, char *username, char *password,
+					 char *connStr, int connectTimeout, int receiveTimeout,
+					 AUTH_TYPE auth_type, CLIENT_TYPE client_type,
+					 char **errBuf)
 {
 	int rc;
 	jstring rv;
@@ -420,9 +420,9 @@ int DBOpenConnection(char *host, int port, char *databaseName,
 	rc = g_jni->CallIntMethod(g_objJdbcClient, g_DBOpenConnection,
 							g_jni->NewStringUTF(host),
 							port,
-							g_jni->NewStringUTF(databaseName),
 							g_jni->NewStringUTF(username),
 							g_jni->NewStringUTF(password),
+							g_jni->NewStringUTF(connStr),
 							connectTimeout,
 							receiveTimeout,
 							auth_type,

@@ -32,7 +32,7 @@ BEGIN
   EXECUTE d_sql;
  END IF;
 
- IF auth = 'NOSASL' THEN
+ IF auth ~* 'NOSASL' THEN
   RAISE NOTICE 'Either LDAP authentication have wrong username or password OR using NOSASL authentication';
  END IF;
 

@@ -76,13 +76,15 @@ int Destroy(void);
  *
  * @param host           IP address/Host Name of computer running the Hive server.
  * @param port           Port on which the Hive server is listening.
- * @param databaseName   Name of the database on the Hive server to which to connect.
  * @param username       The name of the user for authentication on the Hive server.
  * @param password       The password of the user for authentication on the Hive server.
+ * @param connStr        Connection string to be used.
  * @param connectTimeout Time in seconds to wait for the connection to get established
-                         and authenticated.
+ *                       and authenticated.
  * @param receiveTimeout Time in seconds to wait for queries to get executed on this connection.
-                         This time will be used in calls to JDBC setQueryTimeout.
+ *                       This time will be used in calls to JDBC setQueryTimeout.
+ * @param auth_type      Auth type like LDAP, NOSASL etc.
+ * @param client_type    Type of client: HIVESERVER2 or SPARKSERVER
  * @param errBuf         Buffer to receive an error message if any.
  *                       It receives a copy of the pointer to the already allocated
  *                       memory that the caller does not need to worry about.
@@ -90,10 +92,10 @@ int Destroy(void);
  *         The return value is the index of the connection object.
  *         Error messages will be stored in errBuf.
  */
-int DBOpenConnection(char *host, int port, char *databaseName,
-					char *username, char *password,
-					int connectTimeout, int receiveTimeout,
-					AUTH_TYPE auth_type, CLIENT_TYPE client_type, char **errBuf);
+int DBOpenConnection(char *host, int port, char *username, char *password,
+					 char *connStr, int connectTimeout, int receiveTimeout,
+					 AUTH_TYPE authType, CLIENT_TYPE client_type,
+					 char **errBuf);
 
 /**
  * @brief Disconnect from a Hive database.
