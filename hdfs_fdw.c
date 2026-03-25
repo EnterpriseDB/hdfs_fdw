@@ -2281,18 +2281,9 @@ hdfs_foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel,
 									  grouped_rel->relids,
 									  NULL,
 									  NULL);
-#elif PG_VERSION_NUM >= 140000
+#else
 			rinfo = make_restrictinfo(root,
 									  expr,
-									  true,
-									  false,
-									  false,
-									  root->qual_security_level,
-									  grouped_rel->relids,
-									  NULL,
-									  NULL);
-#else
-			rinfo = make_restrictinfo(expr,
 									  true,
 									  false,
 									  false,
@@ -2469,17 +2460,10 @@ hdfs_add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	total_cost = 10 + startup_cost;
 
 	/* Estimate output tuples which should be same as number of groups */
-#if PG_VERSION_NUM >= 140000
 	num_groups = estimate_num_groups(root,
 									 get_sortgrouplist_exprs(root->parse->groupClause,
 															 fpinfo->grouped_tlist),
 									 input_rel->rows, NULL, NULL);
-#else
-	num_groups = estimate_num_groups(root,
-									 get_sortgrouplist_exprs(root->parse->groupClause,
-															 fpinfo->grouped_tlist),
-									 input_rel->rows, NULL);
-#endif
 
 	/* Create and add foreign path to the grouping relation. */
 #if PG_VERSION_NUM >= 180000
