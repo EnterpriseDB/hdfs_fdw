@@ -122,7 +122,7 @@ int DBCloseConnection(int con_index);
  * @return Any negative value indicates an error, 0 or +ve means success.
  *         The value returned is the number of connections closed
  */
-int DBCloseAllConnections();
+int DBCloseAllConnections(void);
 
 /**
  * @brief Execute a query.
