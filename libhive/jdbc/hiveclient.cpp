@@ -94,13 +94,19 @@ int Initialize()
     sprintf(libjvm, "%s/%s", g_jvmpath, "libjvm.so");
 
     hdfs_dll_handle = dlopen(libjvm, RTLD_LAZY);
+    delete[] libjvm;
     if(hdfs_dll_handle == NULL)
     {
         return -1;
     }
-    delete[] libjvm;
 
     _JNI_CreateJavaVM = (_JNI_CreateJavaVM_PTR)dlsym(hdfs_dll_handle, "JNI_CreateJavaVM");
+    if (_JNI_CreateJavaVM == NULL)
+    {
+        dlclose(hdfs_dll_handle);
+        hdfs_dll_handle = NULL;
+        return -1;
+    }
 
     options = new JavaVMOption[1];
 
@@ -395,7 +401,11 @@ int Initialize()
 
 int Destroy()
 {
-    dlclose(hdfs_dll_handle);
+    if (hdfs_dll_handle != NULL)
+    {
+        dlclose(hdfs_dll_handle);
+        hdfs_dll_handle = NULL;
+    }
 	if (g_jvm != NULL)
 		g_jvm->DestroyJavaVM();
 	return(0);

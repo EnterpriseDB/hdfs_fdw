@@ -22,11 +22,11 @@ fi
 function configure_thrift
 {
 	rm -rf thrift-0.9.2.tar.gz
-	wget http://mirrors.gigenet.com/apache/thrift/0.9.2/thrift-0.9.2.tar.gz
+	wget https://archive.apache.org/dist/thrift/0.9.2/thrift-0.9.2.tar.gz
 	tar -zxvf thrift-0.9.2.tar.gz
 	cd thrift-0.9.2
 	export CXXFLAGS="-fPIC"
-	./configure --prefix=$1 -with-qt4=no --with-c_glib=no --with-csharp=no --with-java=no --with-erlang=no --with-nodejs=no --with-lua=no --with-python=no --with-perl=no --with-php=no --with-php_extension=no --with-ruby=no --with-haskell=no --with-go=no --with-d=no
+	./configure --prefix="$1" -with-qt4=no --with-c_glib=no --with-csharp=no --with-java=no --with-erlang=no --with-nodejs=no --with-lua=no --with-python=no --with-perl=no --with-php=no --with-php_extension=no --with-ruby=no --with-haskell=no --with-go=no --with-d=no
 	make
 	make install
 	cd ..
@@ -39,7 +39,7 @@ function configure_fb303
 	
 	export CXXFLAGS="-fPIC"
 	./bootstrap.sh
-	./configure --prefix=$1
+	./configure --prefix="$1"
 	make
 	make install
 	cd ../../../
@@ -53,7 +53,7 @@ function configure_libhive
 	make install
 }
 
-configure_thrift
-configure_fb303
+configure_thrift "$1"
+configure_fb303 "$1"
 configure_libhive
 
