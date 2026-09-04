@@ -22,7 +22,7 @@ fi
 function configure_thrift
 {
 	rm -rf thrift-0.9.2.tar.gz
-	wget https://archive.apache.org/dist/thrift/0.9.2/thrift-0.9.2.tar.gz
+	wget --max-redirect=0 https://archive.apache.org/dist/thrift/0.9.2/thrift-0.9.2.tar.gz
 	tar -zxvf thrift-0.9.2.tar.gz
 	cd thrift-0.9.2
 	export CXXFLAGS="-fPIC"
