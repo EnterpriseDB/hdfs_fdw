@@ -1748,6 +1748,13 @@ hdfs_deparse_string(StringInfo buf, const char *val, bool isstr)
 			(ch == '}' && (i == (strlen(val) - 1))) || ch == '\"')
 			continue;
 
+		/*
+		 * Escape single quotes by doubling them, so that the value stays a
+		 * single string literal when constructing IN-clause string literals.
+		 */
+		if (ch == '\'' && isstr)
+			appendStringInfoChar(buf, '\'');
+
 		if (ch == ',' && isstr)
 			appendStringInfoString(buf, "', '");
 		else

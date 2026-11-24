@@ -47,7 +47,33 @@ hdfs_get_connection(ForeignServer *server, hdfs_opt *opt)
 			appendStringInfo(&connstr, ";auth=noSasl");	/* DEFAULT */
 	}
 
-	elog(DEBUG3, "connection string: %s", connstr.data);
+	/*
+	 * Log connection string with the trustStorePassword value redacted.  A
+	 * fixed-width mask is used so the password length is not revealed.
+	 */
+	{
+		char	   *pw_start = strstr(connstr.data, "trustStorePassword=");
+
+		if (pw_start)
+		{
+			StringInfoData redacted;
+			char	   *pw_val = pw_start + strlen("trustStorePassword=");
+			char	   *pw_end = strchr(pw_val, ';');
+
+			initStringInfo(&redacted);
+			/* copy everything up to and including "trustStorePassword=" */
+			appendBinaryStringInfo(&redacted, connstr.data, pw_val - connstr.data);
+			appendStringInfoString(&redacted, "****");
+			/* append the remainder following the password value, if any */
+			if (pw_end)
+				appendStringInfoString(&redacted, pw_end);
+
+			elog(DEBUG3, "connection string: %s", redacted.data);
+			pfree(redacted.data);
+		}
+		else
+			elog(DEBUG3, "connection string: %s", connstr.data);
+	}
 
 	conn = DBOpenConnection(opt->host,
 							opt->port,
@@ -59,11 +85,32 @@ hdfs_get_connection(ForeignServer *server, hdfs_opt *opt)
 							opt->auth_type,
 							opt->client_type,
 							&err_buf);
+
+	/* Scrub the cleartext connection string from memory. */
+	explicit_bzero(connstr.data, connstr.len);
+	pfree(connstr.data);
+
 	if (conn < 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_FDW_UNABLE_TO_ESTABLISH_CONNECTION),
 				 errmsg("failed to initialize the connection: (%s)",
 						err_buf)));
+
+	/*
+	 * Zero out sensitive credentials now that connection is established.
+	 * We don't pfree here because these strings point into DefElem nodes
+	 * that may still be referenced; the memory context will reclaim them.
+	 */
+	if (opt->password)
+	{
+		explicit_bzero(opt->password, strlen(opt->password));
+		opt->password = NULL;
+	}
+	if (opt->trustStorePassword)
+	{
+		explicit_bzero(opt->trustStorePassword, strlen(opt->trustStorePassword));
+		opt->trustStorePassword = NULL;
+	}
 
 	ereport(DEBUG1,
 			(errmsg("hdfs_fdw: new connection(%d) opened for server \"%s\"",

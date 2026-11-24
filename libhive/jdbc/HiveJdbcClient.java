@@ -165,9 +165,10 @@ public class HiveJdbcClient
 		DriverManager.setLoginTimeout(connectTimeout);
 
 		String conURL = connStr;
+		String safeURL = conURL.replaceAll("trustStorePassword=[^;]*", "trustStorePassword=****");
 
 		if (m_isDebug)
-			System.out.println("HiveJdbcClient::DBOpenConnection attempting to connect to " + conURL);
+			System.out.println("HiveJdbcClient::DBOpenConnection attempting to connect to " + safeURL);
 
 		try
 		{
@@ -216,10 +217,10 @@ public class HiveJdbcClient
 		catch (SQLException ex)
 		{
 			if (m_isDebug)
-				System.out.println("HiveJdbcClient::DBOpenConnection could not connect to " + conURL);
+				System.out.println("HiveJdbcClient::DBOpenConnection could not connect to " + safeURL);
 
 			errBuf.catVal("ERROR : Could not connect to ");
-			errBuf.catVal(conURL);
+			errBuf.catVal(safeURL);
 			errBuf.catVal(" within ");
 			errBuf.catVal(DriverManager.getLoginTimeout());
 			errBuf.catVal(" seconds");
@@ -228,7 +229,7 @@ public class HiveJdbcClient
 		}
 
 		if (m_isDebug)
-			System.out.println("HiveJdbcClient::DBOpenConnection connected to " + conURL);
+			System.out.println("HiveJdbcClient::DBOpenConnection connected to " + safeURL);
 
 		m_host[index].resetVal();
 		m_host[index].catVal(host);
@@ -242,7 +243,7 @@ public class HiveJdbcClient
 		m_port[index] = port;
 
 		errBuf.catVal("Connected ["+ index + "] to ");
-		errBuf.catVal(conURL);
+		errBuf.catVal(safeURL);
 
 		return (index);
 	}

@@ -89,7 +89,11 @@ be specified in options:
 	to the JDBC API setFetchSize. The default value is `10000`.
   * `log_remote_sql`:  If true, logging will include SQL commands
 	executed on the remote hive server and the number of times that a scan
-	is repeated. The default is false.
+	is repeated. The default is false. **Security note:** When enabled,
+	`log_remote_sql` logs the full remote SQL query text to the PostgreSQL
+	server log, which may include literal values from WHERE clauses. This
+	is analogous to PostgreSQL's `log_statement = 'all'`. Ensure server
+	log files have appropriate access controls.
   * `use_remote_estimate`: Include the use_remote_estimate to instruct
 	the server to use EXPLAIN commands on the remote server when estimating
 	processing costs. By default, use_remote_estimate is false, and remote
