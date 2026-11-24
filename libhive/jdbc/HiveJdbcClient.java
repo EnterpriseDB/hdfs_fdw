@@ -202,7 +202,9 @@ public class HiveJdbcClient
 				default:
 					if (userName == null || userName.equals(""))
 					{
-						m_hdfsConnection[index] = DriverManager.getConnection(conURL, "userName", "password");
+						errBuf.catVal("ERROR : A valid user name is required");
+						m_isFree[index] = true;
+						return (-3);
 					}
 					else
 					{

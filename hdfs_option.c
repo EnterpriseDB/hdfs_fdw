@@ -14,6 +14,8 @@
 
 #include "postgres.h"
 
+#include <ctype.h>
+
 #include "access/reloptions.h"
 #include "catalog/pg_foreign_server.h"
 #include "catalog/pg_foreign_table.h"
@@ -149,6 +151,30 @@ hdfs_is_valid_option(const char *option, Oid context)
 }
 
 /*
+ * hdfs_validate_identifier
+ * 		Ensure an identifier option (e.g. dbname, table_name) contains only
+ * 		alphanumeric characters and underscores.
+ *
+ * These values are interpolated directly into the remote connection string
+ * and HiveQL, so restrict them to a safe set of characters.
+ */
+static void
+hdfs_validate_identifier(const char *name, const char *optname)
+{
+	const char *p;
+
+	for (p = name; *p; p++)
+	{
+		if (!isalnum((unsigned char) *p) && *p != '_')
+			ereport(ERROR,
+					(errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+					 errmsg("invalid character '%c' in %s option", *p, optname),
+					 errhint("%s must contain only alphanumeric characters and underscores.",
+							 optname)));
+	}
+}
+
+/*
  * Fetch the options for a hdfs_fdw foreign table.
  */
 hdfs_opt *
@@ -217,10 +243,16 @@ hdfs_get_options(Oid foreigntableid)
 			opt->password = defGetString(def);
 
 		if (strcmp(def->defname, "dbname") == 0)
+		{
 			opt->dbname = defGetString(def);
+			hdfs_validate_identifier(opt->dbname, "dbname");
+		}
 
 		if (strcmp(def->defname, "table_name") == 0)
+		{
 			opt->table_name = defGetString(def);
+			hdfs_validate_identifier(opt->table_name, "table_name");
+		}
 
 		if (strcmp(def->defname, "client_type") == 0)
 		{
